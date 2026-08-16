@@ -358,3 +358,61 @@ body {
 .switch a {
   color: var(--text);
 }
+
+/* ---- 监控看板 ---- */
+.monitor h2 {
+  margin: 4px 0 8px;
+}
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.card.stat {
+  text-align: center;
+  margin-bottom: 0;
+}
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.monitor table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.monitor th,
+.monitor td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.monitor th {
+  color: var(--muted);
+  font-weight: 500;
+}
+.monitor .mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.monitor .msg-cell {
+  max-width: 420px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--muted);
+}
+.monitor code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}

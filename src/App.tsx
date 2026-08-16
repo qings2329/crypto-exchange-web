@@ -12,6 +12,7 @@ import { Margin } from "./pages/Margin";
 import { Wealth } from "./pages/Wealth";
 import { Risk } from "./pages/Risk";
 import { Notifications } from "./pages/Notifications";
+import { Monitor } from "./pages/Monitor";
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || "#/trade");
@@ -33,6 +34,7 @@ const PAGES: Record<string, () => JSX.Element> = {
   "/wealth": Wealth,
   "/risk": Risk,
   "/notifications": Notifications,
+  "/monitor": Monitor,
 };
 
 function Router() {

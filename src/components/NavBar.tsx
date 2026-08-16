@@ -10,6 +10,7 @@ const LINKS: { path: string; label: string }[] = [
   { path: "/wealth", label: "理财" },
   { path: "/risk", label: "风控" },
   { path: "/notifications", label: "通知" },
+  { path: "/monitor", label: "监控" },
 ];
 
 export function NavBar() {
