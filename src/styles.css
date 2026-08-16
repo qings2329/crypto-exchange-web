@@ -327,6 +327,40 @@ body {
   color: var(--text);
   margin: 4px 0 2px;
 }
+.ostatus {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+.ostatus.pending {
+  color: #d29922;
+  border-color: #d29922;
+}
+.ostatus.paid {
+  color: #1f6feb;
+  border-color: #1f6feb;
+}
+.ostatus.completed {
+  color: var(--buy);
+  border-color: var(--buy);
+}
+.ostatus.cancelled {
+  color: var(--muted);
+}
+.ostatus.appeal {
+  color: var(--sell);
+  border-color: var(--sell);
+}
+.ostatus.unknown {
+  color: var(--muted);
+}
+.row-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .wform {
   margin-bottom: 16px;
   max-width: 420px;

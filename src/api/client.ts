@@ -178,6 +178,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  otcUpdateOrderStatus: (orderId: number, status: OtcOrderStatus) =>
+    request<{ order_id: number; status: string }>(`/api/v1/otc/orders/${orderId}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
 
   // ---- 杠杆 ----
   marginAccount: () => request("/api/v1/margin/account"),
@@ -246,6 +251,9 @@ export interface OtcOrderPayload {
   ad_id: number;
   amount: number;
 }
+
+// OTC 订单状态机：待付款 -> 已付款 -> 已完成；或走向取消/申诉。
+export type OtcOrderStatus = "pending" | "paid" | "completed" | "cancelled" | "appeal";
 
 // ---------- 监控查询（后端聚合接口返回结构）----------
 export interface MonitorSummaryRemote {
