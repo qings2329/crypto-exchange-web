@@ -173,6 +173,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  otcPlaceOrder: (payload: OtcOrderPayload) =>
+    request<{ order_id: number; status: string }>("/api/v1/otc/orders", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // ---- 杠杆 ----
   marginAccount: () => request("/api/v1/margin/account"),
@@ -234,6 +239,12 @@ export interface OtcAdPayload {
   max_amount: number; // 单笔最大数量
   payment_methods: string[]; // 支持的支付方式
   remark?: string; // 备注（可选）
+}
+
+// 针对某条广告下单的载荷。amount 为本次成交数量。
+export interface OtcOrderPayload {
+  ad_id: number;
+  amount: number;
 }
 
 // ---------- 监控查询（后端聚合接口返回结构）----------
