@@ -142,6 +142,16 @@ export const api = {
   futuresIndex: () => request("/api/v1/futures/index"),
   futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
   futuresWithdraws: () => request("/api/v1/futures/wallet/withdraws"),
+  futuresWithdraw: (payload: {
+    asset: string;
+    address: string;
+    amount: number;
+    network?: string;
+  }) =>
+    request<{ order_id: number; status: string }>("/api/v1/futures/wallet/withdraw", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // ---- 期权 ----
   optionContracts: () => request("/api/v1/options/contracts"),
