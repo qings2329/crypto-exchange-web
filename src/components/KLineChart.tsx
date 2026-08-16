@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, connectMarketWS, type Kline } from "../api/client";
+import { api, connectKlineWS, type Kline } from "../api/client";
 import { reportWsDrop } from "../lib/monitor";
 
 interface Props {
@@ -66,25 +66,36 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // 实时最新价回填最后一根蜡烛
+  // 实时 K 线：专用 WS 通道推送整根蜡烛（含量、自动翻根）
   useEffect(() => {
     const wasLive = { current: false };
-    const stop = connectMarketWS(
+    const stop = connectKlineWS(
       symbol,
-      (t) => {
+      interval,
+      (k) => {
         setLive(true);
         wasLive.current = true;
         const list = dataRef.current;
-        if (list.length === 0) return;
+        if (list.length === 0) {
+          // 历史尚未返回，先暂存这一根
+          const next = [k];
+          dataRef.current = next;
+          setData(next);
+          return;
+        }
         const last = list[list.length - 1];
-        const price = t.last;
-        const next: Kline = {
-          ...last,
-          c: price,
-          h: Math.max(last.h, price),
-          l: Math.min(last.l, price),
-        };
-        const updated = list.slice(0, -1).concat(next);
+        let updated: Kline[];
+        if (k.t === last.t) {
+          // 同一根：替换
+          updated = list.slice(0, -1).concat(k);
+        } else if (k.t > last.t) {
+          // 新周期：追加并裁剪到 limit
+          updated = list.concat(k);
+          if (updated.length > limit) updated = updated.slice(updated.length - limit);
+        } else {
+          // 乱序/历史回填：忽略，避免破坏时序
+          return;
+        }
         dataRef.current = updated;
         setData(updated);
       },
@@ -100,7 +111,7 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
       setLive(false);
       stop();
     };
-  }, [symbol]);
+  }, [symbol, interval, limit]);
 
   // 绘制
   useEffect(() => {

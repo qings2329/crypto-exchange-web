@@ -287,3 +287,33 @@ export function connectMarketWS(
   }
   return () => ws.close();
 }
+
+// 连接 K 线 WS：按 symbol+interval 订阅，每次成交推送当前整根蜡烛（含量、自动翻根）。
+// 消息体约定为 Kline 对象本身，或 {type:'kline',data} 包裹。
+export function connectKlineWS(
+  symbol: string,
+  interval: string,
+  onKline: (k: Kline) => void,
+  onClose?: () => void
+): () => void {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(
+    `${proto}://${location.host}/api/v1/market/kline/ws?symbol=${encodeURIComponent(
+      symbol
+    )}&interval=${encodeURIComponent(interval)}`
+  );
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      const k: Kline | undefined = msg && "t" in msg ? (msg as Kline) : msg?.data;
+      if (k && typeof k.t === "number") onKline(k);
+    } catch {
+      /* ignore */
+    }
+  };
+  if (onClose) {
+    ws.onclose = onClose;
+    ws.onerror = onClose;
+  }
+  return () => ws.close();
+}
