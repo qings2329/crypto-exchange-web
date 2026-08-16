@@ -1,0 +1,360 @@
+:root {
+  --bg: #0e1117;
+  --panel: #161b22;
+  --border: #232a33;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --buy: #2ea043;
+  --sell: #cf2430;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-weight: 600;
+}
+.symbol {
+  color: var(--muted);
+}
+
+.ticker {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ticker .last {
+  font-size: 22px;
+  font-weight: 600;
+}
+.muted {
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.orderbook {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.ob-head,
+.ob-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+}
+.ob-head {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ob-row.ask span:first-child {
+  color: var(--sell);
+}
+.ob-row.bid span:first-child {
+  color: var(--buy);
+}
+.ob-spread {
+  height: 8px;
+}
+
+.orderform {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.seg {
+  display: flex;
+  gap: 8px;
+}
+.seg button {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.seg button.active.buy {
+  background: var(--buy);
+  border-color: var(--buy);
+}
+.seg button.active.sell {
+  background: var(--sell);
+  border-color: var(--sell);
+}
+.orderform label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--muted);
+  gap: 4px;
+}
+.orderform input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px;
+  border-radius: 6px;
+}
+.submit {
+  padding: 10px;
+  background: var(--buy);
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.msg {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- 导航栏 ---- */
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.navbar .brand {
+  font-weight: 700;
+}
+.navbar .links {
+  display: flex;
+  gap: 14px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.navbar .links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+}
+.navbar .links a.active {
+  color: var(--text);
+  font-weight: 600;
+}
+.navbar .right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.navbar .uid {
+  color: var(--muted);
+  font-size: 13px;
+}
+.navbar .logout {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.content {
+  padding: 16px 20px;
+}
+
+/* ---- 通用页面/卡片 ---- */
+.page h2 {
+  margin: 4px 0 16px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+.cell-json {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 360px;
+  white-space: pre-wrap;
+}
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+.kv-row {
+  display: contents;
+}
+.kv-k {
+  color: var(--muted);
+}
+.kv-v {
+  word-break: break-all;
+}
+.raw {
+  font-size: 13px;
+  margin: 0;
+}
+.error {
+  color: #ff7b72;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.ok {
+  color: var(--buy);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* ---- 实时指示点 ---- */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: inline-block;
+}
+.dot.live {
+  background: var(--buy);
+  box-shadow: 0 0 6px var(--buy);
+}
+.ob-foot {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+/* ---- 登录/注册 ---- */
+.auth-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 70vh;
+}
+.auth-card {
+  width: 340px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.auth-card h2 {
+  margin: 0 0 4px;
+}
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--muted);
+  gap: 4px;
+}
+.auth-card input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px;
+  border-radius: 6px;
+}
+.auth-card button {
+  padding: 10px;
+  background: var(--buy);
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.auth-card button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.code-row {
+  display: flex;
+  gap: 8px;
+}
+.code-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px;
+  border-radius: 6px;
+}
+.code-row button {
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.switch {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.switch a {
+  color: var(--text);
+}
