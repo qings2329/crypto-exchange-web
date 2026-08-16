@@ -7,10 +7,13 @@
   "scripts": {
     "start": "node monitor-server.mjs",
     "start:express": "node monitor-express.mjs",
+    "start:kline": "node kline-server.mjs",
     "test": "MONITOR_API_KEY=secret node --test",
-    "test:e2e": "node monitor-e2e.mjs"
+    "test:e2e": "node monitor-e2e.mjs",
+    "test:kline": "node kline-ws.e2e.mjs"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
   }
 }

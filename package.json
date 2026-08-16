@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "npm --prefix server install --no-audit --no-fund && npm --prefix server test && node server/monitor-e2e.mjs",
     "test:server": "npm --prefix server install --no-audit --no-fund && npm --prefix server test",
-    "test:e2e": "npm --prefix server install --no-audit --no-fund && node server/monitor-e2e.mjs"
+    "test:e2e": "npm --prefix server install --no-audit --no-fund && node server/monitor-e2e.mjs",
+    "test:kline": "npm --prefix server install --no-audit --no-fund && node server/kline-ws.e2e.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
