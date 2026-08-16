@@ -8,8 +8,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // REST 与 WebSocket 都走网关 :8080（ws:true 支持升级）
-      "/api": { target: "http://localhost:8080", ws: true },
+      // REST 与 WebSocket 都走网关（ws:true 支持升级）。
+      // 默认 :8080；可用 BACKEND_TARGET 环境变量覆盖（例如本地 mock 跑在别的端口时）。
+      "/api": { target: process.env.BACKEND_TARGET || "http://localhost:8080", ws: true },
     },
   },
 });
