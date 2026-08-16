@@ -130,6 +130,13 @@ export const api = {
     ),
   getTicker: (symbol: string) =>
     request<Ticker>(`/api/v1/market/ticker?symbol=${encodeURIComponent(symbol)}`),
+  // ---- 行情 K 线 ----
+  getKline: (symbol: string, interval = "1m", limit = 500) =>
+    request<Kline[]>(
+      `/api/v1/market/kline?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(
+        interval
+      )}&limit=${limit}`
+    ),
   placeOrder: (symbol: string, side: "buy" | "sell", price: number, qty: number) =>
     request<{ order_id: number; status: string }>("/api/v1/spot/order", {
       method: "POST",
@@ -200,6 +207,16 @@ export interface Ticker {
   best_bid: number;
   best_ask: number;
   timestamp: number;
+}
+
+// 单根 K 线（OHLCV）。t 为毫秒时间戳，o/h/l/c/v 分别为开/高/低/收/量。
+export interface Kline {
+  t: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
 }
 
 // ---------- 监控查询（后端聚合接口返回结构）----------
