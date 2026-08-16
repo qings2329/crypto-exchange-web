@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { api, connectSpotWS, type Depth } from "../api/client";
+import { reportWsDrop } from "../lib/monitor";
 
 // 订单簿：WebSocket 实时接收深度推送；首屏与 WS 缺失时回退 REST 拉取。
 export function OrderBook({ symbol }: { symbol: string }) {
   const [depth, setDepth] = useState<Depth | null>(null);
   const [live, setLive] = useState(false);
   const pollRef = useRef<number | null>(null);
+  const wasLive = useRef(false);
 
   useEffect(() => {
     let alive = true;
     setDepth(null);
     setLive(false);
+    wasLive.current = false;
 
     const loadRest = async () => {
       try {
@@ -22,12 +25,26 @@ export function OrderBook({ symbol }: { symbol: string }) {
     };
     loadRest();
 
-    const stopWs = connectSpotWS(symbol, (d) => {
-      if (alive) {
-        setDepth(d);
-        setLive(true);
+    const stopWs = connectSpotWS(
+      symbol,
+      (d) => {
+        if (alive) {
+          setDepth(d);
+          setLive(true);
+          wasLive.current = true;
+        }
+      },
+      undefined,
+      () => {
+        // WS 断线：仅在曾推送过（live true→false）时上报，卸载不报
+        if (!alive) return;
+        setLive(false);
+        if (wasLive.current) {
+          wasLive.current = false;
+          reportWsDrop(symbol);
+        }
       }
-    });
+    );
 
     pollRef.current = window.setInterval(loadRest, 2000);
 

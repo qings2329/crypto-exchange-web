@@ -1,0 +1,16 @@
+{
+  "name": "crypto-exchange-monitor-skeleton",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "监控后端接口骨架示例（含零依赖 http 版与 Express 版，内存存储）",
+  "scripts": {
+    "start": "node monitor-server.mjs",
+    "start:express": "node monitor-express.mjs",
+    "test": "MONITOR_API_KEY=secret node --test",
+    "test:e2e": "node monitor-e2e.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

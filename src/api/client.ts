@@ -168,6 +168,11 @@ export const api = {
 
   // ---- 通知 ----
   notifications: () => request("/api/v1/notification/admin/list"),
+
+  // ---- 监控（服务端聚合，需后端实现 /api/v1/monitor/*）----
+  monitorSummary: () => request<MonitorSummaryRemote>("/api/v1/monitor/summary"),
+  monitorEvents: (limit = 50) =>
+    request<MonitorEventItem[]>("/api/v1/monitor/events?limit=" + limit),
 };
 
 // ---------- 类型 ----------
@@ -187,12 +192,34 @@ export interface Ticker {
   timestamp: number;
 }
 
+// ---------- 监控查询（后端聚合接口返回结构）----------
+export interface MonitorSummaryRemote {
+  errors: number; // 全局错误总数
+  apiErrors: number; // 接口异常总数
+  wsDrops: number; // WS 掉线总数
+  vitals: Record<string, number>; // 最新/聚合的核心指标
+  total: number; // 事件总数
+  range?: string; // 聚合窗口，例如 "24h"
+}
+
+export interface MonitorEventItem {
+  ts: number;
+  type: "error" | "api_error" | "vital" | "ws_drop" | "custom";
+  name?: string;
+  message?: string;
+  code?: number;
+  status?: number;
+  value?: number;
+  meta?: Record<string, unknown>;
+}
+
 // ---------- WebSocket 助手 ----------
 // 连接现货行情 WS：推送 {type:'depth',data} 与 {type:'trade',data}。
 export function connectSpotWS(
   symbol: string,
   onDepth: (d: Depth) => void,
-  onTrade?: (t: any) => void
+  onTrade?: (t: any) => void,
+  onClose?: () => void
 ): () => void {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/api/v1/spot/ws?symbol=${encodeURIComponent(symbol)}`);
@@ -205,11 +232,19 @@ export function connectSpotWS(
       /* ignore */
     }
   };
+  if (onClose) {
+    ws.onclose = onClose;
+    ws.onerror = onClose;
+  }
   return () => ws.close();
 }
 
 // 连接行情 WS：直接广播 Ticker 快照（即 ticker 对象本身）。
-export function connectMarketWS(symbol: string, onTicker: (t: Ticker) => void): () => void {
+export function connectMarketWS(
+  symbol: string,
+  onTicker: (t: Ticker) => void,
+  onClose?: () => void
+): () => void {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/api/v1/market/ws?symbol=${encodeURIComponent(symbol)}`);
   ws.onmessage = (ev) => {
@@ -219,5 +254,9 @@ export function connectMarketWS(symbol: string, onTicker: (t: Ticker) => void): 
       /* ignore */
     }
   };
+  if (onClose) {
+    ws.onclose = onClose;
+    ws.onerror = onClose;
+  }
   return () => ws.close();
 }
