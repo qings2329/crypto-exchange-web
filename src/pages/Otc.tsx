@@ -13,6 +13,7 @@ export function Otc() {
   const [adsErr, setAdsErr] = useState("");
   const [adsLoading, setAdsLoading] = useState(false);
   const [filter, setFilter] = useState("");
+  const [sideTab, setSideTab] = useState<"all" | "buy" | "sell">("all");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
@@ -36,9 +37,13 @@ export function Otc() {
   const filtered = useMemo(() => {
     if (!Array.isArray(ads)) return ads;
     const kw = filter.trim().toLowerCase();
-    if (!kw) return ads;
-    return (ads as unknown[]).filter((row) => JSON.stringify(row).toLowerCase().includes(kw));
-  }, [ads, filter]);
+    return (ads as unknown[]).filter((row) => {
+      const r = row as Record<string, unknown> | null;
+      if (sideTab !== "all" && String(r?.["side"] ?? "").toLowerCase() !== sideTab) return false;
+      if (kw && !JSON.stringify(row).toLowerCase().includes(kw)) return false;
+      return true;
+    });
+  }, [ads, filter, sideTab]);
 
   const total = Array.isArray(filtered) ? filtered.length : 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -193,12 +198,33 @@ export function Otc() {
           </div>
         </div>
 
+        <div className="tabs">
+          {(
+            [
+              { k: "all", label: "全部" },
+              { k: "buy", label: "买币" },
+              { k: "sell", label: "卖币" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.k}
+              className={sideTab === t.k ? "tab active" : "tab"}
+              onClick={() => {
+                setSideTab(t.k);
+                setPage(0);
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         {adsErr ? (
           <div className="error">加载失败：{adsErr}</div>
         ) : ads === undefined ? (
           <div className="muted">加载中…</div>
         ) : total === 0 ? (
-          <div className="muted">{filter ? "无匹配广告" : "暂无广告"}</div>
+          <div className="muted">{filter || sideTab !== "all" ? "无匹配广告" : "暂无广告"}</div>
         ) : (
           <>
             <JsonTable data={pageRows} />
