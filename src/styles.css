@@ -269,6 +269,25 @@ body {
   padding: 5px 8px;
   border-radius: 6px;
 }
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tab {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.tab.active {
+  color: var(--text);
+  border-color: var(--buy);
+  background: rgba(46, 160, 67, 0.12);
+}
 .wform {
   margin-bottom: 16px;
   max-width: 420px;
