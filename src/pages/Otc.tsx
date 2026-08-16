@@ -1,14 +1,79 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { ApiTable } from "../components/ApiTable";
-import { JsonTable } from "../components/JsonTable";
 
 const ADS_EP = "/api/v1/otc/advertisements";
 const PAGE_SIZES = [10, 20, 50];
 
-// OTC 场外交易：发布广告表单 + 广告列表（筛选/分页）+ 我的订单 + 交易对手。
+type AdRow = Record<string, unknown>;
+
+// 读取广告 id（兼容 id / ad_id 两种字段名）
+function adId(ad: AdRow): number | null {
+  const v = ad["id"] ?? ad["ad_id"];
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) && n !== null ? n : null;
+}
+
+function cell(ad: AdRow, key: string): string {
+  const v = ad[key];
+  if (v === null || v === undefined || v === "") return "--";
+  if (Array.isArray(v)) return v.join("、");
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+// 广告表格：固定列 + 操作列（一键下单）
+function AdsTable({ rows, onOrder }: { rows: AdRow[]; onOrder: (ad: AdRow) => void }) {
+  return (
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>方向</th>
+            <th>币种</th>
+            <th>法币</th>
+            <th>单价</th>
+            <th>数量区间</th>
+            <th>支付</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((ad, i) => {
+            const id = adId(ad);
+            const side = String(ad["side"] ?? "").toLowerCase();
+            const sideLabel = side === "buy" ? "买币" : side === "sell" ? "卖币" : cell(ad, "side");
+            return (
+              <tr key={id ?? i}>
+                <td>
+                  <span className={side === "buy" ? "otc-side buy" : side === "sell" ? "otc-side sell" : ""}>
+                    {sideLabel}
+                  </span>
+                </td>
+                <td>{cell(ad, "asset")}</td>
+                <td>{cell(ad, "fiat")}</td>
+                <td>{cell(ad, "price")}</td>
+                <td>
+                  {cell(ad, "min_amount")} ~ {cell(ad, "max_amount")}
+                </td>
+                <td>{cell(ad, "payment_methods")}</td>
+                <td>
+                  <button className="link-btn" disabled={id === null} onClick={() => onOrder(ad)}>
+                    下单
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// OTC 场外交易：发布广告表单 + 广告列表（筛选/分页/分Tab）+ 一键下单 + 我的订单 + 交易对手。
 export function Otc() {
-  // ---- 广告列表（客户端筛选 + 分页）----
+  // ---- 广告列表（客户端筛选 + 分页 + 分Tab）----
   const [ads, setAds] = useState<unknown>(undefined);
   const [adsErr, setAdsErr] = useState("");
   const [adsLoading, setAdsLoading] = useState(false);
@@ -38,7 +103,7 @@ export function Otc() {
     if (!Array.isArray(ads)) return ads;
     const kw = filter.trim().toLowerCase();
     return (ads as unknown[]).filter((row) => {
-      const r = row as Record<string, unknown> | null;
+      const r = row as AdRow | null;
       if (sideTab !== "all" && String(r?.["side"] ?? "").toLowerCase() !== sideTab) return false;
       if (kw && !JSON.stringify(row).toLowerCase().includes(kw)) return false;
       return true;
@@ -120,6 +185,54 @@ export function Otc() {
     }
   };
 
+  // ---- 一键下单 ----
+  const [selectedAd, setSelectedAd] = useState<AdRow | null>(null);
+  const [orderAmount, setOrderAmount] = useState("");
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [orderMsg, setOrderMsg] = useState("");
+  const [ordersReload, setOrdersReload] = useState(0);
+
+  const submitOrder = async () => {
+    if (!selectedAd) return;
+    const id = adId(selectedAd);
+    if (id === null) {
+      setOrderMsg("广告缺少 id，无法下单");
+      return;
+    }
+    const amt = parseFloat(orderAmount);
+    if (!amt || amt <= 0) {
+      setOrderMsg("请输入正确数量");
+      return;
+    }
+    const min = Number(selectedAd["min_amount"]);
+    const max = Number(selectedAd["max_amount"]);
+    if (Number.isFinite(min) && amt < min) {
+      setOrderMsg(`数量不能低于 ${min}`);
+      return;
+    }
+    if (Number.isFinite(max) && amt > max) {
+      setOrderMsg(`数量不能高于 ${max}`);
+      return;
+    }
+    setOrderSubmitting(true);
+    try {
+      const r = await api.otcPlaceOrder({ ad_id: id, amount: amt });
+      setOrderMsg(`已下单，订单号 ${r.order_id}`);
+      setSelectedAd(null);
+      setOrderAmount("");
+      setOrdersReload((k) => k + 1);
+    } catch (e) {
+      setOrderMsg(`下单失败：${(e as Error).message}`);
+    } finally {
+      setOrderSubmitting(false);
+    }
+  };
+
+  const adPrice = selectedAd ? Number(selectedAd["price"]) : NaN;
+  const orderTotal = Number.isFinite(adPrice) && parseFloat(orderAmount) > 0
+    ? (adPrice as number) * parseFloat(orderAmount)
+    : NaN;
+
   return (
     <div className="page">
       <div className="page-head">
@@ -179,6 +292,41 @@ export function Otc() {
         </div>
       )}
 
+      {selectedAd && (
+        <div className="orderform wform">
+          <div className="order-head">
+            <strong>下单</strong>
+            <button className="link-btn" onClick={() => setSelectedAd(null)}>
+              关闭
+            </button>
+          </div>
+          <div className="order-meta">
+            {String(selectedAd["side"] ?? "").toLowerCase() === "buy" ? "买币" : "卖币"} ·{" "}
+            {cell(selectedAd, "asset")} · 单价 {cell(selectedAd, "price")} {cell(selectedAd, "fiat")}
+            （{cell(selectedAd, "min_amount")} ~ {cell(selectedAd, "max_amount")}）
+          </div>
+          <label>
+            数量
+            <input
+              value={orderAmount}
+              onChange={(e) => setOrderAmount(e.target.value)}
+              placeholder="0.00"
+              inputMode="decimal"
+            />
+          </label>
+          <div className="order-total">
+            预估总额：{Number.isFinite(orderTotal) ? orderTotal.toLocaleString() : "--"}{" "}
+            {cell(selectedAd, "fiat")}
+          </div>
+          <button className="submit" onClick={submitOrder} disabled={orderSubmitting}>
+            {orderSubmitting ? "提交中…" : "确认下单"}
+          </button>
+          {orderMsg && (
+            <div className={orderMsg.startsWith("下单失败") ? "error" : "ok"}>{orderMsg}</div>
+          )}
+        </div>
+      )}
+
       <section className="card">
         <div className="card-head">
           <h3>广告</h3>
@@ -227,7 +375,7 @@ export function Otc() {
           <div className="muted">{filter || sideTab !== "all" ? "无匹配广告" : "暂无广告"}</div>
         ) : (
           <>
-            <JsonTable data={pageRows} />
+            <AdsTable rows={pageRows as AdRow[]} onOrder={(ad) => { setSelectedAd(ad); setOrderAmount(""); setOrderMsg(""); }} />
             <div className="pager">
               <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}>
                 上一页
@@ -259,7 +407,7 @@ export function Otc() {
         )}
       </section>
 
-      <ApiTable title="我的订单" endpoint="/api/v1/otc/orders" empty="暂无订单" />
+      <ApiTable title="我的订单" endpoint="/api/v1/otc/orders" reloadKey={ordersReload} empty="暂无订单" />
       <ApiTable title="交易对手" endpoint="/api/v1/otc/counterparties" empty="暂无交易对手" />
     </div>
   );

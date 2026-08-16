@@ -288,6 +288,45 @@ body {
   border-color: var(--buy);
   background: rgba(46, 160, 67, 0.12);
 }
+.link-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--buy);
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.link-btn:hover:not(:disabled) {
+  border-color: var(--buy);
+}
+.link-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: var(--muted);
+}
+.otc-side.buy {
+  color: var(--buy);
+}
+.otc-side.sell {
+  color: var(--sell);
+}
+.order-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.order-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.order-total {
+  font-size: 13px;
+  color: var(--text);
+  margin: 4px 0 2px;
+}
 .wform {
   margin-bottom: 16px;
   max-width: 420px;
