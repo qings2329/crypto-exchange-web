@@ -168,6 +168,11 @@ export const api = {
   otcAds: () => request("/api/v1/otc/advertisements"),
   otcOrders: () => request("/api/v1/otc/orders"),
   otcCounterparties: () => request("/api/v1/otc/counterparties"),
+  otcCreateAd: (payload: OtcAdPayload) =>
+    request<{ ad_id: number; status: string }>("/api/v1/otc/advertisements", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // ---- 杠杆 ----
   marginAccount: () => request("/api/v1/margin/account"),
@@ -217,6 +222,18 @@ export interface Kline {
   l: number;
   c: number;
   v: number;
+}
+
+// 发布 OTC 广告的载荷。side 为买卖方向，payment_methods 为支付方式列表。
+export interface OtcAdPayload {
+  side: "buy" | "sell";
+  asset: string; // 交易币种，如 USDT
+  fiat: string; // 法币，如 CNY
+  price: number; // 单笔单价（法币/币）
+  min_amount: number; // 单笔最小数量
+  max_amount: number; // 单笔最大数量
+  payment_methods: string[]; // 支持的支付方式
+  remark?: string; // 备注（可选）
 }
 
 // ---------- 监控查询（后端聚合接口返回结构）----------
