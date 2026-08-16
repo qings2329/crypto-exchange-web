@@ -1,26 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
+import { api, type OtcOrderStatus } from "../api/client";
 import { ApiTable } from "../components/ApiTable";
 
 const ADS_EP = "/api/v1/otc/advertisements";
+const ORDERS_EP = "/api/v1/otc/orders";
 const PAGE_SIZES = [10, 20, 50];
 
 type AdRow = Record<string, unknown>;
 
-// 读取广告 id（兼容 id / ad_id 两种字段名）
-function adId(ad: AdRow): number | null {
-  const v = ad["id"] ?? ad["ad_id"];
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) && n !== null ? n : null;
+// 读取广告/订单 id（兼容 id / ad_id / order_id）
+function rowId(row: AdRow, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = row[k];
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isFinite(n) && n !== null) return n;
+  }
+  return null;
 }
+const adId = (ad: AdRow) => rowId(ad, ["id", "ad_id"]);
+const orderId = (o: AdRow) => rowId(o, ["id", "order_id"]);
 
-function cell(ad: AdRow, key: string): string {
-  const v = ad[key];
+function cell(row: AdRow, key: string): string {
+  const v = row[key];
   if (v === null || v === undefined || v === "") return "--";
   if (Array.isArray(v)) return v.join("、");
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
+const normStatus = (s: unknown) => String(s ?? "").toLowerCase();
 
 // 广告表格：固定列 + 操作列（一键下单）
 function AdsTable({ rows, onOrder }: { rows: AdRow[]; onOrder: (ad: AdRow) => void }) {
@@ -41,7 +48,7 @@ function AdsTable({ rows, onOrder }: { rows: AdRow[]; onOrder: (ad: AdRow) => vo
         <tbody>
           {rows.map((ad, i) => {
             const id = adId(ad);
-            const side = String(ad["side"] ?? "").toLowerCase();
+            const side = normStatus(ad["side"]);
             const sideLabel = side === "buy" ? "买币" : side === "sell" ? "卖币" : cell(ad, "side");
             return (
               <tr key={id ?? i}>
@@ -71,7 +78,96 @@ function AdsTable({ rows, onOrder }: { rows: AdRow[]; onOrder: (ad: AdRow) => vo
   );
 }
 
-// OTC 场外交易：发布广告表单 + 广告列表（筛选/分页/分Tab）+ 一键下单 + 我的订单 + 交易对手。
+// ---- 订单状态机 ----
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: "待付款",
+  paid: "已付款",
+  completed: "已完成",
+  cancelled: "已取消",
+  appeal: "申诉中",
+};
+const ORDER_TRANSITIONS: Record<string, { to: OtcOrderStatus; label: string }[]> = {
+  pending: [
+    { to: "paid", label: "标记已付款" },
+    { to: "cancelled", label: "取消" },
+  ],
+  paid: [
+    { to: "completed", label: "确认放行" },
+    { to: "appeal", label: "申诉" },
+  ],
+  appeal: [
+    { to: "completed", label: "仲裁放行" },
+    { to: "cancelled", label: "仲裁取消" },
+  ],
+};
+
+// 订单表格：状态徽标 + 按状态机展示可执行的流转操作
+function OrdersTable({
+  rows,
+  onTransition,
+}: {
+  rows: AdRow[];
+  onTransition: (id: number, to: OtcOrderStatus) => void;
+}) {
+  return (
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>订单号</th>
+            <th>方向</th>
+            <th>币种</th>
+            <th>数量</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o, i) => {
+            const id = orderId(o);
+            const st = normStatus(o["status"]);
+            const label = ORDER_STATUS_LABEL[st] ?? (o["status"] != null ? String(o["status"]) : "未知");
+            const cls = ORDER_STATUS_LABEL[st] ? st : "unknown";
+            const side = normStatus(o["side"]);
+            const sideLabel = side === "buy" ? "买币" : side === "sell" ? "卖币" : cell(o, "side");
+            const acts = ORDER_TRANSITIONS[st] ?? [];
+            return (
+              <tr key={id ?? i}>
+                <td>{id ?? "--"}</td>
+                <td>{sideLabel}</td>
+                <td>{cell(o, "asset")}</td>
+                <td>{cell(o, "amount")}</td>
+                <td>
+                  <span className={`ostatus ${cls}`}>{label}</span>
+                </td>
+                <td>
+                  {acts.length === 0 ? (
+                    <span className="muted">—</span>
+                  ) : (
+                    <span className="row-actions">
+                      {acts.map((a) => (
+                        <button
+                          key={a.to}
+                          className="link-btn"
+                          disabled={id === null}
+                          onClick={() => id !== null && onTransition(id, a.to)}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// OTC 场外交易：发布广告 + 广告列表（筛选/分页/分Tab）+ 一键下单 + 订单状态机 + 交易对手。
 export function Otc() {
   // ---- 广告列表（客户端筛选 + 分页 + 分Tab）----
   const [ads, setAds] = useState<unknown>(undefined);
@@ -104,7 +200,7 @@ export function Otc() {
     const kw = filter.trim().toLowerCase();
     return (ads as unknown[]).filter((row) => {
       const r = row as AdRow | null;
-      if (sideTab !== "all" && String(r?.["side"] ?? "").toLowerCase() !== sideTab) return false;
+      if (sideTab !== "all" && normStatus(r?.["side"]) !== sideTab) return false;
       if (kw && !JSON.stringify(row).toLowerCase().includes(kw)) return false;
       return true;
     });
@@ -233,6 +329,37 @@ export function Otc() {
     ? (adPrice as number) * parseFloat(orderAmount)
     : NaN;
 
+  // ---- 我的订单（状态机流转）----
+  const [orders, setOrders] = useState<unknown>(undefined);
+  const [ordersErr, setOrdersErr] = useState("");
+  const [ordersLoading, setOrdersLoading] = useState(false);
+
+  const loadOrders = useCallback(async () => {
+    setOrdersLoading(true);
+    try {
+      const d = await api.get(ORDERS_EP);
+      setOrders(d);
+      setOrdersErr("");
+    } catch (e) {
+      setOrdersErr((e as Error).message);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders, ordersReload]);
+
+  const transitionOrder = async (id: number, to: OtcOrderStatus) => {
+    try {
+      await api.otcUpdateOrderStatus(id, to);
+      loadOrders();
+    } catch (e) {
+      setOrdersErr((e as Error).message);
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-head">
@@ -301,9 +428,9 @@ export function Otc() {
             </button>
           </div>
           <div className="order-meta">
-            {String(selectedAd["side"] ?? "").toLowerCase() === "buy" ? "买币" : "卖币"} ·{" "}
-            {cell(selectedAd, "asset")} · 单价 {cell(selectedAd, "price")} {cell(selectedAd, "fiat")}
-            （{cell(selectedAd, "min_amount")} ~ {cell(selectedAd, "max_amount")}）
+            {normStatus(selectedAd["side"]) === "buy" ? "买币" : "卖币"} · {cell(selectedAd, "asset")} · 单价{" "}
+            {cell(selectedAd, "price")} {cell(selectedAd, "fiat")}（{cell(selectedAd, "min_amount")} ~{" "}
+            {cell(selectedAd, "max_amount")}）
           </div>
           <label>
             数量
@@ -375,7 +502,14 @@ export function Otc() {
           <div className="muted">{filter || sideTab !== "all" ? "无匹配广告" : "暂无广告"}</div>
         ) : (
           <>
-            <AdsTable rows={pageRows as AdRow[]} onOrder={(ad) => { setSelectedAd(ad); setOrderAmount(""); setOrderMsg(""); }} />
+            <AdsTable
+              rows={pageRows as AdRow[]}
+              onOrder={(ad) => {
+                setSelectedAd(ad);
+                setOrderAmount("");
+                setOrderMsg("");
+              }}
+            />
             <div className="pager">
               <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={safePage === 0}>
                 上一页
@@ -407,7 +541,26 @@ export function Otc() {
         )}
       </section>
 
-      <ApiTable title="我的订单" endpoint="/api/v1/otc/orders" reloadKey={ordersReload} empty="暂无订单" />
+      <section className="card">
+        <div className="card-head">
+          <h3>我的订单</h3>
+          <div className="card-actions">
+            <button className="refresh" onClick={loadOrders} disabled={ordersLoading}>
+              {ordersLoading ? "刷新中…" : "刷新"}
+            </button>
+          </div>
+        </div>
+        {ordersErr ? (
+          <div className="error">加载失败：{ordersErr}</div>
+        ) : orders === undefined ? (
+          <div className="muted">加载中…</div>
+        ) : !Array.isArray(orders) || (orders as unknown[]).length === 0 ? (
+          <div className="muted">暂无订单</div>
+        ) : (
+          <OrdersTable rows={orders as AdRow[]} onTransition={transitionOrder} />
+        )}
+      </section>
+
       <ApiTable title="交易对手" endpoint="/api/v1/otc/counterparties" empty="暂无交易对手" />
     </div>
   );
