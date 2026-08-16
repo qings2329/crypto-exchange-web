@@ -196,6 +196,54 @@ body {
 .page h2 {
   margin: 4px 0 16px;
 }
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 16px;
+}
+.page-head h2 {
+  margin: 0;
+}
+.refresh {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.card-head h3 {
+  margin: 0;
+}
+.filter {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  min-width: 180px;
+}
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wform {
+  margin-bottom: 16px;
+  max-width: 420px;
+}
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
