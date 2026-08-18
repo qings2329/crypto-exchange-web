@@ -1,25 +1,35 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { api, tokenStore } from "../api/client";
+import { roleAtLeast, type Role } from "./rbac";
 
 interface AuthCtxValue {
   uid: string | null;
+  role: Role | null;
   login: (target: string, password: string) => Promise<void>;
   logout: () => void;
+  isAdmin: boolean;
+  // 是否具备不低于 need 的角色等级。
+  hasRole: (need: Role) => boolean;
 }
 
 const AuthCtx = createContext<AuthCtxValue>({
   uid: null,
+  role: null,
   login: async () => {},
   logout: () => {},
+  isAdmin: false,
+  hasRole: () => false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [uid, setUid] = useState<string | null>(tokenStore.uid);
+  const [role, setRole] = useState<Role | null>((tokenStore.role as Role) ?? null);
 
   const login = async (target: string, password: string) => {
     const res = await api.login(target, password);
-    tokenStore.set(res.access_token, res.refresh_token, String(res.user_id));
+    tokenStore.set(res.access_token, res.refresh_token, String(res.user_id), res.role);
     setUid(String(res.user_id));
+    if (res.role) setRole(res.role as Role);
   };
 
   const logout = () => {
@@ -27,11 +37,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (rt) api.logout(rt).catch(() => {});
     tokenStore.clear();
     setUid(null);
+    setRole(null);
     location.hash = "/login";
   };
 
   return (
-    <AuthCtx.Provider value={{ uid, login, logout }}>{children}</AuthCtx.Provider>
+    <AuthCtx.Provider
+      value={{
+        uid,
+        role,
+        login,
+        logout,
+        isAdmin: role === "admin",
+        hasRole: (need) => roleAtLeast(role, need),
+      }}
+    >
+      {children}
+    </AuthCtx.Provider>
   );
 }
 

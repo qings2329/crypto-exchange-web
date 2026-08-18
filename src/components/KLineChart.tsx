@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, connectKlineWS, type Kline } from "../api/client";
 import { reportWsDrop } from "../lib/monitor";
+import { useI18n } from "../i18n";
 
 interface Props {
   symbol: string;
@@ -17,6 +18,7 @@ const PAD = { top: 10, right: 64, bottom: 22, left: 8 };
 // 零依赖的 Canvas K 线组件：拉取历史 K 线后自绘蜡烛图，
 // 并通过行情 WS 将最新价实时回填到最后一根蜡烛，实现轻量实时更新。
 export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
+  const { t } = useI18n();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataRef = useRef<Kline[]>([]);
@@ -43,7 +45,7 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
       })
       .catch((e: unknown) => {
         if (!alive) return;
-        setError(e instanceof Error ? e.message : "加载 K 线失败");
+        setError(e instanceof Error ? e.message : t("trade.klineErr"));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -211,13 +213,13 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
     <div className="kchart">
       <div className="kchart-head">
         <span className="kchart-title">{symbol} · {interval}</span>
-        <span className={live ? "dot live" : "dot"} title={live ? "实时" : "离线"} />
+        <span className={live ? "dot live" : "dot"} title={live ? t("trade.live") : t("trade.offline")} />
       </div>
       <div className="kchart-canvas-wrap" ref={wrapRef}>
-        {loading && <div className="kchart-tip">加载中…</div>}
+        {loading && <div className="kchart-tip">{t("common.loading")}</div>}
         {!loading && error && <div className="kchart-tip err">{error}</div>}
         {!loading && !error && data.length === 0 && (
-          <div className="kchart-tip">暂无 K 线数据</div>
+          <div className="kchart-tip">{t("trade.noKline")}</div>
         )}
         <canvas ref={canvasRef} className="kchart-canvas" />
       </div>
