@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { AuthProvider } from "./lib/auth";
+import { RequireRole, type Role } from "./lib/rbac";
+import { ConfirmProvider } from "./components/Confirm";
+import { I18nProvider } from "./i18n";
 import { NavBar } from "./components/NavBar";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -13,11 +16,18 @@ import { Wealth } from "./pages/Wealth";
 import { Risk } from "./pages/Risk";
 import { Notifications } from "./pages/Notifications";
 import { Monitor } from "./pages/Monitor";
+import { Settings } from "./pages/Settings";
+import { ApiKeys } from "./pages/ApiKeys";
+import { Home } from "./pages/Home";
+import { Announcements } from "./pages/Announcements";
+import { History } from "./pages/History";
+import { Dashboard } from "./pages/Dashboard";
+import { Audit } from "./pages/Audit";
 
 function useHash() {
-  const [hash, setHash] = useState(location.hash || "#/trade");
+  const [hash, setHash] = useState(location.hash || "#/home");
   useEffect(() => {
-    const on = () => setHash(location.hash || "#/trade");
+    const on = () => setHash(location.hash || "#/home");
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
@@ -25,6 +35,9 @@ function useHash() {
 }
 
 const PAGES: Record<string, () => JSX.Element> = {
+  "/home": Home,
+  "/announcements": Announcements,
+  "/history": History,
   "/trade": Trade,
   "/wallet": Wallet,
   "/futures": Futures,
@@ -35,6 +48,24 @@ const PAGES: Record<string, () => JSX.Element> = {
   "/risk": Risk,
   "/notifications": Notifications,
   "/monitor": Monitor,
+  "/settings": Settings,
+  "/apikeys": ApiKeys,
+  "/admin": Dashboard,
+  "/audit": Audit,
+};
+
+// 各页面所需的最低角色。缺省为 user（仅登录即可），运营/管理类页面提升为 operator/admin。
+const PAGE_ROLES: Record<string, Role> = {
+  "/otc": "operator",
+  "/risk": "admin",
+  "/notifications": "admin",
+  "/monitor": "admin",
+  "/options": "admin",
+  "/futures": "admin",
+  "/margin": "admin",
+  "/announcements": "admin",
+  "/admin": "admin",
+  "/audit": "admin",
 };
 
 function Router() {
@@ -44,18 +75,16 @@ function Router() {
   if (path === "/login") return <Login />;
   if (path === "/register") return <Register />;
 
-  // 需登录的受保护页面：无 token 则跳转登录。
-  if (!localStorage.getItem("cx_access_token")) {
-    location.hash = "/login";
-    return <Login />;
-  }
+  const Page = PAGES[path] ?? Home;
+  const need = PAGE_ROLES[path] ?? "user";
 
-  const Page = PAGES[path] ?? Trade;
   return (
     <>
       <NavBar />
       <main className="content">
-        <Page />
+        <RequireRole role={need}>
+          <Page />
+        </RequireRole>
       </main>
     </>
   );
@@ -63,8 +92,12 @@ function Router() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Router />
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <ConfirmProvider>
+          <Router />
+        </ConfirmProvider>
+      </AuthProvider>
+    </I18nProvider>
   );
 }

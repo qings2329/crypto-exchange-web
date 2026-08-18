@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useAuth } from "../lib/auth";
+import { useI18n } from "../i18n";
 
 export function Login() {
   const { login } = useAuth();
+  const { t } = useI18n();
   const [target, setTarget] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
@@ -25,13 +27,13 @@ export function Login() {
   return (
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
-        <h2>登录</h2>
+        <h2>{t("login.title")}</h2>
         <label>
-          账号（邮箱/手机）
+          {t("login.account")}
           <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="user1" />
         </label>
         <label>
-          密码
+          {t("login.password")}
           <input
             type="password"
             value={password}
@@ -41,10 +43,18 @@ export function Login() {
         </label>
         {err && <div className="error">{err}</div>}
         <button type="submit" disabled={busy}>
-          {busy ? "登录中…" : "登录"}
+          {busy ? t("login.submitting") : t("login.submit")}
         </button>
+        <div className="demo-accounts">
+          <div className="demo-title">{t("login.demoAccounts")}</div>
+          <ul>
+            <li><code>admin@ce.dev</code> / <code>Admin@123</code> · {t("login.role.admin")}</li>
+            <li><code>op@ce.dev</code> / <code>Op@123</code> · {t("login.role.operator")}</li>
+            <li><code>user@ce.dev</code> / <code>User@123</code> · {t("login.role.user")}</li>
+          </ul>
+        </div>
         <div className="switch">
-          没有账号？<a href="#/register">注册</a>
+          {t("login.noAccount")}<a href="#/register">{t("login.register")}</a>
         </div>
       </form>
     </div>

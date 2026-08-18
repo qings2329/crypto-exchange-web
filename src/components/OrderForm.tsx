@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { api } from "../api/client";
+import { useI18n } from "../i18n";
 
 // 下单表单：限价买/卖。下单走网关 -> spot 服务 -> 撮合引擎。
 export function OrderForm({ symbol }: { symbol: string }) {
+  const { t } = useI18n();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("");
@@ -13,14 +15,14 @@ export function OrderForm({ symbol }: { symbol: string }) {
     const p = parseFloat(price);
     const q = parseFloat(qty);
     if (!p || !q) {
-      setMsg("请输入价格和数量");
+      setMsg(t("trade.errPriceQty"));
       return;
     }
     try {
       const r = await api.placeOrder(symbol, side, p, q);
-      setMsg(`已提交，订单号 ${r.order_id}`);
+      setMsg(t("trade.submitted", { id: r.order_id }));
     } catch (e) {
-      setMsg(`下单失败: ${(e as Error).message}`);
+      setMsg(t("trade.fail", { err: (e as Error).message }));
     }
   };
 
@@ -31,25 +33,25 @@ export function OrderForm({ symbol }: { symbol: string }) {
           className={side === "buy" ? "active buy" : ""}
           onClick={() => setSide("buy")}
         >
-          买入
+          {t("trade.buy")}
         </button>
         <button
           className={side === "sell" ? "active sell" : ""}
           onClick={() => setSide("sell")}
         >
-          卖出
+          {t("trade.sell")}
         </button>
       </div>
       <label>
-        价格
+        {t("trade.price")}
         <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />
       </label>
       <label>
-        数量
+        {t("trade.qty")}
         <input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0.0000" />
       </label>
       <button className="submit" onClick={submit}>
-        下单
+        {t("trade.submit")}
       </button>
       {msg && <div className="msg">{msg}</div>}
     </div>

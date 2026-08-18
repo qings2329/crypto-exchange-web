@@ -1,8 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
+import { api, type LedgerEntry } from "../api/client";
+import { useI18n } from "../i18n";
+import { formatDateTime } from "../lib/timezone";
 
 const BALANCE_EP = "/api/v1/futures/wallet/balance";
 const WITHDRAWS_EP = "/api/v1/futures/wallet/withdraws";
+
+// 资金流水业务类型 -> 文案 key（对齐 wallet.biz.*）。
+const BIZ_KEY: Record<string, string> = {
+  deposit: "wallet.biz.deposit",
+  withdraw: "wallet.biz.withdraw",
+  transfer: "wallet.biz.transfer",
+  funding: "wallet.biz.funding",
+  liquidation: "wallet.biz.liquidation",
+  repay: "wallet.biz.repay",
+  open: "wallet.biz.open",
+  close: "wallet.biz.close",
+  fee: "wallet.biz.fee",
+};
+
+function bizLabel(t: (k: string) => string, biz: string): string {
+  return BIZ_KEY[biz] ? t(BIZ_KEY[biz]) : biz;
+}
+
+// 后端 Entry.Time 为 Unix 纳秒；统一按时区格式化展示。
+function fmtNs(ts: number): string {
+  return formatDateTime(ts);
+}
 
 // 渲染单元格：对象/数组折叠为 JSON，其余转字符串
 function renderCell(v: unknown) {
@@ -13,10 +37,11 @@ function renderCell(v: unknown) {
 
 // 自适应表格：数组 -> 行；对象(值为对象) -> 资产 + 各字段列；对象(值为标量) -> 键值
 function AdaptiveTable({ data }: { data: unknown }) {
-  if (data === null || data === undefined) return <div className="muted">无数据</div>;
+  const { t } = useI18n();
+  if (data === null || data === undefined) return <div className="muted">{t("common.noData")}</div>;
 
   if (Array.isArray(data)) {
-    if (data.length === 0) return <div className="muted">无数据</div>;
+    if (data.length === 0) return <div className="muted">{t("common.noData")}</div>;
     const cols = new Set<string>();
     for (const row of data) {
       if (row && typeof row === "object") Object.keys(row as object).forEach((k) => cols.add(k));
@@ -50,7 +75,7 @@ function AdaptiveTable({ data }: { data: unknown }) {
     if (valuesAreObjects) {
       const cols = new Set<string>();
       for (const [, v] of entries) Object.keys(v as object).forEach((k) => cols.add(k));
-      const columns = ["资产", ...cols];
+      const columns = [t("wallet.col.asset"), ...cols];
       return (
         <div className="table-wrap">
           <table className="data-table">
@@ -88,16 +113,23 @@ function AdaptiveTable({ data }: { data: unknown }) {
 
 // 钱包：以合约钱包余额接口为统一资产视图（现货余额经撮合引擎内存态，无独立 HTTP 接口）。
 export function Wallet() {
+  const { t } = useI18n();
   const [balance, setBalance] = useState<unknown>(undefined);
   const [balanceErr, setBalanceErr] = useState("");
   const [withdraws, setWithdraws] = useState<unknown>(undefined);
   const [withdrawsErr, setWithdrawsErr] = useState("");
+  const [ledger, setLedger] = useState<LedgerEntry[] | undefined>(undefined);
+  const [ledgerErr, setLedgerErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [b, w] = await Promise.allSettled([api.get(BALANCE_EP), api.get(WITHDRAWS_EP)]);
+    const [b, w, l] = await Promise.allSettled([
+      api.get(BALANCE_EP),
+      api.get(WITHDRAWS_EP),
+      api.walletLedger(),
+    ]);
     if (b.status === "fulfilled") {
       setBalance(b.value);
       setBalanceErr("");
@@ -109,6 +141,12 @@ export function Wallet() {
       setWithdrawsErr("");
     } else {
       setWithdrawsErr((w.reason as Error).message);
+    }
+    if (l.status === "fulfilled") {
+      setLedger(l.value as LedgerEntry[]);
+      setLedgerErr("");
+    } else {
+      setLedgerErr((l.reason as Error).message);
     }
     setLoading(false);
   }, []);
@@ -123,6 +161,20 @@ export function Wallet() {
     const kw = filter.trim().toLowerCase();
     return (withdraws as unknown[]).filter((row) => JSON.stringify(row).toLowerCase().includes(kw));
   }, [filter, withdraws]);
+
+  // 资金流水客户端筛选（按资产 / 业务类型文本匹配）
+  const [ledgerFilter, setLedgerFilter] = useState("");
+  const filteredLedger = useMemo(() => {
+    if (!Array.isArray(ledger)) return [];
+    const kw = ledgerFilter.trim().toLowerCase();
+    if (!kw) return ledger;
+    return ledger.filter(
+      (e) =>
+        e.asset.toLowerCase().includes(kw) ||
+        bizLabel(t, e.biz_type).toLowerCase().includes(kw) ||
+        e.biz_type.toLowerCase().includes(kw)
+    );
+  }, [ledger, ledgerFilter]);
 
   // ---- 提现表单 ----
   const [showForm, setShowForm] = useState(false);
@@ -149,7 +201,7 @@ export function Wallet() {
     setFormMsg("");
     const amt = parseFloat(amount);
     if (!asset || !address || !amt || amt <= 0) {
-      setFormMsg("请填写资产、地址和正确金额");
+      setFormMsg(t("wallet.errForm"));
       return;
     }
     setSubmitting(true);
@@ -160,7 +212,7 @@ export function Wallet() {
         amount: amt,
         network: network || undefined,
       });
-      setFormMsg(`已提交，提现单号 ${r.order_id}`);
+      setFormMsg(t("wallet.submitted", { id: r.order_id }));
       setShowForm(false);
       setAsset("");
       setAddress("");
@@ -168,7 +220,7 @@ export function Wallet() {
       setNetwork("");
       load();
     } catch (e) {
-      setFormMsg(`提现失败：${(e as Error).message}`);
+      setFormMsg(t("wallet.fail", { err: (e as Error).message }));
     } finally {
       setSubmitting(false);
     }
@@ -177,18 +229,18 @@ export function Wallet() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>钱包资产</h2>
+        <h2>{t("wallet.title")}</h2>
         <button className="refresh" onClick={load} disabled={loading}>
-          {loading ? "刷新中…" : "刷新"}
+          {loading ? t("common.loading") : t("common.refresh")}
         </button>
       </div>
 
       <section className="card">
-        <h3>余额</h3>
+        <h3>{t("wallet.balance")}</h3>
         {balanceErr ? (
-          <div className="error">加载失败：{balanceErr}</div>
+          <div className="error">{t("common.loadError", { err: balanceErr })}</div>
         ) : balance === undefined ? (
-          <div className="muted">加载中…</div>
+          <div className="muted">{t("common.loading")}</div>
         ) : (
           <AdaptiveTable data={balance} />
         )}
@@ -196,16 +248,16 @@ export function Wallet() {
 
       <section className="card">
         <div className="card-head">
-          <h3>提现记录</h3>
+          <h3>{t("wallet.withdraws")}</h3>
           <div className="card-actions">
             <input
               className="filter"
-              placeholder="筛选资产 / 状态…"
+              placeholder={t("wallet.filterPlaceholder")}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
             <button className="refresh" onClick={() => setShowForm((v) => !v)}>
-              {showForm ? "收起" : "申请提现"}
+              {showForm ? t("otc.collapse") : t("wallet.applyWithdraw")}
             </button>
           </div>
         </div>
@@ -213,12 +265,12 @@ export function Wallet() {
         {showForm && (
           <div className="orderform wform">
             <label>
-              资产
+              {t("wallet.asset")}
               <input
                 list="asset-options"
                 value={asset}
                 onChange={(e) => setAsset(e.target.value)}
-                placeholder="如 USDT"
+                placeholder={t("wallet.phAsset")}
               />
             </label>
             <datalist id="asset-options">
@@ -227,11 +279,11 @@ export function Wallet() {
               ))}
             </datalist>
             <label>
-              提现地址
-              <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x… / 链上地址" />
+              {t("wallet.address")}
+              <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("wallet.phAddress")} />
             </label>
             <label>
-              数量
+              {t("wallet.amount")}
               <input
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -240,24 +292,79 @@ export function Wallet() {
               />
             </label>
             <label>
-              网络（可选）
-              <input value={network} onChange={(e) => setNetwork(e.target.value)} placeholder="如 ERC20 / TRC20" />
+              {t("wallet.network")}
+              <input value={network} onChange={(e) => setNetwork(e.target.value)} placeholder={t("wallet.phNetwork")} />
             </label>
             <button className="submit" onClick={submitWithdraw} disabled={submitting}>
-              {submitting ? "提交中…" : "提交提现"}
+              {submitting ? t("common.loading") : t("wallet.submitWithdraw")}
             </button>
-            {formMsg && <div className={formMsg.startsWith("提现失败") ? "error" : "ok"}>{formMsg}</div>}
+            {formMsg && (
+              <div className={formMsg.startsWith(t("wallet.fail", { err: "" })) ? "error" : "ok"}>
+                {formMsg}
+              </div>
+            )}
           </div>
         )}
 
         {withdrawsErr ? (
-          <div className="error">加载失败：{withdrawsErr}</div>
+          <div className="error">{t("common.loadError", { err: withdrawsErr })}</div>
         ) : withdraws === undefined ? (
-          <div className="muted">加载中…</div>
+          <div className="muted">{t("common.loading")}</div>
         ) : Array.isArray(withdraws) && (withdraws as unknown[]).length === 0 ? (
-          <div className="muted">暂无提现记录</div>
+          <div className="muted">{t("wallet.noWithdraws")}</div>
         ) : (
           <AdaptiveTable data={filteredWithdraws} />
+        )}
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("wallet.ledger")}</h3>
+          <div className="card-actions">
+            <input
+              className="filter"
+              placeholder={t("wallet.ledgerFilterPlaceholder")}
+              value={ledgerFilter}
+              onChange={(e) => setLedgerFilter(e.target.value)}
+            />
+          </div>
+        </div>
+        {ledgerErr ? (
+          <div className="error">{t("common.loadError", { err: ledgerErr })}</div>
+        ) : ledger === undefined ? (
+          <div className="muted">{t("common.loading")}</div>
+        ) : filteredLedger.length === 0 ? (
+          <div className="muted">{t("wallet.noLedger")}</div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("wallet.col.time")}</th>
+                  <th>{t("wallet.col.asset")}</th>
+                  <th>{t("wallet.col.type")}</th>
+                  <th>{t("wallet.col.delta")}</th>
+                  <th>{t("wallet.col.balance")}</th>
+                  <th>{t("wallet.col.ref")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLedger.map((e) => (
+                  <tr key={e.id}>
+                    <td>{fmtNs(e.time)}</td>
+                    <td>{e.asset}</td>
+                    <td>{bizLabel(t, e.biz_type)}</td>
+                    <td className={e.delta >= 0 ? "otc-side buy" : "otc-side sell"}>
+                      {e.delta >= 0 ? "+" : ""}
+                      {e.delta.toLocaleString()}
+                    </td>
+                    <td>{e.balance.toLocaleString()}</td>
+                    <td className="cell-json">{e.ref || "--"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

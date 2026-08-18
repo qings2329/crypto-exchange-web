@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { api, connectSpotWS, type Depth } from "../api/client";
 import { reportWsDrop } from "../lib/monitor";
+import { useI18n } from "../i18n";
 
 // 订单簿：WebSocket 实时接收深度推送；首屏与 WS 缺失时回退 REST 拉取。
 export function OrderBook({ symbol }: { symbol: string }) {
+  const { t } = useI18n();
   const [depth, setDepth] = useState<Depth | null>(null);
   const [live, setLive] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -61,8 +63,8 @@ export function OrderBook({ symbol }: { symbol: string }) {
   return (
     <div className="orderbook">
       <div className="ob-head">
-        <span>价格</span>
-        <span>数量</span>
+        <span>{t("trade.obPrice")}</span>
+        <span>{t("trade.obQty")}</span>
       </div>
       {asks.map((r, i) => (
         <div className="ob-row ask" key={`a${i}`}>
@@ -77,7 +79,7 @@ export function OrderBook({ symbol }: { symbol: string }) {
           <span>{r.volume.toFixed(4)}</span>
         </div>
       ))}
-      <div className="ob-foot">{live ? "实时" : "轮询"}</div>
+      <div className="ob-foot">{live ? t("trade.live") : t("trade.polling")}</div>
     </div>
   );
 }

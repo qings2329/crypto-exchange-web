@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { api, connectMarketWS, type Ticker as TickerT } from "../api/client";
 import { reportWsDrop } from "../lib/monitor";
+import { useI18n } from "../i18n";
 
 // 行情条：优先用 WebSocket 实时推送，断线/未连接时回退 REST 轮询。
 export function TickerBar({ symbol }: { symbol: string }) {
+  const { t } = useI18n();
   const [ticker, setTicker] = useState<TickerT | null>(null);
   const [live, setLive] = useState(false);
   const pollRef = useRef<number | null>(null);
@@ -59,8 +61,8 @@ export function TickerBar({ symbol }: { symbol: string }) {
   return (
     <div className="ticker">
       <span className="last">{ticker ? ticker.last.toFixed(2) : "--"}</span>
-      <span className="muted">最新价</span>
-      <span className={live ? "dot live" : "dot"} title={live ? "实时推送" : "轮询"} />
+      <span className="muted">{t("trade.lastPrice")}</span>
+      <span className={live ? "dot live" : "dot"} title={live ? t("trade.livePush") : t("trade.polling")} />
     </div>
   );
 }

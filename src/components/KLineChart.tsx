@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, connectKlineWS, type Kline } from "../api/client";
 import { reportWsDrop } from "../lib/monitor";
+import { useI18n } from "../i18n";
 
 interface Props {
   symbol: string;
@@ -10,13 +11,15 @@ interface Props {
 
 const UP = "#16c784";
 const DOWN = "#ea3943";
-const GRID = "rgba(255,255,255,0.06)";
-const AXIS = "#8b95a5";
+// 网格/坐标轴颜色在绘制时从主题变量读取（随主题切换生效），避免浅色主题下白网格不可见。
+const FALLBACK_GRID = "rgba(255,255,255,0.06)";
+const FALLBACK_AXIS = "#8b95a5";
 const PAD = { top: 10, right: 64, bottom: 22, left: 8 };
 
 // 零依赖的 Canvas K 线组件：拉取历史 K 线后自绘蜡烛图，
 // 并通过行情 WS 将最新价实时回填到最后一根蜡烛，实现轻量实时更新。
 export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
+  const { t } = useI18n();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataRef = useRef<Kline[]>([]);
@@ -27,6 +30,8 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+  // 主题版本：data-theme 变化时自增，驱动 K 线重绘以应用新主题色。
+  const [themeVer, setThemeVer] = useState(0);
 
   // 加载历史 K 线
   useEffect(() => {
@@ -43,7 +48,7 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
       })
       .catch((e: unknown) => {
         if (!alive) return;
-        setError(e instanceof Error ? e.message : "加载 K 线失败");
+        setError(e instanceof Error ? e.message : t("trade.klineErr"));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -113,6 +118,14 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
     };
   }, [symbol, interval, limit]);
 
+  // 监听 <html data-theme> 变化，主题切换时触发重绘（让图表颜色跟随主题）。
+  useEffect(() => {
+    const el = document.documentElement;
+    const mo = new MutationObserver(() => setThemeVer((v) => v + 1));
+    mo.observe(el, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => mo.disconnect();
+  }, []);
+
   // 绘制
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -156,7 +169,10 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
     const yOf = (p: number) => PAD.top + ((max - p) / (max - min)) * priceH;
     const xOf = (i: number) => PAD.left + step * (i + 0.5);
 
-    // 网格 + 价格刻度（右侧）
+    // 网格 + 价格刻度（右侧）：颜色取自当前主题变量，浅/深主题均可见。
+    const css = getComputedStyle(document.documentElement);
+    const GRID = css.getPropertyValue("--border").trim() || FALLBACK_GRID;
+    const AXIS = css.getPropertyValue("--muted").trim() || FALLBACK_AXIS;
     ctx.font = "11px ui-monospace, monospace";
     ctx.textBaseline = "middle";
     ctx.fillStyle = AXIS;
@@ -205,19 +221,19 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
         ctx.globalAlpha = 1;
       }
     }
-  }, [data, size]);
+  }, [data, size, themeVer]);
 
   return (
     <div className="kchart">
       <div className="kchart-head">
         <span className="kchart-title">{symbol} · {interval}</span>
-        <span className={live ? "dot live" : "dot"} title={live ? "实时" : "离线"} />
+        <span className={live ? "dot live" : "dot"} title={live ? t("trade.live") : t("trade.offline")} />
       </div>
       <div className="kchart-canvas-wrap" ref={wrapRef}>
-        {loading && <div className="kchart-tip">加载中…</div>}
+        {loading && <div className="kchart-tip">{t("common.loading")}</div>}
         {!loading && error && <div className="kchart-tip err">{error}</div>}
         {!loading && !error && data.length === 0 && (
-          <div className="kchart-tip">暂无 K 线数据</div>
+          <div className="kchart-tip">{t("trade.noKline")}</div>
         )}
         <canvas ref={canvasRef} className="kchart-canvas" />
       </div>
