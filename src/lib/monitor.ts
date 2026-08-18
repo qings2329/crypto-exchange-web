@@ -3,7 +3,7 @@
 // 设计原则：零强制依赖、可降级——未启用或上报端点不可用时只在 console 输出，绝不向外抛错。
 // web-vitals 为可选依赖：需自行 `npm i web-vitals`，缺失时性能采集自动跳过。
 
-import { ApiError } from "../api/client";
+import { ApiError, tokenStore } from "../api/client";
 
 export type MonitorEvent = {
   type: "error" | "api_error" | "vital" | "ws_drop" | "custom";
@@ -62,25 +62,32 @@ export function getMonitorSummary(): MonitorSummary {
   return s;
 }
 
-// ---- 上报传输：优先 sendBeacon（页面卸载不丢），回退 fetch(keepalive) ----
+// ---- 上报传输：优先 fetch(keepalive)（可携带鉴权头，确保后端聚合闭环），回退 sendBeacon ----
+function authHeader(): string | undefined {
+  try {
+    const t = tokenStore.access;
+    return t ? `Bearer ${t}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function flush() {
   if (!queue.length) return;
   const batch = queue;
   queue = [];
   const payload = JSON.stringify({ events: batch });
-  if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-    const blob = new Blob([payload], { type: "application/json" });
-    if (navigator.sendBeacon(ENDPOINT, blob)) return;
-  }
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const a = authHeader();
+  if (a) headers["Authorization"] = a;
   if (typeof fetch !== "undefined") {
-    fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: payload,
-      keepalive: true,
-    }).catch(() => {
+    fetch(ENDPOINT, { method: "POST", headers, body: payload, keepalive: true }).catch(() => {
       /* 上报失败不影响业务 */
     });
+    return;
+  }
+  if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+    navigator.sendBeacon(ENDPOINT, new Blob([payload], { type: "application/json" }));
   }
 }
 

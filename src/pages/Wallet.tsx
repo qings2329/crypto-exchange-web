@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type LedgerEntry } from "../api/client";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
+import { isValidCryptoAddress, validateAmount } from "../lib/validate";
 
 const BALANCE_EP = "/api/v1/futures/wallet/balance";
 const WITHDRAWS_EP = "/api/v1/futures/wallet/withdraws";
@@ -184,6 +185,17 @@ export function Wallet() {
   const [network, setNetwork] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formMsg, setFormMsg] = useState("");
+  const [addrErr, setAddrErr] = useState("");
+  const [amtErr, setAmtErr] = useState("");
+
+  const onAddressChange = (v: string) => {
+    setAddress(v);
+    if (addrErr) setAddrErr("");
+  };
+  const onAmountChange = (v: string) => {
+    setAmount(v);
+    if (amtErr) setAmtErr("");
+  };
 
   // 从余额数据推导可选资产（对象取 key；数组取 asset 字段）
   const assetOptions = useMemo(() => {
@@ -199,17 +211,27 @@ export function Wallet() {
 
   const submitWithdraw = async () => {
     setFormMsg("");
-    const amt = parseFloat(amount);
-    if (!asset || !address || !amt || amt <= 0) {
+    setAddrErr("");
+    setAmtErr("");
+    if (!asset) {
       setFormMsg(t("wallet.errForm"));
+      return;
+    }
+    if (!isValidCryptoAddress(address)) {
+      setAddrErr(t("wallet.errAddress"));
+      return;
+    }
+    const amtRes = validateAmount(amount);
+    if (!amtRes.ok) {
+      setAmtErr(t("wallet.errAmount"));
       return;
     }
     setSubmitting(true);
     try {
       const r = await api.futuresWithdraw({
         asset,
-        address,
-        amount: amt,
+        address: address.trim(),
+        amount: amtRes.value as number,
         network: network || undefined,
       });
       setFormMsg(t("wallet.submitted", { id: r.order_id }));
@@ -280,16 +302,18 @@ export function Wallet() {
             </datalist>
             <label>
               {t("wallet.address")}
-              <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("wallet.phAddress")} />
+              <input value={address} onChange={(e) => onAddressChange(e.target.value)} placeholder={t("wallet.phAddress")} />
+              {addrErr && <div className="form-error">{addrErr}</div>}
             </label>
             <label>
               {t("wallet.amount")}
               <input
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => onAmountChange(e.target.value)}
                 placeholder="0.00"
                 inputMode="decimal"
               />
+              {amtErr && <div className="form-error">{amtErr}</div>}
             </label>
             <label>
               {t("wallet.network")}

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:analyze": "tsc -b && ANALYZE=true vite build",
     "preview": "vite preview",
+    "test:fe": "vitest run",
+    "test:fe:watch": "vitest",
+    "dev:server": "npm --prefix server install --no-audit --no-fund && node server/gateway.mjs",
     "test": "npm --prefix server install --no-audit --no-fund && npm --prefix server test && node server/monitor-e2e.mjs",
     "test:server": "npm --prefix server install --no-audit --no-fund && npm --prefix server test",
     "test:e2e": "npm --prefix server install --no-audit --no-fund && node server/monitor-e2e.mjs",
@@ -14,15 +18,22 @@
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "web-vitals": "^6.1.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.5",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^30.0.1",
     "playwright": "^1.62.1",
+    "rollup-plugin-visualizer": "^7.1.1",
     "typescript": "^5.5.4",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "vitest": "^2.1.9"
   }
 }

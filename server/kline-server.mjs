@@ -5,7 +5,7 @@
 import http from "node:http";
 import { WebSocketServer } from "ws";
 
-const PORT = Number(process.env.KLINE_PORT || 8080);
+const PORT = Number(process.env.KLINE_PORT || 8802);
 const TICK_MS = 400; // 实时推送频率
 const ROLL_EVERY = 8; // 每 8 个 tick 翻一根新蜡烛（约 3.2s，便于观察）
 

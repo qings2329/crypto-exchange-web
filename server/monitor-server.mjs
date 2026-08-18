@@ -2,14 +2,14 @@
 // 实现前端 initMonitor 上报 + 监控看板查询所需的三个端点。
 // 存储与聚合逻辑见 ./monitor-store.mjs（仅内存，生产请替换为 DB / 消息队列）。
 //
-// 运行：  node server/monitor-server.mjs   （默认监听 :8080/api/v1/monitor）
+// 运行：  node server/monitor-server.mjs   （默认监听 :8803/api/v1/monitor）
 // 前端开发时与现有 /api 代理指向同一网关即可被 /api/v1/monitor/* 命中。
 
 import http from "node:http";
 import { pushEvents, summary, recentEvents } from "./monitor-store.mjs";
 import { isAuthorized } from "./monitor-auth.mjs";
 
-const PORT = Number(process.env.MONITOR_PORT) || 8080;
+const PORT = Number(process.env.MONITOR_PORT) || 8803;
 const BASE = "/api/v1/monitor";
 
 // ---- 鉴权：X-Api-Key（与 Express 版一致）----

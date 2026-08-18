@@ -2,7 +2,7 @@
 // 与 ./apikey-express.mjs 功能一致：用户态 API Key 增删改查，挂在 /api/v1/user/api-keys。
 // 存储见 ./apikey-store.mjs；鉴权见 ./apikey-auth.mjs（Bearer token -> userId）。
 //
-// 运行：  node server/apikey-server.mjs   （默认监听 :8080/api/v1/user/api-keys）
+// 运行：  node server/apikey-server.mjs   （默认监听 :8804/api/v1/user/api-keys）
 
 import http from "node:http";
 import {
@@ -13,7 +13,7 @@ import {
 } from "./apikey-auth.mjs";
 import { listKeys, createKey, updateStatus, deleteKey } from "./apikey-store.mjs";
 
-const PORT = Number(process.env.APIKEY_PORT) || 8080;
+const PORT = Number(process.env.APIKEY_PORT) || 8804;
 const BASE = "/api/v1/user/api-keys";
 const PERMS = new Set(["read", "trade", "withdraw"]);
 

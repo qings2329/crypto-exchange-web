@@ -1,5 +1,5 @@
 // 后端 API 客户端。
-// 通过 Vite 代理（/api -> 网关 :8080）访问所有微服务；统一注入 Bearer Token，
+// 通过 Vite 代理（/api -> 网关 :8787）访问所有微服务；统一注入 Bearer Token，
 // 遇到 401 自动用 refresh_token 刷新并重试一次；统一解包 {code,message,data} 响应体。
 
 const ACCESS = "cx_access_token";
@@ -109,7 +109,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const msg = body?.message || res.statusText || "请求失败";
-    throw new ApiError(msg, body?.code ?? -1, res.status);
+    const err = new ApiError(msg, body?.code ?? -1, res.status);
+    // 集中上报接口异常（动态导入避免与 monitor 模块形成静态循环依赖）。
+    import("../lib/monitor")
+      .then((m) => m.reportApiError(err, { path }))
+      .catch(() => {});
+    throw err;
   }
   if (body && typeof body === "object" && "data" in body) return body.data as T;
   return body as T;
@@ -391,7 +396,6 @@ export const api = {
   },
 
   // ---- 杠杆 ----
-  marginAccount: () => request("/api/v1/margin/account"),
   marginAccounts: () => request<any[]>("/api/v1/margin/accounts"),
   marginLiqPrice: () => request("/api/v1/margin/liq-price"),
   // POST /api/v1/margin/accounts/:id/adjust 调整账户余额（需 admin 角色）。
@@ -1012,6 +1016,58 @@ export interface LedgerEntry {
 
 // ---------- WebSocket 助手 ----------
 // 连接现货行情 WS：推送 {type:'depth',data} 与 {type:'trade',data}。
+// 带指数退避自动重连的 WS 连接工厂：掉线后按 1s,2s,4s…（上限 10s）重试；
+// 调用方主动关闭（返回的函数）时停止重连。onClose 在每次掉线（含最终用户关闭）时回调，
+// 供上层切到轮询态；重连成功后首条消息会把上层 live 标记重新置真（见 Ticker/OrderBook）。
+function connectWithRetry(
+  url: string,
+  onMessage: (ev: MessageEvent) => void,
+  onClose?: () => void
+): () => void {
+  let ws: WebSocket | null = null;
+  let closedByUser = false;
+  let retries = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearTimer = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const open = () => {
+    if (closedByUser) return;
+    const sock = new WebSocket(url);
+    ws = sock;
+    sock.onmessage = onMessage;
+    // 错误会紧接着触发 onclose，由 onclose 统一负责重连，这里无需额外处理。
+    sock.onerror = () => {};
+    sock.onclose = () => {
+      if (closedByUser) {
+        onClose?.();
+        return;
+      }
+      onClose?.(); // 通知上层掉线（UI 切到轮询态）
+      const delay = Math.min(1000 * 2 ** retries, 10000);
+      retries++;
+      timer = setTimeout(open, delay);
+    };
+  };
+
+  open();
+
+  return () => {
+    closedByUser = true;
+    clearTimer();
+    if (ws) {
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.close();
+    }
+  };
+}
+
 export function connectSpotWS(
   symbol: string,
   onDepth: (d: Depth) => void,
@@ -1019,8 +1075,8 @@ export function connectSpotWS(
   onClose?: () => void
 ): () => void {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/api/v1/spot/ws?symbol=${encodeURIComponent(symbol)}`);
-  ws.onmessage = (ev) => {
+  const url = `${proto}://${location.host}/api/v1/spot/ws?symbol=${encodeURIComponent(symbol)}`;
+  const onMessage = (ev: MessageEvent) => {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === "depth") onDepth(msg.data as Depth);
@@ -1029,11 +1085,7 @@ export function connectSpotWS(
       /* ignore */
     }
   };
-  if (onClose) {
-    ws.onclose = onClose;
-    ws.onerror = onClose;
-  }
-  return () => ws.close();
+  return connectWithRetry(url, onMessage, onClose);
 }
 
 // 连接行情 WS：直接广播 Ticker 快照（即 ticker 对象本身）。
@@ -1043,19 +1095,15 @@ export function connectMarketWS(
   onClose?: () => void
 ): () => void {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/api/v1/market/ws?symbol=${encodeURIComponent(symbol)}`);
-  ws.onmessage = (ev) => {
+  const url = `${proto}://${location.host}/api/v1/market/ws?symbol=${encodeURIComponent(symbol)}`;
+  const onMessage = (ev: MessageEvent) => {
     try {
       onTicker(JSON.parse(ev.data) as Ticker);
     } catch {
       /* ignore */
     }
   };
-  if (onClose) {
-    ws.onclose = onClose;
-    ws.onerror = onClose;
-  }
-  return () => ws.close();
+  return connectWithRetry(url, onMessage, onClose);
 }
 
 // 连接 K 线 WS：按 symbol+interval 订阅，每次成交推送当前整根蜡烛（含量、自动翻根）。
@@ -1067,12 +1115,10 @@ export function connectKlineWS(
   onClose?: () => void
 ): () => void {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(
-    `${proto}://${location.host}/api/v1/market/kline/ws?symbol=${encodeURIComponent(
-      symbol
-    )}&interval=${encodeURIComponent(interval)}`
-  );
-  ws.onmessage = (ev) => {
+  const url = `${proto}://${location.host}/api/v1/market/kline/ws?symbol=${encodeURIComponent(
+    symbol
+  )}&interval=${encodeURIComponent(interval)}`;
+  const onMessage = (ev: MessageEvent) => {
     try {
       const msg = JSON.parse(ev.data);
       const k: Kline | undefined = msg && "t" in msg ? (msg as Kline) : msg?.data;
@@ -1081,9 +1127,5 @@ export function connectKlineWS(
       /* ignore */
     }
   };
-  if (onClose) {
-    ws.onclose = onClose;
-    ws.onerror = onClose;
-  }
-  return () => ws.close();
+  return connectWithRetry(url, onMessage, onClose);
 }

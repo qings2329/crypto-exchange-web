@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { useI18n } from "../i18n";
+import { isValidAccount, validatePassword } from "../lib/validate";
 
 export function Register() {
   const { t } = useI18n();
@@ -14,6 +15,7 @@ export function Register() {
   const sendCode = async () => {
     setErr("");
     if (!target.trim()) return setErr(t("register.needAccount"));
+    if (!isValidAccount(target)) return setErr(t("register.errAccount"));
     setBusy(true);
     try {
       const r = await api.sendCode(target.trim(), "register");
@@ -28,6 +30,8 @@ export function Register() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr("");
+    if (!isValidAccount(target)) return setErr(t("register.errAccount"));
+    if (!validatePassword(password)) return setErr(t("register.errPassword"));
     setBusy(true);
     try {
       await api.register(target.trim(), password, code.trim());
