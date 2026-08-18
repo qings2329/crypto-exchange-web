@@ -1378,3 +1378,196 @@ th.sortable:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 通知列表：表头固定 + 虚拟滚动列表（列对齐由 grid 模板保证） */
+.notif-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.notif-grid {
+  display: grid;
+  grid-template-columns: 40px minmax(120px, 1.4fr) 90px 120px minmax(160px, 2fr) 90px 130px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+.notif-head {
+  height: 44px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.notif-grid-body {
+  scrollbar-gutter: stable;
+}
+.notif-row {
+  height: 48px;
+  border-bottom: 1px solid var(--border);
+}
+.notif-row:hover {
+  background: rgba(127, 127, 127, 0.06);
+}
+.notif-clamp {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notif-empty {
+  padding: 24px;
+  text-align: center;
+}
+
+/* 全局 Toast 通知（右上角浮层） */
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  max-width: 360px;
+}
+.toast {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.98;
+}
+.toast.error {
+  border-left-color: var(--sell);
+}
+.toast.success {
+  border-left-color: var(--buy);
+}
+.toast.warning {
+  border-left-color: #d29922;
+}
+.toast.info {
+  border-left-color: #388bfd;
+}
+.toast-msg {
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* 全局错误边界兜底界面 */
+.error-boundary {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.error-boundary-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px 28px;
+  max-width: 480px;
+  text-align: center;
+}
+.error-boundary-card h2 {
+  margin: 0 0 8px;
+}
+.error-boundary-msg {
+  color: var(--muted);
+  margin: 0 0 16px;
+  word-break: break-word;
+}
+
+/* ---- 响应式 / 移动端适配 ---- */
+/* 平板及以下：压缩留白，网格退化为单列，表格已在 .table-wrap 内可横向滚动。 */
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .content {
+    padding: 12px 14px;
+  }
+  .card {
+    padding: 14px;
+  }
+  .ticker {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 手机：导航栏改为「品牌 + 操作」置顶，链接区横向滚动，避免拥挤换行。 */
+@media (max-width: 640px) {
+  .navbar {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 10px 14px;
+  }
+  .navbar .brand {
+    flex: 1 1 auto;
+  }
+  .navbar .links {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .navbar .links a {
+    white-space: nowrap;
+    font-size: 13px;
+  }
+  .navbar .right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .content {
+    padding: 10px 12px;
+  }
+  .page h2 {
+    font-size: 18px;
+  }
+  .page-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .card {
+    padding: 12px;
+  }
+  /* 通知虚拟列表在窄屏下收紧各列最小宽度 */
+  .notif-grid {
+    grid-template-columns: 32px 1.2fr 76px 96px 1.6fr 76px 104px;
+    gap: 6px;
+    padding: 0 8px;
+  }
+  .otc-drawer {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 12px 12px 0 0;
+  }
+  .wform {
+    max-width: 100%;
+  }
+}
+
+/* 超窄屏：进一步压缩字号与间距。 */
+@media (max-width: 380px) {
+  .navbar .right .lang-switch .lang {
+    padding: 4px 7px;
+    font-size: 12px;
+  }
+  .notif-grid {
+    grid-template-columns: 28px 1fr 64px 60px 1fr 64px 88px;
+  }
+}

@@ -11,6 +11,7 @@ import {
 } from "../api/client";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
+import { validateAmount } from "../lib/validate";
 
 const PAGE_SIZES = [10, 20, 50];
 
@@ -647,20 +648,20 @@ export function Otc() {
   const submitAd = async () => {
     setFormMsg("");
     setFormErr(false);
-    const p = parseFloat(price);
-    const min = parseFloat(minAmount);
-    const max = parseFloat(maxAmount);
+    const pRes = validateAmount(price);
+    const minRes = validateAmount(minAmount);
+    const maxRes = validateAmount(maxAmount);
     if (!asset.trim() || !fiat.trim()) {
       setFormMsg(t("otc.form.errAsset"));
       setFormErr(true);
       return;
     }
-    if (!p || p <= 0) {
+    if (!pRes.ok) {
       setFormMsg(t("otc.form.errPrice"));
       setFormErr(true);
       return;
     }
-    if (!min || min <= 0 || !max || max < min) {
+    if (!minRes.ok || !maxRes.ok || (maxRes.value as number) < (minRes.value as number)) {
       setFormMsg(t("otc.form.errAmount"));
       setFormErr(true);
       return;
@@ -681,9 +682,9 @@ export function Otc() {
         side,
         asset: asset.trim(),
         fiat_currency: fiat.trim(),
-        price: p,
-        min_amount: min,
-        max_amount: max,
+        price: pRes.value as number,
+        min_amount: minRes.value as number,
+        max_amount: maxRes.value as number,
         payment_methods: methods,
       });
       setFormMsg(t("otc.form.published", { id: r.id }));
@@ -723,8 +724,8 @@ export function Otc() {
       setOrderErr(true);
       return;
     }
-    const fa = parseFloat(fiatAmount);
-    if (!fa || fa <= 0) {
+    const faRes = validateAmount(fiatAmount);
+    if (!faRes.ok) {
       setOrderMsg(t("otc.order.errFiat"));
       setOrderErr(true);
       return;
@@ -736,7 +737,7 @@ export function Otc() {
     }
     setOrderSubmitting(true);
     try {
-      await api.otcTakeOrder({ ad_id: id, fiat_amount: fa, payment_method: payMethod.trim() });
+      await api.otcTakeOrder({ ad_id: id, fiat_amount: faRes.value as number, payment_method: payMethod.trim() });
       setOrderMsg(t("otc.order.placed"));
       setOrderErr(false);
       setSelectedAd(null);

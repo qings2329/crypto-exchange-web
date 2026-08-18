@@ -10,6 +10,7 @@ import { Modal } from "../components/Modal";
 import { useConfirm } from "../components/Confirm";
 import { useSelection, BatchBar, type BatchAction } from "../components/Batch";
 import { TextField, TextAreaField, SelectField } from "../components/Form";
+import { VirtualList } from "../components/VirtualList";
 import { useI18n } from "../i18n";
 
 const LEVEL_KEY: Record<NotificationLevel, string> = {
@@ -101,49 +102,49 @@ export function Notifications() {
         {err && <div className="error">{t("common.loadError", { err })}</div>}
         {!err && list === undefined && <div className="muted">{t("common.loading")}</div>}
         {!err && list !== undefined && (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th className="col-check">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-                  </th>
-                  <th>{t("notif.col.title")}</th>
-                  <th>{t("notif.col.level")}</th>
-                  <th>{t("notif.col.scope")}</th>
-                  <th>{t("notif.col.content")}</th>
-                  <th>{t("notif.col.status")}</th>
-                  <th>{t("notif.col.action")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="muted">{t("notif.empty")}</td>
-                  </tr>
-                )}
-                {list.map((n) => (
-                  <tr key={n.id}>
-                    <td className="col-check">
-                      <input type="checkbox" checked={selected.has(n.id)} onChange={() => toggle(n.id)} />
-                    </td>
-                    <td>{n.title}</td>
-                    <td>
+          <div className="notif-list">
+            <div className="notif-grid notif-head">
+              <div className="col-check">
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label={t("common.selectAll")} />
+              </div>
+              <div>{t("notif.col.title")}</div>
+              <div>{t("notif.col.level")}</div>
+              <div>{t("notif.col.scope")}</div>
+              <div>{t("notif.col.content")}</div>
+              <div>{t("notif.col.status")}</div>
+              <div>{t("notif.col.action")}</div>
+            </div>
+            {list.length === 0 ? (
+              <div className="notif-empty muted">{t("notif.empty")}</div>
+            ) : (
+              <VirtualList
+                items={list}
+                rowHeight={48}
+                height={420}
+                getKey={(n) => n.id}
+                className="notif-grid-body"
+                renderRow={(n) => (
+                  <div className="notif-grid notif-row">
+                    <div className="col-check">
+                      <input type="checkbox" checked={selected.has(n.id)} onChange={() => toggle(n.id)} aria-label={t("common.selectRow")} />
+                    </div>
+                    <div className="notif-clamp">{n.title}</div>
+                    <div>
                       <span className={`perm-badge ${n.level === "critical" ? "danger" : n.level === "warning" ? "warn" : "safe"}`}>
                         {t(LEVEL_KEY[n.level])}
                       </span>
-                    </td>
-                    <td>{t(TARGET_KEY[n.target])}{n.target_user ? ` (${n.target_user})` : ""}</td>
-                    <td className="cell-clamp">{n.content}</td>
-                    <td>{t(STATUS_KEY[n.status])}</td>
-                    <td className="row-actions">
+                    </div>
+                    <div className="notif-clamp">{t(TARGET_KEY[n.target])}{n.target_user ? ` (${n.target_user})` : ""}</div>
+                    <div className="cell-clamp">{n.content}</div>
+                    <div>{t(STATUS_KEY[n.status])}</div>
+                    <div className="row-actions">
                       <button className="link-btn" disabled={n.status === "recalled"} onClick={() => recall(n)}>{t("notif.recall")}</button>
                       <button className="link-btn danger" onClick={() => remove(n)}>{t("common.delete")}</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                )}
+              />
+            )}
           </div>
         )}
       </section>

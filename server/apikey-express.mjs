@@ -3,7 +3,7 @@
 // 存储见 ./apikey-store.mjs；鉴权见 ./apikey-auth.mjs（Bearer token -> userId）。
 //
 // 运行：  cd server && npm install && npm run start:apikey
-//         （默认监听 :8080/api/v1/user/api-keys；前端开发将 /api 代理指向该端口即可）
+//         （默认监听 :8804/api/v1/user/api-keys；独立骨架，开发联调请使用统一网关 :8787）
 
 import express from "express";
 import { fileURLToPath } from "node:url";
@@ -15,7 +15,7 @@ import {
 } from "./apikey-auth.mjs";
 import { listKeys, createKey, updateStatus, deleteKey } from "./apikey-store.mjs";
 
-const PORT = Number(process.env.APIKEY_PORT) || 8080;
+const PORT = Number(process.env.APIKEY_PORT) || 8804;
 const BASE = "/api/v1/user/api-keys";
 const PERMS = new Set(["read", "trade", "withdraw"]);
 

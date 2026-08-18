@@ -11,6 +11,7 @@
     "start:apikey": "node apikey-express.mjs",
     "start:apikey:http": "node apikey-server.mjs",
     "start:admin": "node admin-api.mjs",
+    "start:gateway": "node gateway.mjs",
     "test": "MONITOR_API_KEY=secret node --test",
     "test:e2e": "node monitor-e2e.mjs",
     "test:kline": "node kline-ws.e2e.mjs"

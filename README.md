@@ -41,6 +41,14 @@ src/
 | `#/wealth`    | 理财   | 产品与持仓                   |
 | `#/risk`      | 风控   | 规则 / 黑名单 / 事件         |
 | `#/notifications` | 通知 | 后台通知列表                 |
+| `#/home`         | 首页 | 公告横幅 / 模块快捷入口 / 账户概览 |
+| `#/announcements`| 公告 | 公告列表（公开）             |
+| `#/history`      | 历史 | 现货 / 合约订单与成交流水分 Tab |
+| `#/settings`     | 设置 | 资料 / 偏好 / TFA / KYC      |
+| `#/apikeys`      | API Key | 用户 API 密钥管理         |
+| `#/monitor`      | 监控 | 前端监控看板（服务端聚合）   |
+| `#/admin`        | 管理总览 | 后台 KPI 总览（admin）     |
+| `#/audit`        | 审计 | 后台操作审计日志（admin）     |
 
 受保护页面在无 `cx_access_token` 时会自动跳转登录页。
 
@@ -60,13 +68,36 @@ npm run build
 npm run preview
 ```
 
+## 本地开发后端（统一网关）
+
+前端在开发期需要一个后端来提供 `/api/v1/*` 业务接口与行情 WebSocket。仓库内已提供一个**整合后的统一网关** `server/gateway.mjs`：单进程监听 `:8787`，覆盖前端 `src/api/client.ts` 调用的全部业务端点（现货深度/下单/订单/成交、行情 Ticker、K 线、OTC 广告/订单/对手方/沟通、钱包流水、合约、期权、杠杆、理财、风控、通知、用户资料与偏好/TFA/KYC、公告、API Key、管理总览/审计、监控上报与聚合），以及三类行情 WebSocket（`/api/v1/spot/ws`、`/api/v1/market/ws`、`/api/v1/market/kline/ws`）。
+
+启动（会自动安装 `server/` 依赖并运行）：
+
+```bash
+npm run dev:server
+```
+
+随后在另一个终端启动前端即可（`vite` 代理 `/api` 指向 `:8787`）：
+
+```bash
+npm run dev
+```
+
+说明：
+
+- 数据为**内存 mock**，无持久化，仅用于联调；重启即重置。
+- 登录演示账号（见 `server/gateway-auth.mjs` 顶部种子）：`admin@ce.dev` / `op@ce.dev` / `user@ce.dev`（密码分别为 `Admin@123` / `Op@123` / `User@123`）。角色分别为 `admin` / `operator` / `user`，对应前端 RBAC。
+- 之前分散的骨架服务（`kline-server.mjs` / `monitor-server.mjs` / `apikey-express.mjs` / `admin-api.mjs`）仍可作为独立服务运行（`npm --prefix server run start:*`），但**统一网关已覆盖其全部能力**，日常开发只需运行 `dev:server` 一个进程。
+- 监控上报端点 `POST /api/v1/monitor/report`，聚合查询 `GET /api/v1/monitor/summary` 与 `GET /api/v1/monitor/events?limit=`（前端监控看板页读取）。
+
 ## 后端对接（Vite 代理）
 
-开发服务器通过 Vite 代理将 `/api` 转发到后端网关 `http://localhost:8080`，
+开发服务器通过 Vite 代理将 `/api` 转发到后端网关 `http://localhost:8787`，
 REST 与 WebSocket（行情推送）共用该代理（`vite.config.ts` 中 `ws: true` 支持协议升级），
 因此前端统一使用相对路径调用，无需处理跨域。
 
-- 后端基地址：`http://localhost:8080`
+- 后端基地址：`http://localhost:8787`
 - API 前缀：`/api/v1/...`
 - WebSocket：`/api/v1/spot/ws`、`/api/v1/market/ws`
 
@@ -83,7 +114,47 @@ REST 与 WebSocket（行情推送）共用该代理（`vite.config.ts` 中 `ws: 
 
 ## 环境变量
 
-当前通过 Vite 代理硬编码指向 `localhost:8080`，如要对接其他后端地址，修改 `vite.config.ts` 中的 `server.proxy.target` 即可。如需运行时配置，可补充 `.env` 并配合 `import.meta.env`（已在 `.gitignore` 中忽略）。
+当前通过 Vite 代理硬编码指向 `localhost:8787`，如要对接其他后端地址，修改 `vite.config.ts` 中的 `server.proxy.target` 即可。如需运行时配置，可补充 `.env` 并配合 `import.meta.env`（已在 `.gitignore` 中忽略）。
+
+以下变量可在启动各 `server/` 进程前设置，用于覆盖默认监听端口（开发后端统一网关已覆盖全部能力，日常只需关心 `GATEWAY_PORT` 与前端代理目标）：
+
+| 变量 | 作用域 | 默认值 | 说明 |
+| ---- | ------ | ------ | ---- |
+| `GATEWAY_PORT` | `server/gateway.mjs` | `8787` | 统一网关监听端口；前端开发默认对接它 |
+| `BACKEND_TARGET` | `vite.config.ts` | `http://localhost:8787` | Vite 代理 `/api` 的目标地址（含协议与端口） |
+| `ADMIN_PORT` | `server/admin-api.mjs` | `8801` | 独立管理 API 骨架服务端口（统一网关已内置，无需单独运行） |
+| `KLINE_PORT` | `server/kline-server.mjs` | `8802` | 独立 K 线 WebSocket 骨架服务端口 |
+| `MONITOR_PORT` | `server/monitor-server.mjs` / `monitor-express.mjs` | `8803` | 独立监控骨架服务端口 |
+| `APIKEY_PORT` | `server/apikey-express.mjs` / `apikey-server.mjs` | `8804` | 独立 API Key 骨架服务端口 |
+| `MONITOR_API_KEY` | 监控 Express 版 | 未设置（关闭校验） | 设置后，`/api/v1/monitor/*` 请求须带 `X-Api-Key` 头 |
+
+> 说明：开发环境统一网关监听 `:8787`，但历史上曾与宿主机上其他服务常用的 `:8080` 冲突，因此本项目已整体迁移到 `:87xx` / `:88xx` 段，**不再占用 `:8080`**；生产环境的 Nginx 同样反向代理到后端网关 `:8787`（而非 `:8080`），开发 / 生产后端端口保持一致（见下文「部署」）。
+
+## 端口配置（开发 / 生产）
+
+本仓库所有端口分配如下，避免开发后端与宿主机其他进程（尤其是 `:8080`）争用：
+
+### 开发环境
+
+| 端口 | 服务 | 启动方式 | 备注 |
+| ---- | ---- | -------- | ---- |
+| `5173`（Vite 默认，占用时顺延 `5174`…） | 前端开发服务器 | `npm run dev` | Hash 路由 SPA，经 Vite 代理访问后端 |
+| `8787` | 统一后端网关（全量业务 + 行情 WS + 监控聚合） | `npm run dev:server` | **日常开发只需这一个后端进程** |
+| `8801` | 管理 API 骨架（独立） | `npm --prefix server run start:admin` | 统一网关已覆盖，可不选 |
+| `8802` | K 线 WS 骨架（独立） | `npm --prefix server run start:kline` | 统一网关已覆盖，可不选 |
+| `8803` | 监控骨架（独立） | `npm --prefix server run start`（零依赖）或 `start:express`（Express 版） | 统一网关已覆盖，可不选 |
+| `8804` | API Key 骨架（独立） | `npm --prefix server run start:apikey` | 统一网关已覆盖，可不选 |
+
+> 前端通过 Vite 代理把 `/api`（REST 与 WebSocket 同前缀）转发到 `:8787`，因此前端代码始终使用相对路径，无需感知具体端口；若要对接别的后端，改 `vite.config.ts` 的 `proxy.target`（或设 `BACKEND_TARGET`）即可。
+
+### 生产环境
+
+| 端口 | 服务 | 说明 |
+| ---- | ---- | ---- |
+| `80`（或 `443`） | Nginx 静态托管 + 反向代理 | 对外暴露；`dist/` 静态资源 + `/api` 反向代理 |
+| `8787` | 后端网关（生产部署实例，即 `server/gateway.mjs`） | Nginx `location /api { proxy_pass http://localhost:8787 }` 转发；可用 `GATEWAY_PORT` 覆盖；WebSocket 的 `Upgrade`/`Connection` 头须透传 |
+
+> 关键点：生产环境**不经过 Vite 代理**，必须由 Nginx（或你的网关）把 `/api` 反向代理到后端 `:8787`（即统一网关端口，可用 `GATEWAY_PORT` 覆盖），否则接口与行情 WS 都会 404。开发与生产均指向同一后端网关端口 `:8787`，避免与宿主机上其他进程占用的 `:8080` 争用。
 
 ## 部署
 
@@ -114,7 +185,7 @@ server {
 
     # 将 /api 反向代理到后端网关（REST 与 WebSocket 同前缀）
     location /api {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:8787;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;       # 支持 WebSocket 升级
         proxy_set_header Connection "upgrade";
@@ -124,7 +195,7 @@ server {
 }
 ```
 
-> 关键点：生产环境**不会**经过 Vite 代理，因此需要由 Nginx（或你使用的网关）自行把 `/api` 反向代理到后端 `:8080`，否则所有接口与行情 WS 都会 404。WebSocket 的 `Upgrade`/`Connection` 头必须正确透传。
+> 关键点：生产环境**不会**经过 Vite 代理，因此需要由 Nginx（或你使用的网关）自行把 `/api` 反向代理到后端 `:8787`（即统一网关 `server/gateway.mjs` 的监听端口，可用 `GATEWAY_PORT` 环境变量覆盖），否则所有接口与行情 WS 都会 404。WebSocket 的 `Upgrade`/`Connection` 头必须正确透传。
 
 ### 3. 其他托管方式
 
@@ -135,12 +206,12 @@ server {
 
 | 现象 | 可能原因 | 排查 / 解决 |
 | ---- | -------- | ----------- |
-| 页面能打开，但所有数据为空 / 接口报错 | 后端网关未启动或地址不对 | 确认后端在 `:8080` 监听；开发环境检查 `vite.config.ts` 的 `proxy.target`，生产环境检查反向代理配置 |
+| 页面能打开，但所有数据为空 / 接口报错 | 后端网关未启动或地址不对 | 确认后端在 `:8787` 监听（`npm run dev:server`）；开发环境检查 `vite.config.ts` 的 `proxy.target`，生产环境检查反向代理配置 |
 | 接口返回 404（`/api/...`） | 生产环境未配置反向代理 | 在 Nginx（或网关）中增加 `location /api { proxy_pass ... }`，不要依赖 Vite 代理 |
 | WebSocket 连不上 / 行情不刷新 | `Upgrade` 头未透传，或后端 WS 地址错误 | 检查反向代理是否透传 `Upgrade`/`Connection`；确认 `wss://` 在 HTTPS 下可用 |
 | 一直跳回登录页 / 登录后立即失效 | `access_token` 过期且刷新失败 | 清除 `localStorage` 中的 `cx_access_token` 等键重新登录；确认后端 `/api/v1/user/refresh` 正常 |
 | 反复 401 刷新循环 | `refresh_token` 失效或被多处并发刷新 | 客户端已用单例 `refreshing` 防止并发；如无效应清除登录态重新登录 |
-| 跨域（CORS）报错 | 前端直连后端而非经代理/反代 | 开发用 Vite 代理、生产用反向代理，统一走相对路径 `/api`，避免直连 `http://localhost:8080` |
+| 跨域（CORS）报错 | 前端直连后端而非经代理/反代 | 开发用 Vite 代理、生产用反向代理，统一走相对路径 `/api`，避免直连 `http://localhost:8787` |
 | `npm run build` 失败 | TypeScript 严格模式报错 | 查看 `tsc -b` 输出，按报错逐条修复类型问题（开启了 `noUnusedLocals`/`noUnusedParameters` 等） |
 | 开发服务器启动在别的端口 / 端口被占 | 默认 `5173` 已被占用 | Vite 会自动顺延到 `5174`…；或显式指定 `--port`/`--host` |
 | 改动不生效 | 浏览器缓存了旧 `dist` | 构建后强刷浏览器（禁用缓存）或重新部署静态资源 |
@@ -155,6 +226,19 @@ server {
 - **卸载守卫**：所有数据组件用 `let alive = true` + `useEffect` 清理函数，组件卸载后不再 `setState`，避免内存泄漏与“卸载后更新”告警。
 - **WebSocket 资源回收**：`connectSpotWS` / `connectMarketWS` 返回 `() => ws.close()`，在依赖变化或卸载时正确关闭连接，防止连接泄漏。
 - **订单簿 DOM 收敛**：`OrderBook` 用 `slice(0, 10)` 只渲染买卖盘前 10 档，控制渲染节点数，避免深度数据撑大 DOM。
+
+### 已落地的额外优化（本仓库新增）
+
+| 优化项 | 做法 |
+| ------ | ---- |
+| 路由级代码分割 | 所有业务页面改为 `React.lazy` + `Suspense` 按需加载；首屏主包由约 370KB 降至约 258KB，各页面产物为独立 chunk |
+| WS 推送节流 | `Ticker` / `OrderBook` 的 WS `onmessage` 合并 ≥100ms 内的多次推送，减少无谓 `setState` |
+| WS 在线暂停轮询 | 行情 WS 在线（`live=true`）时 REST 兜底轮询回调直接跳过，省流量；断线恢复后继续轮询 |
+| 行级 `React.memo` | 订单簿行抽为 `memo` 组件，避免父组件无关重渲染 |
+| 构建体积分析 | `npm run build:analyze` 生成 `dist/stats.html`（treemap，含 gzip/brotli 体积） |
+
+> 大列表虚拟化（`react-window`）：当前订单簿/通知等列表规模较小（订单簿仅渲染前 10 档），暂未引入；若后续列表显著变长，再按需接入。
+> 静态资源长缓存（`Cache-Control: immutable`）与 `gzip`/`brotli` 压缩属于生产部署项，由托管层（Nginx/CDN）配置，见下文「部署」。
 
 ### 可进一步优化的方向
 
@@ -185,7 +269,7 @@ server {
 
 ### 性能与体验指标
 
-- 接入 `web-vitals` 采集 **LCP / CLS / INP(FID)**，监控首屏与交互体验。
+- 接入 `web-vitals` 采集 **LCP / CLS / INP(FID)**，监控首屏与交互体验。`web-vitals` 已作为依赖安装，`src/lib/monitor.ts` 的 `initMonitor` 启动时动态 `import("web-vitals")` 并回调 `reportVital`，上报携带 `Authorization` 头，经 `POST /api/v1/monitor/report` 进入后端聚合；监控看板「服务端聚合」区可查看 Vitals。
 - 用 `performance.timing` / `PerformanceObserver` 记录各页面 `api.get` 耗时，建立接口 P95 基线。
 - 行情健康度：组件已用 `live` 标记区分「实时推送 / 轮询」（见 `Ticker`/`OrderBook` 的 `dot`/`ob-foot`）。可在 `live` 由 `true→false` 时上报一次「WS 掉线」，量化推送稳定性。
 
@@ -195,11 +279,11 @@ server {
 - 配合体积分析插件设置 **bundle 体积预算**，超阈值时告警，防止依赖无意识膨胀。
 - 上传 **source map** 到监控平台（注意生产 `.map` 不要公开托管，避免源码泄露），以便错误栈还原到源码。
 
-### 后端查询接口约定（待后端实现）
+### 后端查询接口约定（已由统一网关实现）
 
 前端的 `src/api/client.ts` 已定义 `api.monitorSummary()` / `api.monitorEvents()`，
-监控看板页会调用以下两个接口拉取**服务端聚合**数据（未实现时看板回退为「会话本地」视图）。
-请在网关 / 监控服务中实现：
+监控看板页会调用以下两个接口拉取**服务端聚合**数据（后端未实现时看板回退为「会话本地」视图）。
+这两个接口与上报端点 `POST /api/v1/monitor/report` 已由 `server/gateway.mjs` 实现（复用 `server/monitor-store.mjs` 的内存存储与聚合逻辑），看板「服务端聚合」区现已可正常展示：
 
 **`GET /api/v1/monitor/summary`** — 聚合统计
 
@@ -258,7 +342,7 @@ server {
 > - 两者共用 `monitor-store.mjs` 的内存存储与聚合逻辑，生产请替换为 DB/消息队列。
 > - Express 版内置 `X-Api-Key` 鉴权中间件：设置环境变量 `MONITOR_API_KEY` 后，所有 `/api/v1/monitor/*` 请求须带请求头 `X-Api-Key: <key>`（未设置该变量时关闭校验，仅演示用）。调用示例：
 >   ```bash
->   curl -H 'X-Api-Key: secret123' http://localhost:8080/api/v1/monitor/summary
+>   curl -H 'X-Api-Key: secret123' http://localhost:8787/api/v1/monitor/summary
 >   ```
 >
 > 监控骨架的测试（`server/monitor-auth.test.mjs` 单元测试 + `server/monitor-auth.integration.test.mjs` 集成测试 + `server/monitor-e2e.mjs` 端到端脚本）已从根项目接入，

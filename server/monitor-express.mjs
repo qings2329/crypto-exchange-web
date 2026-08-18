@@ -3,14 +3,14 @@
 // 存储与聚合逻辑见 ./monitor-store.mjs（仅内存，生产请替换为 DB / 消息队列）。
 //
 // 运行：  cd server && npm install && npm run start:express
-//         （默认监听 :8080/api/v1/monitor）
+//         （默认监听 :8803/api/v1/monitor）
 
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { pushEvents, summary, recentEvents } from "./monitor-store.mjs";
 import { isAuthorized } from "./monitor-auth.mjs";
 
-const PORT = Number(process.env.MONITOR_PORT) || 8080;
+const PORT = Number(process.env.MONITOR_PORT) || 8803;
 const BASE = "/api/v1/monitor";
 
 const app = express();

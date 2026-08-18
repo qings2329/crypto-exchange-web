@@ -27,11 +27,16 @@ export function roleAtLeast(have, need) {
 
 // ---------- 种子用户（演示账号，生产由用户中心提供）----------
 // 密码明文仅用于 mock；真实网关应对接用户中心并校验哈希。
-const users = [
-  { id: 1, username: "admin", email: "admin@ce.dev", password: "Admin@123", role: "admin", nickname: "管理员" },
-  { id: 2, username: "op", email: "op@ce.dev", password: "Op@123", role: "operator", nickname: "运营" },
-  { id: 3, username: "user1", email: "user@ce.dev", password: "User@123", role: "user", nickname: "普通用户" },
+export const users = [
+  { id: 1, username: "admin", email: "admin@ce.dev", phone: "13800000001", password: "Admin@123", role: "admin", nickname: "管理员", kyc_level: 2, tfa_enabled: true, email_verified: true, phone_verified: true, status: 0 },
+  { id: 2, username: "op", email: "op@ce.dev", phone: "13800000002", password: "Op@123", role: "operator", nickname: "运营", kyc_level: 1, tfa_enabled: false, email_verified: true, phone_verified: false, status: 0 },
+  { id: 3, username: "user1", email: "user@ce.dev", phone: "13800000003", password: "User@123", role: "user", nickname: "普通用户", kyc_level: 0, tfa_enabled: false, email_verified: true, phone_verified: false, status: 0 },
 ];
+
+// 按 id 查种子用户（供统一网关补全 /user/me 档案）。
+export function getUserById(id) {
+  return users.find((u) => u.id === Number(id));
+}
 
 // refresh_token -> { userId, role, exp }
 const refreshStore = new Map();

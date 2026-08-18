@@ -4,9 +4,10 @@ import App from "./App";
 import { initMonitor } from "./lib/monitor";
 import "./styles.css";
 
-// 生产环境（非 localhost）启用监控上报；开发环境仅在 console 输出，不影响业务。
+// 启用监控上报（错误/接口异常/WS 掉线/Web Vitals -> 后端聚合）。
+// 后端未实现 /api/v1/monitor/* 时上报静默失败，不影响业务；本仓库已提供统一网关实现。
 initMonitor({
-  enabled: location.hostname !== "localhost" && location.hostname !== "127.0.0.1",
+  enabled: true,
   endpoint: "/api/v1/monitor/report",
 });
 

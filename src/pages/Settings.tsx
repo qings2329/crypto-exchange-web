@@ -9,6 +9,7 @@ import {
 import { useI18n, LOCALES } from "../i18n";
 import { applyTheme, THEMES, type ThemeId } from "../lib/theme";
 import { setTimeZone, COMMON_TZ } from "../lib/timezone";
+import { validatePassword } from "../lib/validate";
 
 const DEFAULT_PREFS: UserPreferences = {
   user_id: 0,
@@ -112,6 +113,10 @@ export function Settings() {
     setPwdMsg("");
     if (!oldPwd || !newPwd) {
       setPwdMsg(t("settings.pwdNeed"));
+      return;
+    }
+    if (!validatePassword(newPwd)) {
+      setPwdMsg(t("settings.pwdWeak"));
       return;
     }
     try {
