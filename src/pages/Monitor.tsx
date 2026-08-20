@@ -87,7 +87,9 @@ export function Monitor() {
 
   return (
     <div className="monitor">
-      <h2>{t("monitor.title")}</h2>
+      <div className="page-head">
+        <h2>{t("monitor.title")}</h2>
+      </div>
       <p className="muted">{t("monitor.intro", { n: events.length })}</p>
 
       <div className="stat-row">
@@ -98,68 +100,78 @@ export function Monitor() {
       </div>
 
       <section className="card">
-        <h3>{t("monitor.vitals")}</h3>
+        <div className="card-head">
+          <h3>{t("monitor.vitals")}</h3>
+        </div>
         {Object.keys(summary.vitals).length === 0 ? (
           <div className="muted">{t("monitor.noVitals")}</div>
         ) : (
-          <table className="vt">
-            <thead>
-              <tr>
-                <th>{t("monitor.col.metric")}</th>
-                <th>{t("monitor.col.value")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(summary.vitals).map(([k, v]) => (
-                <tr key={k}>
-                  <td>{k}</td>
-                  <td>
-                    {v.toFixed(2)}
-                    {VITAL_UNIT[k] ?? ""}
-                  </td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("monitor.col.metric")}</th>
+                  <th>{t("monitor.col.value")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {Object.entries(summary.vitals).map(([k, v]) => (
+                  <tr key={k}>
+                    <td>{k}</td>
+                    <td className="mono">
+                      {v.toFixed(2)}
+                      {VITAL_UNIT[k] ?? ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
       <section className="card">
-        <h3>{t("monitor.events")}</h3>
+        <div className="card-head">
+          <h3>{t("monitor.events")}</h3>
+        </div>
         {events.length === 0 ? (
           <div className="muted">{t("monitor.noEvents")}</div>
         ) : (
-          <table className="evt">
-            <thead>
-              <tr>
-                <th>{t("monitor.col.time")}</th>
-                <th>{t("monitor.col.type")}</th>
-                <th>{t("monitor.col.name")}</th>
-                <th>{t("monitor.col.info")}</th>
-                <th>{t("monitor.col.status")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((e, i) => (
-                <tr key={i}>
-                  <td className="mono">{fmtTime(e.ts)}</td>
-                  <td>{t(TYPE_KEY[e.type])}</td>
-                  <td>{e.name ?? "--"}</td>
-                  <td className="msg-cell">{e.message ?? "--"}</td>
-                  <td className="mono">
-                    {e.type === "vital"
-                      ? `${(e.value ?? 0).toFixed(2)}${VITAL_UNIT[e.name ?? ""] ?? ""}`
-                      : [e.status, e.code].filter((x) => x !== undefined).join(" / ") || "--"}
-                  </td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("monitor.col.time")}</th>
+                  <th>{t("monitor.col.type")}</th>
+                  <th>{t("monitor.col.name")}</th>
+                  <th>{t("monitor.col.info")}</th>
+                  <th>{t("monitor.col.status")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {events.map((e, i) => (
+                  <tr key={i}>
+                    <td className="mono">{fmtTime(e.ts)}</td>
+                    <td>{t(TYPE_KEY[e.type])}</td>
+                    <td>{e.name ?? "--"}</td>
+                    <td className="cell-clamp">{e.message ?? "--"}</td>
+                    <td className="mono">
+                      {e.type === "vital"
+                        ? `${(e.value ?? 0).toFixed(2)}${VITAL_UNIT[e.name ?? ""] ?? ""}`
+                        : [e.status, e.code].filter((x) => x !== undefined).join(" / ") || "--"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
       <section className="card">
-        <h3>{t("monitor.remote")}</h3>
+        <div className="card-head">
+          <h3>{t("monitor.remote")}</h3>
+        </div>
         {remote.error ? (
           <div className="error">
             {t("monitor.remoteErr", { err: remote.error })}
@@ -191,32 +203,34 @@ export function Monitor() {
             {remote.events.length === 0 ? (
               <div className="muted">{t("monitor.noRemoteEvents")}</div>
             ) : (
-              <table className="evt">
-                <thead>
-                  <tr>
-                    <th>{t("monitor.col.time")}</th>
-                    <th>{t("monitor.col.type")}</th>
-                    <th>{t("monitor.col.name")}</th>
-                    <th>{t("monitor.col.info")}</th>
-                    <th>{t("monitor.col.status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {remote.events.map((e, i) => (
-                    <tr key={i}>
-                      <td className="mono">{fmtTime(e.ts)}</td>
-                      <td>{t(TYPE_KEY[e.type])}</td>
-                      <td>{e.name ?? "--"}</td>
-                      <td className="msg-cell">{e.message ?? "--"}</td>
-                      <td className="mono">
-                        {e.type === "vital"
-                          ? `${(e.value ?? 0).toFixed(2)}${VITAL_UNIT[e.name ?? ""] ?? ""}`
-                          : [e.status, e.code].filter((x) => x !== undefined).join(" / ") || "--"}
-                      </td>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{t("monitor.col.time")}</th>
+                      <th>{t("monitor.col.type")}</th>
+                      <th>{t("monitor.col.name")}</th>
+                      <th>{t("monitor.col.info")}</th>
+                      <th>{t("monitor.col.status")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {remote.events.map((e, i) => (
+                      <tr key={i}>
+                        <td className="mono">{fmtTime(e.ts)}</td>
+                        <td>{t(TYPE_KEY[e.type])}</td>
+                        <td>{e.name ?? "--"}</td>
+                        <td className="cell-clamp">{e.message ?? "--"}</td>
+                        <td className="mono">
+                          {e.type === "vital"
+                            ? `${(e.value ?? 0).toFixed(2)}${VITAL_UNIT[e.name ?? ""] ?? ""}`
+                            : [e.status, e.code].filter((x) => x !== undefined).join(" / ") || "--"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </>
         )}

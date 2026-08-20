@@ -30,13 +30,13 @@ export function OrderForm({ symbol }: { symbol: string }) {
     <div className="orderform">
       <div className="seg">
         <button
-          className={side === "buy" ? "active buy" : ""}
+          className={side === "buy" ? "btn active buy" : "btn"}
           onClick={() => setSide("buy")}
         >
           {t("trade.buy")}
         </button>
         <button
-          className={side === "sell" ? "active sell" : ""}
+          className={side === "sell" ? "btn active sell" : "btn"}
           onClick={() => setSide("sell")}
         >
           {t("trade.sell")}

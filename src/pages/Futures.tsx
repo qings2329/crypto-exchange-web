@@ -9,7 +9,9 @@ export function Futures() {
   const { t } = useI18n();
   return (
     <div className="page">
-      <h2>{t("page.futures")}</h2>
+      <div className="page-head">
+        <h2>{t("page.futures")}</h2>
+      </div>
       <WithdrawReview />
       <PositionLiquidation />
       <div className="grid-2">
@@ -97,9 +99,11 @@ function WithdrawReview() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("futures.withdrawReview")}</h3>
-        <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        <div className="card-actions">
+          <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        </div>
       </div>
       <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
       {err && <div className="error">{t("common.loadError", { err })}</div>}
@@ -198,9 +202,11 @@ function PositionLiquidation() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("futures.positionLiq")}</h3>
-        <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        <div className="card-actions">
+          <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        </div>
       </div>
       <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
       {err && <div className="error">{t("common.loadError", { err })}</div>}

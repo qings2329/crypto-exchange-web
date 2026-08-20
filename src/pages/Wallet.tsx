@@ -32,7 +32,7 @@ function fmtNs(ts: number): string {
 // 渲染单元格：对象/数组折叠为 JSON，其余转字符串
 function renderCell(v: unknown) {
   if (v === null || v === undefined) return "--";
-  if (typeof v === "object") return <code className="cell-json">{JSON.stringify(v)}</code>;
+  if (typeof v === "object") return <code className="mono">{JSON.stringify(v)}</code>;
   return String(v);
 }
 
@@ -109,7 +109,7 @@ function AdaptiveTable({ data }: { data: unknown }) {
     );
   }
 
-  return <div className="cell-json">{String(data)}</div>;
+  return <div className="mono">{String(data)}</div>;
 }
 
 // 钱包：以合约钱包余额接口为统一资产视图（现货余额经撮合引擎内存态，无独立 HTTP 接口）。
@@ -271,21 +271,19 @@ export function Wallet() {
       <section className="card">
         <div className="card-head">
           <h3>{t("wallet.withdraws")}</h3>
-          <div className="card-actions">
-            <input
-              className="filter"
-              placeholder={t("wallet.filterPlaceholder")}
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            />
-            <button className="refresh" onClick={() => setShowForm((v) => !v)}>
-              {showForm ? t("otc.collapse") : t("wallet.applyWithdraw")}
-            </button>
-          </div>
+          <input
+            className="filter"
+            placeholder={t("wallet.filterPlaceholder")}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <button className="btn" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? t("otc.collapse") : t("wallet.applyWithdraw")}
+          </button>
         </div>
 
         {showForm && (
-          <div className="orderform wform">
+          <div className="card">
             <label>
               {t("wallet.asset")}
               <input
@@ -303,7 +301,7 @@ export function Wallet() {
             <label>
               {t("wallet.address")}
               <input value={address} onChange={(e) => onAddressChange(e.target.value)} placeholder={t("wallet.phAddress")} />
-              {addrErr && <div className="form-error">{addrErr}</div>}
+              {addrErr && <div className="error">{addrErr}</div>}
             </label>
             <label>
               {t("wallet.amount")}
@@ -313,13 +311,13 @@ export function Wallet() {
                 placeholder="0.00"
                 inputMode="decimal"
               />
-              {amtErr && <div className="form-error">{amtErr}</div>}
+              {amtErr && <div className="error">{amtErr}</div>}
             </label>
             <label>
               {t("wallet.network")}
               <input value={network} onChange={(e) => setNetwork(e.target.value)} placeholder={t("wallet.phNetwork")} />
             </label>
-            <button className="submit" onClick={submitWithdraw} disabled={submitting}>
+            <button className="btn primary" onClick={submitWithdraw} disabled={submitting}>
               {submitting ? t("common.loading") : t("wallet.submitWithdraw")}
             </button>
             {formMsg && (
@@ -344,14 +342,12 @@ export function Wallet() {
       <section className="card">
         <div className="card-head">
           <h3>{t("wallet.ledger")}</h3>
-          <div className="card-actions">
-            <input
-              className="filter"
-              placeholder={t("wallet.ledgerFilterPlaceholder")}
-              value={ledgerFilter}
-              onChange={(e) => setLedgerFilter(e.target.value)}
-            />
-          </div>
+          <input
+            className="filter"
+            placeholder={t("wallet.ledgerFilterPlaceholder")}
+            value={ledgerFilter}
+            onChange={(e) => setLedgerFilter(e.target.value)}
+          />
         </div>
         {ledgerErr ? (
           <div className="error">{t("common.loadError", { err: ledgerErr })}</div>
@@ -378,12 +374,12 @@ export function Wallet() {
                     <td>{fmtNs(e.time)}</td>
                     <td>{e.asset}</td>
                     <td>{bizLabel(t, e.biz_type)}</td>
-                    <td className={e.delta >= 0 ? "otc-side buy" : "otc-side sell"}>
+                    <td className="ostatus">
                       {e.delta >= 0 ? "+" : ""}
                       {e.delta.toLocaleString()}
                     </td>
                     <td>{e.balance.toLocaleString()}</td>
-                    <td className="cell-json">{e.ref || "--"}</td>
+                    <td className="mono">{e.ref || "--"}</td>
                   </tr>
                 ))}
               </tbody>

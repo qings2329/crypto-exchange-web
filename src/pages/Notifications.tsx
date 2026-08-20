@@ -92,11 +92,13 @@ export function Notifications() {
 
   return (
     <div className="page">
-      <h2>{t("page.notifications")}</h2>
+      <div className="page-head">
+        <h2>{t("page.notifications")}</h2>
+        <button className="btn primary" onClick={() => setShowForm(true)}>{t("notif.publish")}</button>
+      </div>
       <section className="card">
-        <div className="panel-head">
+        <div className="card-head">
           <h3>{t("notif.all")}</h3>
-          <button className="btn primary" onClick={() => setShowForm(true)}>{t("notif.publish")}</button>
         </div>
         <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
         {err && <div className="error">{t("common.loadError", { err })}</div>}
@@ -130,13 +132,13 @@ export function Notifications() {
                     </div>
                     <div className="notif-clamp">{n.title}</div>
                     <div>
-                      <span className={`perm-badge ${n.level === "critical" ? "danger" : n.level === "warning" ? "warn" : "safe"}`}>
+                      <span className={`ostatus ${n.level === "critical" ? "disputed" : n.level === "warning" ? "pending" : "completed"}`}>
                         {t(LEVEL_KEY[n.level])}
                       </span>
                     </div>
                     <div className="notif-clamp">{t(TARGET_KEY[n.target])}{n.target_user ? ` (${n.target_user})` : ""}</div>
                     <div className="cell-clamp">{n.content}</div>
-                    <div>{t(STATUS_KEY[n.status])}</div>
+                    <div className="ostatus unknown">{t(STATUS_KEY[n.status])}</div>
                     <div className="row-actions">
                       <button className="link-btn" disabled={n.status === "recalled"} onClick={() => recall(n)}>{t("notif.recall")}</button>
                       <button className="link-btn danger" onClick={() => remove(n)}>{t("common.delete")}</button>
@@ -219,7 +221,7 @@ function NotificationFormModal({ onClose, onSaved }: { onClose: () => void; onSa
       {target === "user" && (
         <TextField id="n-user" label={t("notif.form.targetUserLabel")} value={targetUser} onChange={(e) => setTargetUser(e.target.value)} placeholder={t("notif.ph.targetUser")} />
       )}
-      {err && <div className="form-error">{err}</div>}
+      {err && <div className="error">{err}</div>}
     </Modal>
   );
 }

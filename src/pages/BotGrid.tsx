@@ -177,59 +177,61 @@ export function BotGrid() {
       {/* Create form */}
       {showForm && (
         <section className="card">
-          <h3>{t("bot.form.title")}</h3>
-          <div className="wform">
-            <label>
-              {t("bot.form.name")}
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("bot.form.namePh")} />
-            </label>
-            <label>
-              {t("bot.form.symbol")}
-              <input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder={t("bot.form.symbolPh")} />
-            </label>
-            <label>
-              {t("bot.form.token")}
-              <input value={token} onChange={(e) => setToken(e.target.value)} placeholder={t("bot.form.tokenPh")} type="password" />
-            </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              <label>
-                {t("bot.form.lower")}
-                <input type="number" min="0" step="any" value={lower} onChange={(e) => setLower(e.target.value)} />
-              </label>
-              <label>
-                {t("bot.form.upper")}
-                <input type="number" min="0" step="any" value={upper} onChange={(e) => setUpper(e.target.value)} />
-              </label>
+          <div className="card-head">
+            <h3>{t("bot.form.title")}</h3>
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("bot.form.name")}</span>
+            <input className="filter" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("bot.form.namePh")} />
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("bot.form.symbol")}</span>
+            <input className="filter" value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder={t("bot.form.symbolPh")} />
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("bot.form.token")}</span>
+            <input className="filter" value={token} onChange={(e) => setToken(e.target.value)} placeholder={t("bot.form.tokenPh")} type="password" />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+            <div className="form-field">
+              <span className="form-label">{t("bot.form.lower")}</span>
+              <input className="filter" type="number" min="0" step="any" value={lower} onChange={(e) => setLower(e.target.value)} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-              <label>
-                {t("bot.form.gridNum")}
-                <input type="number" min="2" value={gridNum} onChange={(e) => setGridNum(e.target.value)} />
-              </label>
-              <label>
-                {t("bot.form.orderAmount")}
-                <input type="number" min="0" step="any" value={orderAmt} onChange={(e) => setOrderAmt(e.target.value)} />
-              </label>
-              <label>
-                {t("bot.form.maxPos")}
-                <input type="number" min="0" step="any" value={maxPos} onChange={(e) => setMaxPos(e.target.value)} />
-              </label>
+            <div className="form-field">
+              <span className="form-label">{t("bot.form.upper")}</span>
+              <input className="filter" type="number" min="0" step="any" value={upper} onChange={(e) => setUpper(e.target.value)} />
             </div>
-            <div className="row-actions">
-              <button className="submit" disabled={creating} onClick={createStrategy}>
-                {creating ? t("bot.form.creating") : t("bot.form.submit")}
-              </button>
-              <button className="btn" onClick={() => setShowForm(false)}>
-                {t("common.cancel")}
-              </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+            <div className="form-field">
+              <span className="form-label">{t("bot.form.gridNum")}</span>
+              <input className="filter" type="number" min="2" value={gridNum} onChange={(e) => setGridNum(e.target.value)} />
             </div>
+            <div className="form-field">
+              <span className="form-label">{t("bot.form.orderAmount")}</span>
+              <input className="filter" type="number" min="0" step="any" value={orderAmt} onChange={(e) => setOrderAmt(e.target.value)} />
+            </div>
+            <div className="form-field">
+              <span className="form-label">{t("bot.form.maxPos")}</span>
+              <input className="filter" type="number" min="0" step="any" value={maxPos} onChange={(e) => setMaxPos(e.target.value)} />
+            </div>
+          </div>
+          <div className="row-actions">
+            <button className="btn primary" disabled={creating} onClick={createStrategy}>
+              {creating ? t("bot.form.creating") : t("bot.form.submit")}
+            </button>
+            <button className="btn" onClick={() => setShowForm(false)}>
+              {t("common.cancel")}
+            </button>
           </div>
         </section>
       )}
 
       {/* Strategy list */}
       <section className="card">
-        <h3>{t("bot.strategies")}</h3>
+        <div className="card-head">
+          <h3>{t("bot.strategies")}</h3>
+        </div>
         {loading && strategies.length === 0 && <div className="muted">{t("common.loading")}</div>}
         {!loading && strategies.length === 0 && <div className="muted">{t("bot.noStrategies")}</div>}
         {strategies.length > 0 && (
@@ -258,7 +260,11 @@ export function BotGrid() {
                       <td>{s.symbol}</td>
                       <td>{t(MARKET_KEY[s.market] ?? s.market)}</td>
                       <td>{t(TYPE_KEY[s.type] ?? s.type)}</td>
-                      <td>{t(STATUS_KEY[s.status] ?? s.status)}</td>
+                      <td>
+                        <span className={`ostatus ${s.status === "active" ? "completed" : "cancelled"}`}>
+                          {t(STATUS_KEY[s.status] ?? s.status)}
+                        </span>
+                      </td>
                       <td style={{ color: (gs?.pnl ?? 0) >= 0 ? "var(--green, #22c55e)" : "var(--red, #ef4444)" }}>
                         {gs ? fmtPnL(gs.pnl) : "—"}
                       </td>
@@ -285,8 +291,10 @@ export function BotGrid() {
       {/* Grid summary for viewed strategy */}
       {viewOrders && viewOrders.grid_state && (
         <section className="card">
-          <h3>{t("bot.gridSummary")} — {viewOrders.name}</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
+          <div className="card-head">
+            <h3>{t("bot.gridSummary")} — {viewOrders.name}</h3>
+          </div>
+          <div className="kv">
             {([
               ["bot.gridLower", viewOrders.params.grid_lower],
               ["bot.gridUpper", viewOrders.params.grid_upper],
@@ -300,9 +308,9 @@ export function BotGrid() {
               ["bot.gridFilledBuys", viewOrders.grid_state.levels?.filter((l) => l.filled && l.side === "buy").length ?? 0],
               ["bot.gridFilledSells", viewOrders.grid_state.levels?.filter((l) => l.filled && l.side === "sell").length ?? 0],
             ] as [string, string | number][]).map(([k, v]) => (
-              <div key={k} style={{ padding: "8px", background: "var(--card-bg, #1a1a2e)", borderRadius: "6px" }}>
-                <div className="muted" style={{ fontSize: "0.8em" }}>{t(k)}</div>
-                <div style={{ fontSize: "1.2em", fontWeight: 600 }}>{String(v)}</div>
+              <div key={k} className="kv-row">
+                <span className="kv-k">{t(k)}</span>
+                <span className="kv-v">{String(v)}</span>
               </div>
             ))}
           </div>
@@ -312,7 +320,7 @@ export function BotGrid() {
       {/* Orders for viewed strategy */}
       {viewOrders && (
         <section className="card">
-          <div className="panel-head">
+          <div className="card-head">
             <h3>{t("bot.orders")} — {viewOrders.name}</h3>
             <button className="btn" onClick={() => setViewOrders(null)}>{t("common.close")}</button>
           </div>
@@ -340,7 +348,9 @@ export function BotGrid() {
                       <td>{o.symbol}</td>
                       <td>{o.price}</td>
                       <td>{o.qty}</td>
-                      <td>{o.status}</td>
+                      <td>
+                        <span className={`ostatus ${o.status}`}>{o.status}</span>
+                      </td>
                       <td>{o.created_at ? new Date(o.created_at / 1e6).toLocaleString() : "—"}</td>
                     </tr>
                   ))}

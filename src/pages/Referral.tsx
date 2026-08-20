@@ -46,33 +46,40 @@ export function Referral() {
 
   return (
     <div className="page">
-      <h2>{t("referral.title")}</h2>
+      <div className="page-head">
+        <h2>{t("referral.title")}</h2>
+      </div>
 
       {/* 邀请码与链接 */}
-      <section style={{ marginBottom: 24 }}>
-        <h3>{t("referral.myCode")}</h3>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
-          <code style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, background: "var(--bg-card)", padding: "8px 16px", borderRadius: 6 }}>
-            {code}
-          </code>
-          <button onClick={copyLink}>{copied ? t("referral.copied") : t("referral.copyLink")}</button>
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("referral.myCode")}</h3>
         </div>
-        <div style={{ fontSize: 13, color: "var(--text-muted)", wordBreak: "break-all" }}>
-          {t("referral.inviteLink")}: {inviteLink}
+        <div className="copy-row">
+          <code className="mono">{code}</code>
+          <button className="copy-btn" onClick={copyLink}>{copied ? t("referral.copied") : t("referral.copyLink")}</button>
+        </div>
+        <div className="kv" style={{ marginTop: 8 }}>
+          <div className="kv-row">
+            <span className="kv-k">{t("referral.inviteLink")}</span>
+            <span className="kv-v mono">{inviteLink}</span>
+          </div>
         </div>
       </section>
 
       {/* 佣金统计 */}
-      <section style={{ marginBottom: 24 }}>
-        <h3>{t("referral.earnings")}</h3>
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("referral.earnings")}</h3>
+        </div>
         {Object.keys(totals).length === 0 ? (
-          <p style={{ color: "var(--text-muted)" }}>{t("referral.noEarnings")}</p>
+          <div className="muted">{t("referral.noEarnings")}</div>
         ) : (
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <div className="kv">
             {Object.entries(totals).map(([asset, amount]) => (
-              <div key={asset} className="card" style={{ minWidth: 120, textAlign: "center" }}>
-                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{asset}</div>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>{(amount / 1e6).toFixed(6)}</div>
+              <div key={asset} className="kv-row">
+                <span className="kv-k">{asset}</span>
+                <span className="kv-v mono">{(amount / 1e6).toFixed(6)}</span>
               </div>
             ))}
           </div>
@@ -80,62 +87,74 @@ export function Referral() {
       </section>
 
       {/* 下线用户列表 */}
-      <section style={{ marginBottom: 24 }}>
-        <h3>{t("referral.referrals")} ({referrals.length})</h3>
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("referral.referrals")} ({referrals.length})</h3>
+        </div>
         {referrals.length === 0 ? (
-          <p style={{ color: "var(--text-muted)" }}>{t("referral.noReferrals")}</p>
+          <div className="muted">{t("referral.noReferrals")}</div>
         ) : (
-          <table className="tbl" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>{t("referral.userId")}</th>
-                <th>{t("referral.nickname")}</th>
-                <th>{t("referral.email")}</th>
-                <th>{t("referral.joinedAt")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {referrals.map((r) => (
-                <tr key={r.user_id}>
-                  <td>{r.user_id}</td>
-                  <td>{r.nickname || "-"}</td>
-                  <td>{r.email || "-"}</td>
-                  <td>{r.created_at ? new Date(r.created_at).toLocaleDateString() : "-"}</td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("referral.userId")}</th>
+                  <th>{t("referral.nickname")}</th>
+                  <th>{t("referral.email")}</th>
+                  <th>{t("referral.joinedAt")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {referrals.map((r) => (
+                  <tr key={r.user_id}>
+                    <td>{r.user_id}</td>
+                    <td>{r.nickname || "-"}</td>
+                    <td>{r.email || "-"}</td>
+                    <td>{r.created_at ? new Date(r.created_at).toLocaleDateString() : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
       {/* 佣金记录 */}
-      <section>
-        <h3>{t("referral.commissions")}</h3>
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("referral.commissions")}</h3>
+        </div>
         {commissions.length === 0 ? (
-          <p style={{ color: "var(--text-muted)" }}>{t("referral.noCommissions")}</p>
+          <div className="muted">{t("referral.noCommissions")}</div>
         ) : (
-          <table className="tbl" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>{t("referral.asset")}</th>
-                <th>{t("referral.amount")}</th>
-                <th>{t("referral.rate")}</th>
-                <th>{t("referral.status")}</th>
-                <th>{t("referral.time")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {commissions.map((c: any) => (
-                <tr key={c.id}>
-                  <td>{c.asset}</td>
-                  <td>{(c.amount / 1e6).toFixed(6)}</td>
-                  <td>{(c.rate * 100).toFixed(1)}%</td>
-                  <td>{c.status === 1 ? t("referral.confirmed") : t("referral.pending")}</td>
-                  <td>{c.created_at ? new Date(c.created_at).toLocaleString() : "-"}</td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("referral.asset")}</th>
+                  <th>{t("referral.amount")}</th>
+                  <th>{t("referral.rate")}</th>
+                  <th>{t("referral.status")}</th>
+                  <th>{t("referral.time")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {commissions.map((c: any) => (
+                  <tr key={c.id}>
+                    <td>{c.asset}</td>
+                    <td className="mono">{(c.amount / 1e6).toFixed(6)}</td>
+                    <td>{(c.rate * 100).toFixed(1)}%</td>
+                    <td>
+                      <span className={`ostatus ${c.status === 1 ? "completed" : "pending"}`}>
+                        {c.status === 1 ? t("referral.confirmed") : t("referral.pending")}
+                      </span>
+                    </td>
+                    <td>{c.created_at ? new Date(c.created_at).toLocaleString() : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

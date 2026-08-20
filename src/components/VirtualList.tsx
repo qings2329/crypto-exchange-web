@@ -42,31 +42,32 @@ export function VirtualList<T>({
   };
 
   return (
-    <div
-      className={className}
-      style={containerStyle}
-      onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-      role="list"
-    >
-      <div style={{ height: total * rowHeight, position: "relative" }}>
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            transform: `translateY(${offsetY}px)`,
-          }}
-        >
-          {visible.map((item, i) => {
-            const index = startIndex + i;
-            const key = getKey ? getKey(item, index) : index;
-            return (
-              <div key={key} role="listitem" style={{ height: rowHeight }}>
-                {renderRow(item, index)}
-              </div>
-            );
-          })}
+    <div className={`table-wrap ${className ?? ""}`.trim()}>
+      <div
+        style={containerStyle}
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        role="list"
+      >
+        <div style={{ height: total * rowHeight, position: "relative" }}>
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              transform: `translateY(${offsetY}px)`,
+            }}
+          >
+            {visible.map((item, i) => {
+              const index = startIndex + i;
+              const key = getKey ? getKey(item, index) : index;
+              return (
+                <div key={key} role="listitem" style={{ height: rowHeight }}>
+                  {renderRow(item, index)}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

@@ -8,7 +8,9 @@ export function Options() {
   const { t } = useI18n();
   return (
     <div className="page">
-      <h2>{t("page.options")}</h2>
+      <div className="page-head">
+        <h2>{t("page.options")}</h2>
+      </div>
       <ContractManage />
       <PositionClose />
     </div>
@@ -38,9 +40,11 @@ function ContractManage() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("options.contracts")}</h3>
-        <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        <div className="card-actions">
+          <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        </div>
       </div>
       {err && <div className="error">{t("common.loadError", { err })}</div>}
       {!err && rows === undefined && <div className="muted">{t("common.loading")}</div>}
@@ -139,9 +143,11 @@ function PositionClose() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("options.positions")}</h3>
-        <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        <div className="card-actions">
+          <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        </div>
       </div>
       <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
       {err && <div className="error">{t("common.loadError", { err })}</div>}

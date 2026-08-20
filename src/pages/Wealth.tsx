@@ -116,11 +116,9 @@ export function Wealth() {
     <div className="page">
       <div className="page-head">
         <h2>{t("wealth.title")}</h2>
-        <div className="card-actions">
-          <button className="refresh" disabled={loading} onClick={loadAll}>
-            {t("common.refresh")}
-          </button>
-        </div>
+        <button className="refresh" disabled={loading} onClick={loadAll}>
+          {t("common.refresh")}
+        </button>
       </div>
 
       {err && <div className="error">{t("wealth.fail", { err })}</div>}
@@ -128,14 +126,16 @@ export function Wealth() {
 
       {/* 认购 */}
       <section className="card">
-        <h3>{t("wealth.subscribe")}</h3>
+        <div className="card-head">
+          <h3>{t("wealth.subscribe")}</h3>
+        </div>
         {openProducts.length === 0 ? (
           <div className="muted">{t("wealth.noProducts")}</div>
         ) : (
-          <div className="wform">
-            <label>
-              {t("wealth.product")}
-              <select value={productId} onChange={(e) => setProductId(Number(e.target.value))}>
+          <div>
+            <div className="form-field">
+              <span className="form-label">{t("wealth.product")}</span>
+              <select className="form-select" value={productId} onChange={(e) => setProductId(Number(e.target.value))}>
                 <option value={0}>{t("otc.selectPlaceholder")}</option>
                 {openProducts.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -145,10 +145,11 @@ export function Wealth() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label>
-              {t("wealth.amount")}
+            </div>
+            <div className="form-field">
+              <span className="form-label">{t("wealth.amount")}</span>
               <input
+                className="filter"
                 type="number"
                 min="0"
                 step="any"
@@ -156,9 +157,9 @@ export function Wealth() {
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={t("wealth.amountPh")}
               />
-            </label>
+            </div>
             <div className="row-actions">
-              <button className="submit" disabled={subscribing || !productId} onClick={subscribe}>
+              <button className="btn primary" disabled={subscribing || !productId} onClick={subscribe}>
                 {subscribing ? t("wealth.subscribing") : t("wealth.subscribeBtn")}
               </button>
             </div>
@@ -168,7 +169,9 @@ export function Wealth() {
 
       {/* 我的持仓 */}
       <section className="card">
-        <h3>{t("wealth.holdings")}</h3>
+        <div className="card-head">
+          <h3>{t("wealth.holdings")}</h3>
+        </div>
         {loading && holdings.length === 0 && <div className="muted">{t("common.loading")}</div>}
         {!loading && holdings.length === 0 && <div className="muted">{t("wealth.noHoldings")}</div>}
         <div className="table-wrap">
@@ -192,9 +195,13 @@ export function Wealth() {
                     <td>{h.id}</td>
                     <td>{p ? p.name : `#${h.product_id}`}</td>
                     <td>{h.asset}</td>
-                    <td>{fmtNum(h.principal)}</td>
-                    <td>{fmtNum(h.accrued_yield)}</td>
-                    <td>{t(STATUS_KEY[h.status] ?? `wealth.status.${h.status}`)}</td>
+                    <td className="mono">{fmtNum(h.principal)}</td>
+                    <td className="mono">{fmtNum(h.accrued_yield)}</td>
+                    <td>
+                      <span className={`ostatus ${h.status}`}>
+                        {t(STATUS_KEY[h.status] ?? `wealth.status.${h.status}`)}
+                      </span>
+                    </td>
                     <td>
                       <button
                         className="link-btn"

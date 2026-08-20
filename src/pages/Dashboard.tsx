@@ -32,7 +32,9 @@ export function Dashboard() {
 
   return (
     <div className="page">
-      <h2>{t("page.dashboard")}</h2>
+      <div className="page-head">
+        <h2>{t("page.dashboard")}</h2>
+      </div>
       {err && <div className="error">{t("dash.overviewError", { err })}</div>}
       <div className="stat-row">
         {cards.map((c) => (
@@ -51,7 +53,9 @@ export function Dashboard() {
       </div>
 
       <section className="card" style={{ marginTop: 16 }}>
-        <h3>{t("dash.moduleEntry")}</h3>
+        <div className="card-head">
+          <h3>{t("dash.moduleEntry")}</h3>
+        </div>
         <div className="quick-links">
           {QUICK.map((q) => (
             <a key={q.path} className="btn" href={`#${q.path}`}>

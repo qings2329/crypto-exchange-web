@@ -23,7 +23,7 @@ function fmtPrice(p: number, market: string): string {
 }
 
 function SideBadge({ side, t }: { side: "buy" | "sell"; t: (k: string) => string }) {
-  const cls = side === "buy" ? "otc-side buy" : "otc-side sell";
+  const cls = side === "buy" ? "btn buy" : "btn sell";
   const label = side === "buy" ? t("trade.buy") : t("trade.sell");
   return <span className={cls}>{label}</span>;
 }
@@ -203,13 +203,15 @@ export function History() {
         ))}
       </div>
 
-      <div className="card-actions" style={{ marginBottom: 12 }}>
-        <input
-          className="filter"
-          placeholder={t("history.filterPlaceholder")}
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
-        />
+      <div className="card">
+        <div className="filter-bar">
+          <input
+            className="filter"
+            placeholder={t("history.filterPlaceholder")}
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+          />
+        </div>
       </div>
 
       {err ? (

@@ -46,17 +46,25 @@ export function Risk() {
   const [tab, setTab] = useState<Tab>("rules");
   return (
     <div className="page">
-      <h2>{t("page.risk")}</h2>
-      <div className="seg">
-        <button className={tab === "rules" ? "active" : ""} onClick={() => setTab("rules")}>
-          {t("risk.tab.rules")}
-        </button>
-        <button className={tab === "blacklist" ? "active" : ""} onClick={() => setTab("blacklist")}>
-          {t("risk.tab.blacklist")}
-        </button>
-        <button className={tab === "events" ? "active" : ""} onClick={() => setTab("events")}>
-          {t("risk.tab.events")}
-        </button>
+      <div className="page-head">
+        <h2>{t("page.risk")}</h2>
+      </div>
+      <div className="tabs">
+        {(
+          [
+            { key: "rules", label: t("risk.tab.rules") },
+            { key: "blacklist", label: t("risk.tab.blacklist") },
+            { key: "events", label: t("risk.tab.events") },
+          ] as const
+        ).map((item) => (
+          <button
+            key={item.key}
+            className={tab === item.key ? "tab active" : "tab"}
+            onClick={() => setTab(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
       {tab === "rules" && <RulesPanel />}
       {tab === "blacklist" && <BlacklistPanel />}
@@ -122,11 +130,13 @@ function RulesPanel() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("risk.rules")}</h3>
-        <button className="btn primary" onClick={() => { setEditing(null); setShowForm(true); }}>
-          {t("risk.newRule")}
-        </button>
+        <div className="card-actions">
+          <button className="btn primary" onClick={() => { setEditing(null); setShowForm(true); }}>
+            {t("risk.newRule")}
+          </button>
+        </div>
       </div>
       <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
       {err && <div className="error">{t("common.loadError", { err })}</div>}
@@ -328,9 +338,11 @@ function BlacklistPanel() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("risk.blacklist")}</h3>
-        <button className="btn primary" onClick={() => setShowForm(true)}>{t("risk.addBlacklist")}</button>
+        <div className="card-actions">
+          <button className="btn primary" onClick={() => setShowForm(true)}>{t("risk.addBlacklist")}</button>
+        </div>
       </div>
       <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
       {err && <div className="error">{t("common.loadError", { err })}</div>}
@@ -509,9 +521,11 @@ function EventsPanel() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("risk.events")}</h3>
-        <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        <div className="card-actions">
+          <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        </div>
       </div>
       <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
       {err && <div className="error">{t("common.loadError", { err })}</div>}

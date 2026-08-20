@@ -123,11 +123,14 @@ export function Announcements() {
 
       {/* 编辑/新建表单 */}
       {formOpen && (
-        <section className="card wform">
-          <h3>{editing.id == null ? t("ann.formNew") : t("ann.formEdit", { id: editing.id })}</h3>
-          <label>
-            {t("ann.level")}
+        <section className="card">
+          <div className="card-head">
+            <h3>{editing.id == null ? t("ann.formNew") : t("ann.formEdit", { id: editing.id })}</h3>
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("ann.level")}</span>
             <select
+              className="form-select"
               value={editing.level}
               onChange={(e) => setEditing({ ...editing, level: e.target.value as AnnouncementLevel })}
             >
@@ -137,39 +140,40 @@ export function Announcements() {
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            {t("ann.titleLabel")}
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("ann.titleLabel")}</span>
             <input
+              className="filter"
               value={editing.title}
               maxLength={128}
               onChange={(e) => setEditing({ ...editing, title: e.target.value })}
               placeholder={t("ann.ph.title")}
             />
-          </label>
-          <label>
-            {t("ann.content")}
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("ann.content")}</span>
             <textarea
+              className="form-textarea"
               value={editing.content}
               maxLength={4096}
               onChange={(e) => setEditing({ ...editing, content: e.target.value })}
               placeholder={t("ann.contentPh")}
-              style={{ minHeight: 80, resize: "vertical" }}
             />
-          </label>
-          <label className="checkbox">
+          </div>
+          <div className="form-check">
             <input
               type="checkbox"
               checked={editing.active}
               onChange={(e) => setEditing({ ...editing, active: e.target.checked })}
             />
             {t("ann.publish")}
-          </label>
+          </div>
           <div className="row-actions">
-            <button className="submit" onClick={save}>
+            <button className="btn primary" onClick={save}>
               {t("common.save")}
             </button>
-            <button className="refresh" onClick={() => { setEditing(EMPTY); setFormOpen(false); }}>
+            <button className="btn" onClick={() => { setEditing(EMPTY); setFormOpen(false); }}>
               {t("common.cancel")}
             </button>
           </div>
@@ -177,8 +181,10 @@ export function Announcements() {
       )}
 
       {/* 列表 */}
-      <section className="card">
-        <h3>{t("ann.allDrafts")}</h3>
+      <section className="bn-card">
+        <div className="bn-card-header">
+          <h3>{t("ann.allDrafts")}</h3>
+        </div>
         {loading && list.length === 0 && <div className="muted">{t("common.loading")}</div>}
         {!loading && list.length === 0 && <div className="muted">{t("ann.noAnn")}</div>}
         <div className="table-wrap">
@@ -210,7 +216,7 @@ export function Announcements() {
                       <button className="link-btn" onClick={() => startEdit(a)}>
                         {t("common.edit")}
                       </button>
-                      <button className="link-btn" onClick={() => remove(a)}>
+                      <button className="link-btn danger" onClick={() => remove(a)}>
                         {t("common.delete")}
                       </button>
                     </div>

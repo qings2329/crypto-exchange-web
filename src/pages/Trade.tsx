@@ -9,12 +9,16 @@ export function Trade() {
   const symbol = "BTC_USDT";
   return (
     <div className="trade">
-      <Header symbol={symbol} />
-      <TickerBar symbol={symbol} />
-      <KLineChart symbol={symbol} interval="1m" />
+      <div className="header">
+        <Header symbol={symbol} />
+        <TickerBar symbol={symbol} />
+      </div>
       <div className="grid">
-        <OrderBook symbol={symbol} />
-        <OrderForm symbol={symbol} />
+        <KLineChart symbol={symbol} interval="1m" />
+        <div>
+          <OrderBook symbol={symbol} />
+          <OrderForm symbol={symbol} />
+        </div>
       </div>
     </div>
   );

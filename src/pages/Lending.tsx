@@ -143,11 +143,9 @@ export function Lending() {
     <div className="page">
       <div className="page-head">
         <h2>{t("lending.title")}</h2>
-        <div className="card-actions">
-          <button className="refresh" disabled={loading} onClick={loadAll}>
-            {t("common.refresh")}
-          </button>
-        </div>
+        <button className="refresh" disabled={loading} onClick={loadAll}>
+          {t("common.refresh")}
+        </button>
       </div>
 
       {err && <div className="error">{t("lending.fail", { err })}</div>}
@@ -155,7 +153,9 @@ export function Lending() {
 
       {/* Pool list */}
       <section className="card">
-        <h3>{t("lending.pools")}</h3>
+        <div className="card-head">
+          <h3>{t("lending.pools")}</h3>
+        </div>
         {pools.length === 0 && !loading && <div className="muted">{t("lending.noPools")}</div>}
         {pools.length > 0 && (
           <div className="table-wrap">
@@ -190,86 +190,91 @@ export function Lending() {
       {/* Lend + Borrow forms side by side */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--gap, 16px)" }}>
         <section className="card">
-          <h3>{t("lending.lend")}</h3>
-          <div className="wform">
-            <label>
-              {t("lending.pools")}
-              <select value={lendPoolId} onChange={(e) => setLendPoolId(Number(e.target.value))}>
-                <option value={0}>{t("otc.selectPlaceholder")}</option>
-                {pools.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.asset} · {fmtRate(p.interest_rate)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {t("lending.amount")}
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={lendAmount}
-                onChange={(e) => setLendAmount(e.target.value)}
-                placeholder={t("lending.amountPh")}
-              />
-            </label>
-            <div className="row-actions">
-              <button className="submit" disabled={lending || !lendPoolId} onClick={doLend}>
-                {lending ? t("lending.lending") : t("lending.submitLend")}
-              </button>
-            </div>
+          <div className="card-head">
+            <h3>{t("lending.lend")}</h3>
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("lending.pools")}</span>
+            <select className="form-select" value={lendPoolId} onChange={(e) => setLendPoolId(Number(e.target.value))}>
+              <option value={0}>{t("otc.selectPlaceholder")}</option>
+              {pools.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.asset} · {fmtRate(p.interest_rate)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("lending.amount")}</span>
+            <input
+              className="filter"
+              type="number"
+              min="0"
+              step="any"
+              value={lendAmount}
+              onChange={(e) => setLendAmount(e.target.value)}
+              placeholder={t("lending.amountPh")}
+            />
+          </div>
+          <div className="row-actions">
+            <button className="btn primary" disabled={lending || !lendPoolId} onClick={doLend}>
+              {lending ? t("lending.lending") : t("lending.submitLend")}
+            </button>
           </div>
         </section>
 
         <section className="card">
-          <h3>{t("lending.borrow")}</h3>
-          <div className="wform">
-            <label>
-              {t("lending.pools")}
-              <select value={borrowPoolId} onChange={(e) => setBorrowPoolId(Number(e.target.value))}>
-                <option value={0}>{t("otc.selectPlaceholder")}</option>
-                {pools.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.asset} · {fmtRate(p.interest_rate)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {t("lending.amount")}
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={borrowAmt}
-                onChange={(e) => setBorrowAmt(e.target.value)}
-                placeholder={t("lending.amountPh")}
-              />
-            </label>
-            <label>
-              {t("lending.collateralLabel")}
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={collateral}
-                onChange={(e) => setCollateral(e.target.value)}
-                placeholder={t("lending.collateralPh")}
-              />
-            </label>
-            <div className="row-actions">
-              <button className="submit" disabled={borrowing || !borrowPoolId} onClick={doBorrow}>
-                {borrowing ? t("lending.borrowing") : t("lending.submitBorrow")}
-              </button>
-            </div>
+          <div className="card-head">
+            <h3>{t("lending.borrow")}</h3>
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("lending.pools")}</span>
+            <select className="form-select" value={borrowPoolId} onChange={(e) => setBorrowPoolId(Number(e.target.value))}>
+              <option value={0}>{t("otc.selectPlaceholder")}</option>
+              {pools.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.asset} · {fmtRate(p.interest_rate)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("lending.amount")}</span>
+            <input
+              className="filter"
+              type="number"
+              min="0"
+              step="any"
+              value={borrowAmt}
+              onChange={(e) => setBorrowAmt(e.target.value)}
+              placeholder={t("lending.amountPh")}
+            />
+          </div>
+          <div className="form-field">
+            <span className="form-label">{t("lending.collateralLabel")}</span>
+            <input
+              className="filter"
+              type="number"
+              min="0"
+              step="any"
+              value={collateral}
+              onChange={(e) => setCollateral(e.target.value)}
+              placeholder={t("lending.collateralPh")}
+            />
+          </div>
+          <div className="row-actions">
+            <button className="btn primary" disabled={borrowing || !borrowPoolId} onClick={doBorrow}>
+              {borrowing ? t("lending.borrowing") : t("lending.submitBorrow")}
+            </button>
           </div>
         </section>
       </div>
 
       {/* My Lends */}
       <section className="card">
-        <h3>{t("lending.myLends")}</h3>
+        <div className="card-head">
+          <h3>{t("lending.myLends")}</h3>
+        </div>
         {loading && lends.length === 0 && <div className="muted">{t("common.loading")}</div>}
         {!loading && lends.length === 0 && <div className="muted">{t("lending.noLends")}</div>}
         {lends.length > 0 && (
@@ -294,7 +299,11 @@ export function Lending() {
                       <td>{pool ? pool.asset : `#${l.pool_id}`}</td>
                       <td>{l.amount}</td>
                       <td>{fmtRate(l.rate)}</td>
-                      <td>{t(LEND_STATUS[l.status] ?? `lending.status.${l.status}`)}</td>
+                      <td>
+                        <span className={`ostatus ${l.status}`}>
+                          {t(LEND_STATUS[l.status] ?? `lending.status.${l.status}`)}
+                        </span>
+                      </td>
                       <td>
                         {l.status === "active" && (
                           <button className="link-btn" onClick={() => doWithdraw(l)}>
@@ -313,7 +322,9 @@ export function Lending() {
 
       {/* My Borrows */}
       <section className="card">
-        <h3>{t("lending.myBorrows")}</h3>
+        <div className="card-head">
+          <h3>{t("lending.myBorrows")}</h3>
+        </div>
         {loading && borrows.length === 0 && <div className="muted">{t("common.loading")}</div>}
         {!loading && borrows.length === 0 && <div className="muted">{t("lending.noBorrows")}</div>}
         {borrows.length > 0 && (
@@ -342,7 +353,11 @@ export function Lending() {
                       <td>{b.collateral}</td>
                       <td>{fmtRate(b.rate)}</td>
                       <td>{b.interest_acc}</td>
-                      <td>{t(BORROW_STATUS[b.status] ?? `lending.status.${b.status}`)}</td>
+                      <td>
+                        <span className={`ostatus ${b.status}`}>
+                          {t(BORROW_STATUS[b.status] ?? `lending.status.${b.status}`)}
+                        </span>
+                      </td>
                       <td>
                         {b.status === "active" && (
                           <button className="link-btn" onClick={() => doRepay(b)}>

@@ -51,7 +51,7 @@ export function TextAreaField({
 }: { label?: ReactNode; error?: string; hint?: ReactNode } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <FormField label={label} htmlFor={id} error={error} hint={hint}>
-      <textarea id={id} className="form-input form-textarea" {...rest} />
+      <textarea id={id} className="form-textarea" {...rest} />
     </FormField>
   );
 }
@@ -66,7 +66,7 @@ export function SelectField({
 }: { label?: ReactNode; error?: string; hint?: ReactNode } & SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <FormField label={label} htmlFor={id} error={error} hint={hint}>
-      <select id={id} className="form-input form-select" {...rest}>
+      <select id={id} className="form-select" {...rest}>
         {children}
       </select>
     </FormField>

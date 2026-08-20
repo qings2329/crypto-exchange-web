@@ -214,8 +214,8 @@ export function ApiKeys() {
     <div className="page">
       <div className="page-head">
         <h2>{t("apikeys.title")}</h2>
-        <div className="card-actions">
-          <button className="refresh" disabled={loading} onClick={() => load()}>
+        <div>
+          <button className="btn" disabled={loading} onClick={() => load()}>
             {t("common.refresh")}
           </button>
           <button className="link-btn" onClick={startCreate}>
@@ -230,7 +230,7 @@ export function ApiKeys() {
           <div className="card-head">
             <h3>{t("apikeys.createdTitle")}</h3>
           </div>
-          <div className="otc-hint">
+          <div className="ok">
             {t("apikeys.saveHint")}
           </div>
           <label>
@@ -257,8 +257,8 @@ export function ApiKeys() {
               </button>
             </div>
           </label>
-          <div className="row-actions">
-            <button className="submit" onClick={() => setCreated(null)}>
+          <div>
+            <button className="btn primary" onClick={() => setCreated(null)}>
               {t("apikeys.closeSaved")}
             </button>
           </div>
@@ -270,7 +270,7 @@ export function ApiKeys() {
 
       {/* 创建表单 */}
       {formOpen && (
-        <section className="card wform">
+        <section className="card">
           <div className="card-head">
             <h3>{t("apikeys.createTitle")}</h3>
           </div>
@@ -286,7 +286,7 @@ export function ApiKeys() {
           <div className="perm-group">
             <div className="perm-title">{t("apikeys.permTitle")}</div>
             {PERMS.map((p) => (
-              <label key={p} className="checkbox perm-check">
+              <label key={p} className="perm-check">
                 <input
                   type="checkbox"
                   checked={form.permissions.includes(p)}
@@ -307,11 +307,11 @@ export function ApiKeys() {
               style={{ minHeight: 72, resize: "vertical", fontFamily: "inherit" }}
             />
           </label>
-          <div className="row-actions">
-            <button className="submit" disabled={creating} onClick={create}>
+          <div>
+            <button className="btn primary" disabled={creating} onClick={create}>
               {creating ? t("apikeys.creating") : t("apikeys.create")}
             </button>
-            <button className="refresh" onClick={() => { setForm(EMPTY); setFormOpen(false); }}>
+            <button className="btn" onClick={() => { setForm(EMPTY); setFormOpen(false); }}>
               {t("common.cancel")}
             </button>
           </div>
@@ -401,7 +401,7 @@ export function ApiKeys() {
                       {k.last_used_at ? formatDateTime(k.last_used_at) : t("apikeys.never")}
                     </td>
                     <td>
-                      <div className="row-actions">
+                      <div>
                         <button className="link-btn" onClick={() => toggleStatus(k)}>
                           {k.status === "active" ? t("apikeys.disable") : t("apikeys.enable")}
                         </button>

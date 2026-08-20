@@ -139,12 +139,12 @@ export function ApiTable({
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="filter-bar">
         <h3>{title}</h3>
-        <div className="panel-tools">
+        <div className="filter">
           {searchable && (
             <input
-              className="form-input table-search"
+              className="table-search"
               placeholder={t("common.search")}
               value={query}
               onChange={(e) => {

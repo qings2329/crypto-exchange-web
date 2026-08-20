@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { createChart, CandlestickSeries, HistogramSeries } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from "lightweight-charts";
 import { api, connectKlineWS, type Kline } from "../api/client";
 import { reportWsDrop } from "../lib/monitor";
 import { useI18n } from "../i18n";
@@ -9,31 +11,46 @@ interface Props {
   limit?: number;
 }
 
-const UP = "#16c784";
-const DOWN = "#ea3943";
-// 网格/坐标轴颜色在绘制时从主题变量读取（随主题切换生效），避免浅色主题下白网格不可见。
-const FALLBACK_GRID = "rgba(255,255,255,0.06)";
-const FALLBACK_AXIS = "#8b95a5";
-const PAD = { top: 10, right: 64, bottom: 22, left: 8 };
+function klineToCandlestick(k: Kline): CandlestickData<Time> {
+  return { time: (k.t / 1000) as Time, open: k.o, high: k.h, low: k.l, close: k.c };
+}
 
-// 零依赖的 Canvas K 线组件：拉取历史 K 线后自绘蜡烛图，
-// 并通过行情 WS 将最新价实时回填到最后一根蜡烛，实现轻量实时更新。
+function klineToVolume(k: Kline): HistogramData<Time> {
+  return {
+    time: (k.t / 1000) as Time,
+    value: k.v,
+    color: k.c >= k.o ? "rgba(14,203,129,0.45)" : "rgba(246,70,93,0.45)",
+  };
+}
+
+function readTheme() {
+  const css = getComputedStyle(document.documentElement);
+  const v = (prop: string, fb: string) => css.getPropertyValue(prop).trim() || fb;
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  return {
+    background: v("--panel", isLight ? "#fff" : "#1e2329"),
+    textColor: v("--text-2", isLight ? "#707a8a" : "#848e9c"),
+    gridColor: v("--border", isLight ? "#e6e6e6" : "#2b3139"),
+    upColor: v("--buy", "#0ecb81"),
+    downColor: v("--sell", "#f6465d"),
+    crosshairLineColor: v("--muted", isLight ? "#707a8a" : "#848e9c"),
+  };
+}
+
 export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
   const { t } = useI18n();
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const dataRef = useRef<Kline[]>([]);
-  const sizeRef = useRef({ w: 0, h: 0 });
 
   const [data, setData] = useState<Kline[]>([]);
-  const [size, setSize] = useState({ w: 0, h: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
-  // 主题版本：data-theme 变化时自增，驱动 K 线重绘以应用新主题色。
   const [themeVer, setThemeVer] = useState(0);
 
-  // 加载历史 K 线
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -53,25 +70,9 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
       .finally(() => {
         if (alive) setLoading(false);
       });
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [symbol, interval, limit]);
 
-  // 容器尺寸自适应
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const r = entries[0].contentRect;
-      sizeRef.current = { w: Math.floor(r.width), h: Math.floor(r.height) };
-      setSize(sizeRef.current);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // 实时 K 线：专用 WS 通道推送整根蜡烛（含量、自动翻根）
   useEffect(() => {
     const wasLive = { current: false };
     const stop = connectKlineWS(
@@ -82,7 +83,6 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
         wasLive.current = true;
         const list = dataRef.current;
         if (list.length === 0) {
-          // 历史尚未返回，先暂存这一根
           const next = [k];
           dataRef.current = next;
           setData(next);
@@ -91,14 +91,11 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
         const last = list[list.length - 1];
         let updated: Kline[];
         if (k.t === last.t) {
-          // 同一根：替换
           updated = list.slice(0, -1).concat(k);
         } else if (k.t > last.t) {
-          // 新周期：追加并裁剪到 limit
           updated = list.concat(k);
           if (updated.length > limit) updated = updated.slice(updated.length - limit);
         } else {
-          // 乱序/历史回填：忽略，避免破坏时序
           return;
         }
         dataRef.current = updated;
@@ -112,13 +109,9 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
         }
       }
     );
-    return () => {
-      setLive(false);
-      stop();
-    };
+    return () => { setLive(false); stop(); };
   }, [symbol, interval, limit]);
 
-  // 监听 <html data-theme> 变化，主题切换时触发重绘（让图表颜色跟随主题）。
   useEffect(() => {
     const el = document.documentElement;
     const mo = new MutationObserver(() => setThemeVer((v) => v + 1));
@@ -126,102 +119,81 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
     return () => mo.disconnect();
   }, []);
 
-  // 绘制
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || size.w === 0 || size.h === 0) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const el = wrapRef.current;
+    if (!el) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = size.w * dpr;
-    canvas.height = size.h * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, size.w, size.h);
+    const theme = readTheme();
+    const chart = createChart(el, {
+      layout: { background: { color: theme.background }, textColor: theme.textColor },
+      grid: { vertLines: { color: theme.gridColor }, horzLines: { color: theme.gridColor } },
+      crosshair: { vertLine: { color: theme.crosshairLineColor, labelBackgroundColor: theme.background }, horzLine: { color: theme.crosshairLineColor, labelBackgroundColor: theme.background } },
+      rightPriceScale: { borderColor: theme.gridColor },
+      timeScale: { borderColor: theme.gridColor, timeVisible: true },
+      autoSize: true,
+    });
+    chartRef.current = chart;
 
-    const list = data;
-    if (list.length === 0) return;
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: theme.upColor,
+      downColor: theme.downColor,
+      borderUpColor: theme.upColor,
+      borderDownColor: theme.downColor,
+      wickUpColor: theme.upColor,
+      wickDownColor: theme.downColor,
+    });
+    candleRef.current = candleSeries;
 
-    const plotW = size.w - PAD.left - PAD.right;
-    const plotH = size.h - PAD.top - PAD.bottom;
-    const volH = Math.round(plotH * 0.18);
-    const priceH = plotH - volH - 6;
+    const volSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: "volume" },
+      priceScaleId: "vol",
+    });
+    volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    volRef.current = volSeries;
 
-    let min = Infinity;
-    let max = -Infinity;
-    let maxVol = 0;
-    for (const k of list) {
-      if (k.l < min) min = k.l;
-      if (k.h > max) max = k.h;
-      if (k.v > maxVol) maxVol = k.v;
-    }
-    if (!isFinite(min) || !isFinite(max) || min === max) {
-      min = min - 1;
-      max = max + 1;
-    }
-    const padR = (max - min) * 0.05;
-    min -= padR;
-    max += padR;
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      candleRef.current = null;
+      volRef.current = null;
+    };
+  }, []);
 
-    const n = list.length;
-    const step = plotW / n;
-    const cw = Math.max(1, Math.min(step * 0.7, 18));
-    const yOf = (p: number) => PAD.top + ((max - p) / (max - min)) * priceH;
-    const xOf = (i: number) => PAD.left + step * (i + 0.5);
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candle = candleRef.current;
+    const vol = volRef.current;
+    if (!chart || !candle || !vol) return;
 
-    // 网格 + 价格刻度（右侧）：颜色取自当前主题变量，浅/深主题均可见。
-    const css = getComputedStyle(document.documentElement);
-    const GRID = css.getPropertyValue("--border").trim() || FALLBACK_GRID;
-    const AXIS = css.getPropertyValue("--muted").trim() || FALLBACK_AXIS;
-    ctx.font = "11px ui-monospace, monospace";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = AXIS;
-    const ticks = 5;
-    for (let i = 0; i <= ticks; i++) {
-      const p = min + ((max - min) * i) / ticks;
-      const y = yOf(p);
-      ctx.strokeStyle = GRID;
-      ctx.beginPath();
-      ctx.moveTo(PAD.left, y);
-      ctx.lineTo(PAD.left + plotW, y);
-      ctx.stroke();
-      ctx.fillText(p.toFixed(2), PAD.left + plotW + 6, y);
-    }
+    const theme = readTheme();
+    chart.applyOptions({
+      layout: { background: { color: theme.background }, textColor: theme.textColor },
+      grid: { vertLines: { color: theme.gridColor }, horzLines: { color: theme.gridColor } },
+      crosshair: { vertLine: { color: theme.crosshairLineColor, labelBackgroundColor: theme.background }, horzLine: { color: theme.crosshairLineColor, labelBackgroundColor: theme.background } },
+      rightPriceScale: { borderColor: theme.gridColor },
+      timeScale: { borderColor: theme.gridColor },
+    });
+    candle.applyOptions({
+      upColor: theme.upColor,
+      downColor: theme.downColor,
+      borderUpColor: theme.upColor,
+      borderDownColor: theme.downColor,
+      wickUpColor: theme.upColor,
+      wickDownColor: theme.downColor,
+    });
+  }, [themeVer]);
 
-    // 蜡烛 + 成交量
-    for (let i = 0; i < n; i++) {
-      const k = list[i];
-      const x = xOf(i);
-      const up = k.c >= k.o;
-      const color = up ? UP : DOWN;
-      const yo = yOf(k.o);
-      const yc = yOf(k.c);
-      const yh = yOf(k.h);
-      const yl = yOf(k.l);
+  useEffect(() => {
+    const candle = candleRef.current;
+    const vol = volRef.current;
+    if (!candle || !vol) return;
+    if (data.length === 0) return;
 
-      // 影线
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(x, yh);
-      ctx.lineTo(x, yl);
-      ctx.stroke();
-
-      // 实体
-      const top = Math.min(yo, yc);
-      const bh = Math.max(1, Math.abs(yc - yo));
-      ctx.fillStyle = color;
-      ctx.fillRect(x - cw / 2, top, cw, bh);
-
-      // 成交量
-      if (maxVol > 0) {
-        const vh = (k.v / maxVol) * volH;
-        const vy = size.h - PAD.bottom - vh;
-        ctx.globalAlpha = 0.45;
-        ctx.fillRect(x - cw / 2, vy, cw, vh);
-        ctx.globalAlpha = 1;
-      }
-    }
-  }, [data, size, themeVer]);
+    const candleData: CandlestickData<Time>[] = data.map(klineToCandlestick);
+    const volData: HistogramData<Time>[] = data.map(klineToVolume);
+    candle.setData(candleData);
+    vol.setData(volData);
+  }, [data]);
 
   return (
     <div className="kchart">
@@ -235,7 +207,6 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
         {!loading && !error && data.length === 0 && (
           <div className="kchart-tip">{t("trade.noKline")}</div>
         )}
-        <canvas ref={canvasRef} className="kchart-canvas" />
       </div>
     </div>
   );

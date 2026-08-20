@@ -11,7 +11,9 @@ export function Margin() {
   const { t } = useI18n();
   return (
     <div className="page">
-      <h2>{t("page.margin")}</h2>
+      <div className="page-head">
+        <h2>{t("page.margin")}</h2>
+      </div>
       <AccountList />
       <ApiTable title={t("margin.liqPrice")} endpoint="/api/v1/margin/liq-price" />
     </div>
@@ -71,9 +73,11 @@ function AccountList() {
 
   return (
     <section className="card">
-      <div className="panel-head">
+      <div className="card-head">
         <h3>{t("margin.accounts")}</h3>
-        <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        <div className="card-actions">
+          <button className="btn" onClick={load}>{t("common.refresh")}</button>
+        </div>
       </div>
       <BatchBar ids={[...selected]} actions={batchActions} onClear={clear} busy={busy} onRun={onRun} />
       {err && <div className="error">{t("common.loadError", { err })}</div>}

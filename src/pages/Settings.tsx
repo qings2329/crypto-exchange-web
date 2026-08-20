@@ -219,25 +219,27 @@ export function Settings() {
         <h2>{t("settings.title")}</h2>
       </div>
 
-      {loading && <div className="muted">{t("common.loading")}</div>}
+      {loading && <div className="mono">{t("common.loading")}</div>}
       {err && <div className="error">{t("common.loadError", { err })}</div>}
 
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.profile")}</h3>
         </div>
-        <div className="wform">
-          <label>
-            {t("settings.nickname")}
-            <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder={t("settings.ph.nickname")} maxLength={32} />
-          </label>
-          <label>
-            {t("settings.avatar")}
-            <input value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder={t("settings.ph.url")} />
-          </label>
-          <button className="submit" onClick={saveProfile}>
-            {t("settings.saveProfile")}
-          </button>
+        <div className="card-body">
+          <div className="form-field">
+            <label className="form-label">{t("settings.nickname")}</label>
+            <input className="filter" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder={t("settings.ph.nickname")} maxLength={32} />
+          </div>
+          <div className="form-field">
+            <label className="form-label">{t("settings.avatar")}</label>
+            <input className="filter" value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder={t("settings.ph.url")} />
+          </div>
+          <div className="card-actions">
+            <button className="btn primary" onClick={saveProfile}>
+              {t("settings.saveProfile")}
+            </button>
+          </div>
           {profileMsg && (
             <div className={isFail(profileMsg, "settings.profileFail", t) ? "error" : "ok"}>{profileMsg}</div>
           )}
@@ -248,18 +250,20 @@ export function Settings() {
         <div className="card-head">
           <h3>{t("settings.pwd")}</h3>
         </div>
-        <div className="wform">
-          <label>
-            {t("settings.oldPwd")}
-            <input type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} />
-          </label>
-          <label>
-            {t("settings.newPwd")}
-            <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
-          </label>
-          <button className="submit" onClick={savePassword}>
-            {t("settings.changePwd")}
-          </button>
+        <div className="card-body">
+          <div className="form-field">
+            <label className="form-label">{t("settings.oldPwd")}</label>
+            <input className="filter" type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} />
+          </div>
+          <div className="form-field">
+            <label className="form-label">{t("settings.newPwd")}</label>
+            <input className="filter" type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+          </div>
+          <div className="card-actions">
+            <button className="btn primary" onClick={savePassword}>
+              {t("settings.changePwd")}
+            </button>
+          </div>
           {pwdMsg && <div className={isFail(pwdMsg, "settings.pwdFail", t) ? "error" : "ok"}>{pwdMsg}</div>}
         </div>
       </section>
@@ -267,49 +271,55 @@ export function Settings() {
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.tfa")}</h3>
-          <span className={tfaEnabled ? "ostatus completed" : "ostatus unknown"}>
+          <span className={tfaEnabled ? "ok" : "mono"}>
             {tfaEnabled ? t("settings.tfaOn") : t("settings.tfaOff")}
           </span>
         </div>
-        <div className="wform">
+        <div className="card-body">
           {!tfaEnabled && !tfaSecret && (
-            <button className="submit" onClick={tfaSetupStart}>
-              {t("settings.tfaEnableStart")}
-            </button>
+            <div className="card-actions">
+              <button className="btn primary" onClick={tfaSetupStart}>
+                {t("settings.tfaEnableStart")}
+              </button>
+            </div>
           )}
           {tfaSecret && (
             <>
-              <div className="otc-hint">
+              <div className="form-hint">
                 {t("settings.tfaHint")}
               </div>
-              <label>
-                {t("settings.tfaSecret")}
-                <input value={tfaSecret} readOnly />
-              </label>
+              <div className="form-field">
+                <label className="form-label">{t("settings.tfaSecret")}</label>
+                <input className="filter mono" value={tfaSecret} readOnly />
+              </div>
               {tfaUri && (
-                <label>
-                  {t("settings.tfaUri")}
-                  <input value={tfaUri} readOnly />
-                </label>
+                <div className="form-field">
+                  <label className="form-label">{t("settings.tfaUri")}</label>
+                  <input className="filter mono" value={tfaUri} readOnly />
+                </div>
               )}
-              <label>
-                {t("settings.tfaCode")}
-                <input value={tfaCode} onChange={(e) => setTfaCode(e.target.value)} placeholder={t("settings.tfaCodePh")} />
-              </label>
-              <button className="submit" onClick={tfaEnable}>
-                {t("settings.tfaEnable")}
-              </button>
+              <div className="form-field">
+                <label className="form-label">{t("settings.tfaCode")}</label>
+                <input className="filter" value={tfaCode} onChange={(e) => setTfaCode(e.target.value)} placeholder={t("settings.tfaCodePh")} />
+              </div>
+              <div className="card-actions">
+                <button className="btn primary" onClick={tfaEnable}>
+                  {t("settings.tfaEnable")}
+                </button>
+              </div>
             </>
           )}
           {tfaEnabled && (
             <>
-              <label>
-                {t("settings.tfaCodeClose")}
-                <input value={tfaCode} onChange={(e) => setTfaCode(e.target.value)} placeholder={t("settings.tfaCodePh")} />
-              </label>
-              <button className="link-btn" onClick={tfaDisable}>
-                {t("settings.tfaDisable")}
-              </button>
+              <div className="form-field">
+                <label className="form-label">{t("settings.tfaCodeClose")}</label>
+                <input className="filter" value={tfaCode} onChange={(e) => setTfaCode(e.target.value)} placeholder={t("settings.tfaCodePh")} />
+              </div>
+              <div className="card-actions">
+                <button className="btn danger" onClick={tfaDisable}>
+                  {t("settings.tfaDisable")}
+                </button>
+              </div>
             </>
           )}
           {tfaMsg && <div className={tfaError ? "error" : "ok"}>{tfaMsg}</div>}
@@ -319,13 +329,13 @@ export function Settings() {
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.kyc")}</h3>
-          <span className={`ostatus ${kycLevel === 2 ? "completed" : kycLevel === 1 ? "disputed" : kycLevel === 3 ? "cancelled" : "unknown"}`}>
+          <span className={kycLevel === 2 ? "ok" : kycLevel === 1 ? "mono" : kycLevel === 3 ? "error" : "mono"}>
             {t(KYC_KEY[kycLevel] ?? "home.kyc.unverified")}
           </span>
         </div>
-        <div className="wform">
+        <div className="card-body">
           {kyc && (
-            <div className="otc-hint">
+            <div className="form-hint">
               {t("settings.kycStatus", {
                 label: t(KYC_KEY[kyc.status] ?? "home.kyc.unverified"),
                 reason: kyc.status === 3 && kyc.reject_reason ? t("settings.kycReason", { reason: kyc.reject_reason }) : "",
@@ -334,20 +344,22 @@ export function Settings() {
             </div>
           )}
           {kyc?.status === 1 ? (
-            <div className="muted">{t("settings.kycReviewing")}</div>
+            <div className="mono">{t("settings.kycReviewing")}</div>
           ) : (
             <>
-              <label>
-                {t("settings.realName")}
+              <div className="form-field">
+                <label className="form-label">{t("settings.realName")}</label>
                 <input
+                  className="filter"
                   value={kycForm.real_name}
                   onChange={(e) => setKycForm({ ...kycForm, real_name: e.target.value })}
                   placeholder={t("settings.realNamePh")}
                 />
-              </label>
-              <label>
-                {t("settings.idType")}
+              </div>
+              <div className="form-field">
+                <label className="form-label">{t("settings.idType")}</label>
                 <select
+                  className="form-select"
                   value={kycForm.id_type}
                   onChange={(e) => setKycForm({ ...kycForm, id_type: e.target.value })}
                 >
@@ -355,34 +367,39 @@ export function Settings() {
                   <option value="passport">{t("settings.passport")}</option>
                   <option value="driver_license">{t("settings.driverLicense")}</option>
                 </select>
-              </label>
-              <label>
-                {t("settings.idNumber")}
+              </div>
+              <div className="form-field">
+                <label className="form-label">{t("settings.idNumber")}</label>
                 <input
+                  className="filter"
                   value={kycForm.id_number}
                   onChange={(e) => setKycForm({ ...kycForm, id_number: e.target.value })}
                   placeholder={t("settings.idNumberPh")}
                 />
-              </label>
-              <label>
-                {t("settings.docFront")}
+              </div>
+              <div className="form-field">
+                <label className="form-label">{t("settings.docFront")}</label>
                 <input
+                  className="filter"
                   value={kycForm.doc_front}
                   onChange={(e) => setKycForm({ ...kycForm, doc_front: e.target.value })}
                   placeholder={t("settings.ph.url")}
                 />
-              </label>
-              <label>
-                {t("settings.docBack")}
+              </div>
+              <div className="form-field">
+                <label className="form-label">{t("settings.docBack")}</label>
                 <input
+                  className="filter"
                   value={kycForm.doc_back}
                   onChange={(e) => setKycForm({ ...kycForm, doc_back: e.target.value })}
                   placeholder={t("settings.ph.url")}
                 />
-              </label>
-              <button className="submit" onClick={submitKyc}>
-                {kyc?.status === 3 ? t("settings.resubmitKyc") : t("settings.submitKyc")}
-              </button>
+              </div>
+              <div className="card-actions">
+                <button className="btn primary" onClick={submitKyc}>
+                  {kyc?.status === 3 ? t("settings.resubmitKyc") : t("settings.submitKyc")}
+                </button>
+              </div>
             </>
           )}
           {kycMsg && <div className={isFail(kycMsg, "settings.kycFail", t) ? "error" : "ok"}>{kycMsg}</div>}
@@ -393,59 +410,67 @@ export function Settings() {
         <div className="card-head">
           <h3>{t("settings.prefs")}</h3>
         </div>
-        <div className="wform">
-          <label>
-            {t("settings.theme")}
-            <select value={prefs.theme} onChange={(e) => setPrefs({ ...prefs, theme: e.target.value })}>
+        <div className="card-body">
+          <div className="form-field">
+            <label className="form-label">{t("settings.theme")}</label>
+            <select className="form-select" value={prefs.theme} onChange={(e) => setPrefs({ ...prefs, theme: e.target.value })}>
               {THEMES.map((th) => (
                 <option key={th.value} value={th.value}>{t(th.key)}</option>
               ))}
             </select>
-          </label>
-          <label>
-            {t("settings.language")}
-            <select value={prefs.language} onChange={(e) => setPrefs({ ...prefs, language: e.target.value })}>
+          </div>
+          <div className="form-field">
+            <label className="form-label">{t("settings.language")}</label>
+            <select className="form-select" value={prefs.language} onChange={(e) => setPrefs({ ...prefs, language: e.target.value })}>
               {LOCALES.map((lc) => (
                 <option key={lc.value} value={lc.value}>{lc.label}</option>
               ))}
             </select>
-          </label>
-          <label>
-            {t("settings.timezone")}
-            <select value={prefs.timezone} onChange={(e) => setPrefs({ ...prefs, timezone: e.target.value })}>
+          </div>
+          <div className="form-field">
+            <label className="form-label">{t("settings.timezone")}</label>
+            <select className="form-select" value={prefs.timezone} onChange={(e) => setPrefs({ ...prefs, timezone: e.target.value })}>
               <option value="">{t("settings.tzAuto")}</option>
               {COMMON_TZ.map((tz) => (
                 <option key={tz} value={tz}>{tz}</option>
               ))}
             </select>
-          </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={prefs.notify_order}
-              onChange={(e) => setPrefs({ ...prefs, notify_order: e.target.checked })}
-            />
-            {t("settings.notifyOrder")}
-          </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={prefs.notify_security}
-              onChange={(e) => setPrefs({ ...prefs, notify_security: e.target.checked })}
-            />
-            {t("settings.notifySecurity")}
-          </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={prefs.notify_marketing}
-              onChange={(e) => setPrefs({ ...prefs, notify_marketing: e.target.checked })}
-            />
-            {t("settings.notifyMarketing")}
-          </label>
-          <button className="submit" onClick={savePrefs}>
-            {t("settings.savePrefs")}
-          </button>
+          </div>
+          <div className="form-field">
+            <label className="form-check">
+              <input
+                type="checkbox"
+                checked={prefs.notify_order}
+                onChange={(e) => setPrefs({ ...prefs, notify_order: e.target.checked })}
+              />
+              {t("settings.notifyOrder")}
+            </label>
+          </div>
+          <div className="form-field">
+            <label className="form-check">
+              <input
+                type="checkbox"
+                checked={prefs.notify_security}
+                onChange={(e) => setPrefs({ ...prefs, notify_security: e.target.checked })}
+              />
+              {t("settings.notifySecurity")}
+            </label>
+          </div>
+          <div className="form-field">
+            <label className="form-check">
+              <input
+                type="checkbox"
+                checked={prefs.notify_marketing}
+                onChange={(e) => setPrefs({ ...prefs, notify_marketing: e.target.checked })}
+              />
+              {t("settings.notifyMarketing")}
+            </label>
+          </div>
+          <div className="card-actions">
+            <button className="btn primary" onClick={savePrefs}>
+              {t("settings.savePrefs")}
+            </button>
+          </div>
           {prefMsg && (
             <div className={isFail(prefMsg, "settings.prefFail", t) ? "error" : "ok"}>{prefMsg}</div>
           )}

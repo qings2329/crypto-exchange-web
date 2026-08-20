@@ -6,7 +6,9 @@ export function Audit() {
   const { t } = useI18n();
   return (
     <div className="page">
-      <h2>{t("page.audit")}</h2>
+      <div className="page-head">
+        <h2>{t("page.audit")}</h2>
+      </div>
       <ApiTable
         title={t("audit.title")}
         endpoint="/api/v1/admin/audit"
