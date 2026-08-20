@@ -490,6 +490,55 @@ export const api = {
       body: JSON.stringify({ ids }),
     }),
 
+  // ---- 借贷 ----
+  lendingPools: async () => {
+    const d = await request<{ pools: LendingPool[] }>("/api/v1/lending/pools");
+    return d.pools ?? [];
+  },
+  lendingPoolInfo: (id: number) =>
+    request<LendingPoolInfo>(`/api/v1/lending/pools/${id}`),
+  lendingLend: (poolId: number, amount: string) =>
+    request<LendOrder>("/api/v1/lending/lend", {
+      method: "POST",
+      body: JSON.stringify({ pool_id: poolId, amount }),
+    }),
+  lendingBorrow: (poolId: number, borrowAmount: string, collateral: string) =>
+    request<BorrowOrder>("/api/v1/lending/borrow", {
+      method: "POST",
+      body: JSON.stringify({ pool_id: poolId, borrow_amount: borrowAmount, collateral }),
+    }),
+  lendingRepay: (id: number) =>
+    request<BorrowOrder>(`/api/v1/lending/repay/${id}`, { method: "POST" }),
+  lendingWithdraw: (id: number) =>
+    request<LendOrder>(`/api/v1/lending/withdraw/${id}`, { method: "POST" }),
+  lendingMyLends: async () => {
+    const d = await request<{ lends: LendOrder[] }>("/api/v1/lending/my/lends");
+    return d.lends ?? [];
+  },
+  lendingMyBorrows: async () => {
+    const d = await request<{ borrows: BorrowOrder[] }>("/api/v1/lending/my/borrows");
+    return d.borrows ?? [];
+  },
+
+  // ---- 交易机器人 ----
+  botStrategies: async () => {
+    const d = await request<{ strategies: BotStrategy[] }>("/api/v1/bot/strategies");
+    return d.strategies ?? [];
+  },
+  botCreateStrategy: (payload: BotCreatePayload) =>
+    request<BotStrategy>("/api/v1/bot/strategies", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  botStartStrategy: (id: number) =>
+    request<{ id: number; status: string }>(`/api/v1/bot/strategies/${id}/start`, { method: "POST" }),
+  botStopStrategy: (id: number) =>
+    request<{ id: number; status: string }>(`/api/v1/bot/strategies/${id}/stop`, { method: "POST" }),
+  botStrategyOrders: async (id: number) => {
+    const d = await request<{ orders: BotOrder[] }>(`/api/v1/bot/strategies/${id}/orders`);
+    return d.orders ?? [];
+  },
+
   // ---- 管理总览 ----
   // GET /api/v1/admin/overview 后台总览 KPI（需 admin 角色）。
   adminOverview: () => request<AdminOverview>("/api/v1/admin/overview"),
@@ -1012,6 +1061,127 @@ export interface LedgerEntry {
   biz_type: string; // deposit / withdraw / transfer / funding / liquidation / repay 等
   ref: string; // 关联单号（订单号 / 链上哈希 / 提现 hold_id）
   time: number; // Unix 纳秒
+}
+
+// ---------- 借贷 ----------
+export type LendingPoolStatus = "active" | "paused" | "closed";
+export type LendOrderStatus = "active" | "withdrawn";
+export type BorrowOrderStatus = "active" | "repaid" | "liquidated";
+
+export interface LendingPool {
+  id: number;
+  asset: string;
+  total_supply: string;
+  total_borrow: string;
+  available: string;
+  interest_rate: number;
+  collateral_req: number;
+}
+
+export interface LendingPoolInfo extends LendingPool {
+  utilization: number;
+  status: LendingPoolStatus;
+  created_at: number;
+}
+
+export interface LendOrder {
+  id: number;
+  user_id: number;
+  pool_id: number;
+  amount: string;
+  rate: number;
+  status: LendOrderStatus;
+  created_at: number;
+}
+
+export interface BorrowOrder {
+  id: number;
+  user_id: number;
+  pool_id: number;
+  amount: string;
+  collateral: string;
+  rate: number;
+  interest_acc: string;
+  status: BorrowOrderStatus;
+  created_at: number;
+  repaid_at: number;
+}
+
+// ---------- 交易机器人 ----------
+export type BotMarket = "spot" | "futures";
+export type BotStrategyType = "grid" | "dca" | "ma";
+export type BotStrategyStatus = "active" | "stopped";
+
+export interface BotStrategy {
+  id: number;
+  user_id: number;
+  name: string;
+  market: BotMarket;
+  symbol: string;
+  side: string;
+  type: BotStrategyType;
+  params: BotParams;
+  status: BotStrategyStatus;
+  grid_state?: GridState;
+  created_at: number;
+}
+
+export interface BotParams {
+  grid_lower?: number;
+  grid_upper?: number;
+  grid_num?: number;
+  grid_step?: number;
+  dca_interval_sec?: number;
+  dca_amount?: number;
+  ma_short?: number;
+  ma_long?: number;
+  max_position?: number;
+  order_amount: number;
+}
+
+export interface GridState {
+  levels?: GridLevel[];
+  position: number;
+  pnl: number;
+  trade_count: number;
+  last_price: number;
+  prev_price: number;
+  initialized: boolean;
+}
+
+export interface GridLevel {
+  price: number;
+  qty: number;
+  side: string;
+  placed: boolean;
+  order_id: string;
+  filled: boolean;
+  fill_price: number;
+}
+
+export interface BotOrder {
+  id: number;
+  strategy_id: number;
+  user_id: number;
+  market: BotMarket;
+  symbol: string;
+  side: string;
+  price: number;
+  qty: number;
+  client_oid: string;
+  exchange_order_id: string;
+  status: string;
+  created_at: number;
+}
+
+export interface BotCreatePayload {
+  name: string;
+  market: BotMarket;
+  symbol: string;
+  side: string;
+  type: BotStrategyType;
+  user_token: string;
+  params: BotParams;
 }
 
 // ---------- WebSocket 助手 ----------

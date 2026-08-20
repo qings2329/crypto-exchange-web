@@ -26,6 +26,8 @@ const ApiKeys = lazy(() => import("./pages/ApiKeys").then((m) => ({ default: m.A
 const Home = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
 const Announcements = lazy(() => import("./pages/Announcements").then((m) => ({ default: m.Announcements })));
 const History = lazy(() => import("./pages/History").then((m) => ({ default: m.History })));
+const Lending = lazy(() => import("./pages/Lending").then((m) => ({ default: m.Lending })));
+const BotGrid = lazy(() => import("./pages/BotGrid").then((m) => ({ default: m.BotGrid })));
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })));
 const Audit = lazy(() => import("./pages/Audit").then((m) => ({ default: m.Audit })));
 
@@ -50,6 +52,8 @@ const PAGES: Record<string, React.ComponentType> = {
   "/otc": Otc,
   "/margin": Margin,
   "/wealth": Wealth,
+  "/lending": Lending,
+  "/bot": BotGrid,
   "/risk": Risk,
   "/notifications": Notifications,
   "/monitor": Monitor,
