@@ -8,6 +8,11 @@ export function Register() {
   const [target, setTarget] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [referralCode, setReferralCode] = useState(() => {
+    // 从 URL hash 参数 ?ref=XXX 自动填充邀请码
+    const m = location.hash.match(/[?&]ref=([^&]+)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  });
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,7 +39,7 @@ export function Register() {
     if (!validatePassword(password)) return setErr(t("register.errPassword"));
     setBusy(true);
     try {
-      await api.register(target.trim(), password, code.trim());
+      await api.register(target.trim(), password, code.trim(), referralCode.trim() || undefined);
       setMsg(t("register.success"));
       setTimeout(() => (location.hash = "/login"), 800);
     } catch (e) {
@@ -71,6 +76,14 @@ export function Register() {
             {t("register.getCode")}
           </button>
         </div>
+        <label>
+          {t("register.referralCode")}
+          <input
+            value={referralCode}
+            onChange={(e) => setReferralCode(e.target.value)}
+            placeholder={t("register.referralCodePlaceholder")}
+          />
+        </label>
         {err && <div className="error">{t("register.fail", { err })}</div>}
         {msg && <div className="ok">{msg}</div>}
         <button type="submit" disabled={busy}>

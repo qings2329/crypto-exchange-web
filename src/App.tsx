@@ -30,6 +30,7 @@ const Lending = lazy(() => import("./pages/Lending").then((m) => ({ default: m.L
 const BotGrid = lazy(() => import("./pages/BotGrid").then((m) => ({ default: m.BotGrid })));
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })));
 const Audit = lazy(() => import("./pages/Audit").then((m) => ({ default: m.Audit })));
+const Referral = lazy(() => import("./pages/Referral").then((m) => ({ default: m.Referral })));
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || "#/home");
@@ -61,6 +62,7 @@ const PAGES: Record<string, React.ComponentType> = {
   "/apikeys": ApiKeys,
   "/admin": Dashboard,
   "/audit": Audit,
+  "/referral": Referral,
 };
 
 // 各页面所需的最低角色。缺省为 user（仅登录即可），运营/管理类页面提升为 operator/admin。

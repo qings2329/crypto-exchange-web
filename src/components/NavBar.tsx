@@ -19,6 +19,7 @@ const LINKS: { path: string; key: string; role?: "operator" | "admin" }[] = [
   { path: "/wealth", key: "nav.wealth" },
   { path: "/lending", key: "nav.lending" },
   { path: "/bot", key: "nav.bot" },
+  { path: "/referral", key: "nav.referral" },
   { path: "/risk", key: "nav.risk", role: "admin" },
   { path: "/notifications", key: "nav.notifications", role: "admin" },
   { path: "/monitor", key: "nav.monitor", role: "admin" },

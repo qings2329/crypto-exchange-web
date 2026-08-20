@@ -139,10 +139,10 @@ export const api = {
       "/api/v1/user/login",
       { method: "POST", body: JSON.stringify({ target, password }) }
     ),
-  register: (target: string, password: string, code: string) =>
+  register: (target: string, password: string, code: string, referralCode?: string) =>
     request<{ user_id: number; message: string }>("/api/v1/user/register", {
       method: "POST",
-      body: JSON.stringify({ target, password, code }),
+      body: JSON.stringify({ target, password, code, referral_code: referralCode }),
     }),
   sendCode: (target: string, purpose: string) =>
     request<{ message: string }>("/api/v1/user/send-code", {
@@ -607,6 +607,22 @@ export const api = {
   // DELETE /api/v1/announcement/admin/:id 删除公告（管理后台，需 admin 角色）。
   adminDeleteAnnouncement: (id: number) =>
     request<{ ok: boolean }>(`/api/v1/announcement/admin/${id}`, { method: "DELETE" }),
+
+  // ---- 邀请 ----
+  referralCode: () =>
+    request<{ referral_code: string }>("/api/v1/user/referral-code"),
+  referrals: async () => {
+    const d = await request<{ referrals: { user_id: number; nickname: string; email: string; created_at: string }[]; total: number }>("/api/v1/user/referrals");
+    return d;
+  },
+  referralStats: () =>
+    request<{ totals: Record<string, number> }>("/api/v1/referral/stats"),
+  referralCommissions: async (params?: { limit?: number; offset?: number }) => {
+    const d = await request<{ commissions: any[]; total: number }>(
+      withQuery("/api/v1/referral/commissions", params as Record<string, string | number | undefined>)
+    );
+    return d;
+  },
 };
 
 // ---------- 类型 ----------
