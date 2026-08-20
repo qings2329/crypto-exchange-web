@@ -79,6 +79,9 @@ const PAGE_ROLES: Record<string, Role> = {
   "/audit": "admin",
 };
 
+// 无需登录即可访问的公开页面（首页、公告、借贷、理财等展示型页面）。
+const PUBLIC_PAGES = new Set(["/home", "/announcements", "/lending", "/wealth"]);
+
 function Router() {
   const hash = useHash();
   const path = hash.replace(/^#/, "").split("?")[0];
@@ -88,18 +91,23 @@ function Router() {
 
   const Page = PAGES[path] ?? Home;
   const need = PAGE_ROLES[path] ?? "user";
+  const isPublic = PUBLIC_PAGES.has(path);
+
+  const content = (
+    <ErrorBoundary>
+      <Suspense fallback={<div className="page muted">{""}</div>}>
+        <Page />
+      </Suspense>
+    </ErrorBoundary>
+  );
 
   return (
     <>
       <NavBar />
       <main className="content">
-        <RequireRole role={need}>
-          <ErrorBoundary>
-            <Suspense fallback={<div className="page muted">{""}</div>}>
-              <Page />
-            </Suspense>
-          </ErrorBoundary>
-        </RequireRole>
+        {isPublic ? content : (
+          <RequireRole role={need}>{content}</RequireRole>
+        )}
       </main>
     </>
   );
