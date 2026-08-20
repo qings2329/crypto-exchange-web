@@ -1,66 +1,102 @@
 :root {
-  --bg: #0e1117;
-  --panel: #161b22;
-  --border: #232a33;
-  --text: #e6edf3;
-  --muted: #8b949e;
-  --buy: #2ea043;
-  --sell: #cf2430;
+  --bg: #0b0e11;
+  --panel: #1e2329;
+  --panel-hover: #2b3139;
+  --border: #2b3139;
+  --text: #eaecef;
+  --muted: #848e9c;
+  --accent: #fcd535;
+  --accent-hover: #f0b90b;
+  --buy: #0ecb81;
+  --sell: #f6465d;
+  --card: #1e2329;
+  --input-bg: #2b3139;
+  --tag-bg: rgba(252, 213, 53, 0.1);
 }
 
-/* 浅色主题：在设置页选择 theme=light 时由 JS 设置 document.documentElement.dataset.theme="light" 生效。 */
+/* 浅色主题 */
 [data-theme="light"] {
-  --bg: #f6f8fa;
+  --bg: #fafafa;
   --panel: #ffffff;
-  --border: #d0d7de;
-  --text: #1f2328;
-  --muted: #656d76;
-  --buy: #1a7f37;
-  --sell: #cf2430;
+  --panel-hover: #f5f5f5;
+  --border: #e6e6e6;
+  --text: #1e2329;
+  --muted: #848e9c;
+  --accent: #fcd535;
+  --accent-hover: #f0b90b;
+  --buy: #0ecb81;
+  --sell: #f6465d;
+  --card: #ffffff;
+  --input-bg: #f5f5f5;
+  --tag-bg: rgba(252, 213, 53, 0.08);
 }
 
-/* 显式深色（与 :root 默认一致），供设置页选择 theme=dark 时生效。 */
+/* 显式深色 */
 [data-theme="dark"] {
-  --bg: #0e1117;
-  --panel: #161b22;
-  --border: #232a33;
-  --text: #e6edf3;
-  --muted: #8b949e;
-  --buy: #2ea043;
-  --sell: #cf2430;
+  --bg: #0b0e11;
+  --panel: #1e2329;
+  --panel-hover: #2b3139;
+  --border: #2b3139;
+  --text: #eaecef;
+  --muted: #848e9c;
+  --accent: #fcd535;
+  --accent-hover: #f0b90b;
+  --buy: #0ecb81;
+  --sell: #f6465d;
+  --card: #1e2329;
+  --input-bg: #2b3139;
+  --tag-bg: rgba(252, 213, 53, 0.1);
 }
 
-/* 暗夜蓝：深蓝调深色主题。 */
+/* 暗夜蓝 */
 [data-theme="midnight"] {
   --bg: #0b1020;
   --panel: #131a2e;
+  --panel-hover: #1c2541;
   --border: #25304d;
   --text: #dbe4ff;
   --muted: #7e8db5;
-  --buy: #2ea043;
-  --sell: #cf2430;
+  --accent: #fcd535;
+  --accent-hover: #f0b90b;
+  --buy: #0ecb81;
+  --sell: #f6465d;
+  --card: #131a2e;
+  --input-bg: #1c2541;
+  --tag-bg: rgba(252, 213, 53, 0.1);
 }
 
-/* 森林绿：墨绿调深色主题。 */
+/* 森林绿 */
 [data-theme="forest"] {
   --bg: #0d1410;
   --panel: #16201a;
+  --panel-hover: #1e2d24;
   --border: #253029;
   --text: #d7f0e0;
   --muted: #7f9b8a;
-  --buy: #2ea043;
-  --sell: #cf2430;
+  --accent: #fcd535;
+  --accent-hover: #f0b90b;
+  --buy: #0ecb81;
+  --sell: #f6465d;
+  --card: #16201a;
+  --input-bg: #1e2d24;
+  --tag-bg: rgba(252, 213, 53, 0.1);
 }
 
-/* 暖阳：暖色浅色主题。 */
+/* 暖阳 */
 [data-theme="solar"] {
   --bg: #fbf3e4;
   --panel: #fffaf0;
+  --panel-hover: #fff5e0;
   --border: #e6d8bf;
   --text: #4a3f2f;
   --muted: #8a7a5f;
-  --buy: #3f8f3f;
-  --sell: #c0392b;
+  --accent: #d4a017;
+  --accent-hover: #b8860b;
+  --buy: #0ecb81;
+  --sell: #f6465d;
+  --card: #fffaf0;
+  --input-bg: #f5eed8;
+  --tag-bg: rgba(212, 160, 23, 0.1);
 }
 
 * {
@@ -206,72 +242,111 @@ body {
   color: var(--muted);
 }
 
-/* ---- 导航栏 ---- */
+/* ---- 导航栏（币安风格） ---- */
 .navbar {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 10px 20px;
+  gap: 0;
+  padding: 0 24px;
+  height: 56px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 100;
 }
 .navbar .brand {
   font-weight: 700;
+  font-size: 20px;
+  color: var(--accent);
+  text-decoration: none;
+  margin-right: 32px;
+  white-space: nowrap;
+  letter-spacing: -0.5px;
 }
 .navbar .links {
   display: flex;
-  gap: 14px;
+  gap: 0;
   flex: 1;
-  flex-wrap: wrap;
+  align-items: center;
 }
 .navbar .links a {
   color: var(--muted);
   text-decoration: none;
   font-size: 14px;
+  padding: 16px 12px;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.navbar .links a:hover {
+  color: var(--text);
 }
 .navbar .links a.active {
-  color: var(--text);
+  color: var(--accent);
   font-weight: 600;
 }
 .navbar .right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .navbar .uid {
   color: var(--muted);
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.navbar .role-badge {
+  background: var(--tag-bg);
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
 }
 .navbar .logout {
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text);
-  padding: 6px 12px;
-  border-radius: 6px;
+  color: var(--muted);
+  padding: 6px 16px;
+  border-radius: 4px;
   cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+.navbar .logout:hover {
+  color: var(--text);
+  border-color: var(--muted);
 }
 
-/* ---- 语言切换 ---- */
+/* ---- 语言切换（币安风格） ---- */
 .lang-switch {
   display: inline-flex;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
 }
 .lang-switch .lang {
   background: transparent;
   border: none;
+  border-right: 1px solid var(--border);
   color: var(--muted);
   padding: 5px 10px;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
+  transition: all 0.15s;
+}
+.lang-switch .lang:last-child {
+  border-right: none;
+}
+.lang-switch .lang:hover {
+  color: var(--text);
 }
 .lang-switch .lang.active {
-  background: var(--accent, #3b82f6);
-  color: #fff;
+  background: var(--accent);
+  color: #0b0e11;
+  font-weight: 600;
 }
 
 .content {
@@ -1569,5 +1644,327 @@ th.sortable:hover {
   }
   .notif-grid {
     grid-template-columns: 28px 1fr 64px 60px 1fr 64px 88px;
+  }
+}
+
+/* ============================================================
+   币安风格组件（Binance-style Components）
+   ============================================================ */
+
+/* ---- 首页 Hero 横幅 ---- */
+.home-hero {
+  background: linear-gradient(135deg, #1e2329 0%, #2b3139 50%, #1e2329 100%);
+  border-radius: 12px;
+  padding: 48px 40px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.home-hero::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(252, 213, 53, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.home-hero h1 {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.home-hero h2 {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.home-hero .hero-sub {
+  font-size: 16px;
+  color: var(--muted);
+  margin: 0 0 28px;
+  max-width: 520px;
+  line-height: 1.6;
+}
+.home-hero .hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--accent);
+  color: #0b0e11;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.btn-outline:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+/* ---- 币安风格卡片 ---- */
+.bn-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.bn-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.bn-card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.bn-card-header .link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+.bn-card-header .link:hover {
+  text-decoration: underline;
+}
+
+/* ---- 市场概览表格 ---- */
+.market-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.market-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.market-table td {
+  padding: 12px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.market-table tr:last-child td {
+  border-bottom: none;
+}
+.market-table tr:hover td {
+  background: var(--panel-hover);
+}
+.market-table .coin-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.market-table .coin-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b0e11;
+}
+.market-table .price {
+  font-variant-numeric: tabular-nums;
+}
+.market-table .change-up {
+  color: var(--buy);
+  font-weight: 500;
+}
+.market-table .change-down {
+  color: var(--sell);
+  font-weight: 500;
+}
+.market-table .trade-btn {
+  padding: 6px 16px;
+  background: var(--accent);
+  color: #0b0e11;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.market-table .trade-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* ---- 快捷入口网格（币安风格） ---- */
+.bn-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.bn-shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  transition: all 0.2s;
+}
+.bn-shortcut:hover {
+  border-color: var(--accent);
+  background: var(--panel-hover);
+  transform: translateY(-2px);
+}
+.bn-shortcut-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--tag-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.bn-shortcut-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.bn-shortcut-desc {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---- 账户信息卡片（币安风格） ---- */
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.account-stat {
+  text-align: center;
+  padding: 16px;
+  background: var(--panel-hover);
+  border-radius: 8px;
+}
+.account-stat .stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.account-stat .stat-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+.stat-ok { color: var(--buy); }
+.stat-warn { color: var(--accent); }
+.stat-bad { color: var(--sell); }
+
+/* ---- 公告列表（币安风格） ---- */
+.bn-ann-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bn-ann-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.bn-ann-item:last-child {
+  border-bottom: none;
+}
+.bn-ann-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bn-ann-badge.info {
+  background: rgba(14, 203, 129, 0.1);
+  color: var(--buy);
+}
+.bn-ann-badge.warning {
+  background: rgba(252, 213, 53, 0.1);
+  color: var(--accent);
+}
+.bn-ann-badge.maintenance {
+  background: rgba(246, 70, 93, 0.1);
+  color: var(--sell);
+}
+.bn-ann-title {
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* ---- 未登录首页提示 ---- */
+.guest-cta {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* ---- 响应式补充 ---- */
+@media (max-width: 768px) {
+  .home-hero {
+    padding: 32px 24px;
+  }
+  .home-hero h1, .home-hero h2 {
+    font-size: 24px;
+  }
+  .bn-shortcuts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .account-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .bn-shortcuts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .account-grid {
+    grid-template-columns: 1fr;
   }
 }
