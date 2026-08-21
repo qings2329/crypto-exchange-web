@@ -152,6 +152,9 @@ const PUBLIC_PATHS = new Set([
   // OTC 公开行情：广告列表与法币报价匿名可读（下单等写操作仍需登录）
   "/api/v1/otc/advertisements",
   "/api/v1/otc/prices",
+  // 理财产品列表 / Launchpool 项目列表匿名可读（申购、质押等写操作需登录）
+  "/api/v1/earn/products",
+  "/api/v1/launchpad/projects",
 ]);
 function gateway(req, res, next) {
   if (PUBLIC_PATHS.has(req.path)) return next();

@@ -907,6 +907,231 @@ setInterval(() => {
   }
 }, 1000).unref();
 
+// ---------- 理财（Earn Hub：活期/定期）----------
+// 产品静态数据；持仓利息按读取时刻实时累计（amount × apy × 天数 / 365）。
+const DAY_MS = 86400e3;
+const earnProducts = [
+  { id: nextId(), name: "USDT 活期理财", asset: "USDT", term_days: 0, apy: 0.065, min_amount: 10, max_amount: 500000, status: "open" },
+  { id: nextId(), name: "USDC 活期理财", asset: "USDC", term_days: 0, apy: 0.052, min_amount: 10, max_amount: 300000, status: "open" },
+  { id: nextId(), name: "BTC 7天定期", asset: "BTC", term_days: 7, apy: 0.098, min_amount: 0.001, max_amount: 50, status: "open" },
+  { id: nextId(), name: "ETH 30天定期", asset: "ETH", term_days: 30, apy: 0.125, min_amount: 0.01, max_amount: 500, status: "open" },
+  { id: nextId(), name: "BNB 120天定期", asset: "BNB", term_days: 120, apy: 0.158, min_amount: 0.1, max_amount: 2000, status: "open" },
+  { id: nextId(), name: "FDUSD 30天定期", asset: "FDUSD", term_days: 30, apy: 0.112, min_amount: 10, max_amount: 100000, status: "open" },
+];
+const earnSubscriptions = []; // {id,user_id,product_id,asset,amount,apy,start_at,status}
+
+app.get("/api/v1/earn/products", (req, res) => {
+  const { term } = req.query;
+  let list = earnProducts.filter((p) => p.status === "open");
+  if (term === "flexible") list = list.filter((p) => p.term_days === 0);
+  if (term === "fixed") list = list.filter((p) => p.term_days > 0);
+  if (term && /^\d+$/.test(String(term))) list = list.filter((p) => p.term_days === Number(term));
+  ok(res, { products: list });
+});
+
+app.get("/api/v1/earn/subscriptions", (req, res) => {
+  const uid = Number(req.user.sub);
+  const now = Date.now();
+  const list = earnSubscriptions
+    .filter((s) => s.user_id === uid)
+    .map((s) => {
+      const days = Math.max(0, (now - Date.parse(s.start_at)) / DAY_MS);
+      return { ...s, accrued: r6(s.amount * s.apy * (days / 365)) };
+    });
+  ok(res, { subscriptions: list });
+});
+
+function r6(x) {
+  return Math.round(x * 1e6) / 1e6;
+}
+
+app.post("/api/v1/earn/subscribe", (req, res) => {
+  const b = req.body || {};
+  const p = earnProducts.find((x) => x.id === Number(b.product_id));
+  if (!p || p.status !== "open") return fail(res, 404, "产品不存在或已售罄");
+  const amount = Number(b.amount);
+  if (!(amount >= p.min_amount)) return fail(res, 400, `最低申购 ${p.min_amount} ${p.asset}`);
+  if (amount > p.max_amount) return fail(res, 400, `超出单户限额 ${p.max_amount} ${p.asset}`);
+  if (!b.agreed) return fail(res, 400, "请先阅读并同意《理财服务协议》");
+  const sub = {
+    id: nextId(),
+    user_id: Number(req.user.sub),
+    product_id: p.id,
+    asset: p.asset,
+    amount,
+    apy: p.apy,
+    term_days: p.term_days,
+    start_at: new Date().toISOString(),
+    status: "active",
+  };
+  earnSubscriptions.unshift(sub);
+  ok(res, sub, 201);
+});
+
+app.post("/api/v1/earn/subscriptions/:id/redeem", (req, res) => {
+  const s = earnSubscriptions.find(
+    (x) => x.id === Number(req.params.id) && x.user_id === Number(req.user.sub)
+  );
+  if (!s) return fail(res, 404, "持仓不存在");
+  if (s.status !== "active") return fail(res, 409, "该持仓已赎回");
+  const days = Math.max(0, (Date.now() - Date.parse(s.start_at)) / DAY_MS);
+  const accrued = r6(s.amount * s.apy * (days / 365));
+  s.status = "redeemed";
+  s.redeemed_at = new Date().toISOString();
+  ok(res, { ...s, accrued, redeemed_amount: r6(s.amount + accrued) });
+});
+
+// ---------- 新币挖矿（Launchpool）----------
+// 项目状态由时间窗推导：upcoming / ongoing / ended；奖励按质押时长实时累计。
+const launchProjects = [
+  {
+    id: nextId(),
+    name: "NovaChain",
+    token: "NOVA",
+    total_supply: "2,000,000,000",
+    starts_at: new Date(Date.now() - DAY_MS).toISOString(),
+    ends_at: new Date(Date.now() + 20 * DAY_MS).toISOString(),
+    pools: [
+      { id: "bnb", asset: "BNB", apy: 0.088 },
+      { id: "fdusd", asset: "FDUSD", apy: 0.045 },
+    ],
+  },
+  {
+    id: nextId(),
+    name: "QuantumPay",
+    token: "QPAY",
+    total_supply: "800,000,000",
+    starts_at: new Date(Date.now() + 2 * DAY_MS).toISOString(),
+    ends_at: new Date(Date.now() + 32 * DAY_MS).toISOString(),
+    pools: [
+      { id: "bnb", asset: "BNB", apy: 0.102 },
+      { id: "fdusd", asset: "FDUSD", apy: 0.058 },
+    ],
+  },
+  {
+    id: nextId(),
+    name: "MetaVerse X",
+    token: "MVX",
+    total_supply: "1,000,000,000",
+    starts_at: new Date(Date.now() - 30 * DAY_MS).toISOString(),
+    ends_at: new Date(Date.now() - 5 * DAY_MS).toISOString(),
+    pools: [
+      { id: "bnb", asset: "BNB", apy: 0.075 },
+      { id: "fdusd", asset: "FDUSD", apy: 0.038 },
+    ],
+  },
+];
+const launchPositions = []; // {id,user_id,project_id,pool_id,staked,rewards,last_accrual_at}
+
+function launchStatus(p, now = Date.now()) {
+  if (now < Date.parse(p.starts_at)) return "upcoming";
+  if (now > Date.parse(p.ends_at)) return "ended";
+  return "ongoing";
+}
+function findPosition(uid, projectId, poolId) {
+  return launchPositions.find(
+    (x) => x.user_id === uid && x.project_id === projectId && x.pool_id === poolId
+  );
+}
+// 读取时把自上次结算以来的奖励落账
+function settleRewards(pos, project) {
+  const now = Date.now();
+  if (launchStatus(project, now) !== "ongoing") {
+    // 项目结束后停止计息
+    const end = Math.min(now, Date.parse(project.ends_at));
+    const days = Math.max(0, (end - Date.parse(pos.last_accrual_at)) / DAY_MS);
+    if (days > 0) {
+      const pool = project.pools.find((x) => x.id === pos.pool_id);
+      // 全精度累计：短间隔轮询的增量远小于 1e-6，r6 会把奖励抹零
+      pos.rewards = Math.round((pos.rewards + pos.staked * pool.apy * (days / 365)) * 1e12) / 1e12;
+    }
+    pos.last_accrual_at = new Date(end).toISOString();
+    return;
+  }
+  const days = Math.max(0, (now - Date.parse(pos.last_accrual_at)) / DAY_MS);
+  if (days > 0) {
+    const pool = project.pools.find((x) => x.id === pos.pool_id);
+    pos.rewards = Math.round((pos.rewards + pos.staked * pool.apy * (days / 365)) * 1e12) / 1e12;
+    pos.last_accrual_at = new Date(now).toISOString();
+  }
+}
+
+app.get("/api/v1/launchpad/projects", (req, res) => {
+  const now = Date.now();
+  ok(res, {
+    projects: launchProjects.map((p) => ({
+      ...p,
+      status: launchStatus(p, now),
+      starts_at: p.starts_at,
+      ends_at: p.ends_at,
+    })),
+  });
+});
+
+app.get("/api/v1/launchpad/positions", (req, res) => {
+  const uid = Number(req.user.sub);
+  const list = launchPositions
+    .filter((x) => x.user_id === uid)
+    .map((pos) => {
+      const project = launchProjects.find((p) => p.id === pos.project_id);
+      if (project) settleRewards(pos, project);
+      return pos;
+    });
+  ok(res, { positions: list });
+});
+
+app.post("/api/v1/launchpad/stake", (req, res) => {
+  const { project_id, pool_id, amount } = req.body || {};
+  const project = launchProjects.find((p) => p.id === Number(project_id));
+  if (!project) return fail(res, 404, "项目不存在");
+  if (launchStatus(project) !== "ongoing") return fail(res, 409, "仅进行中的项目可质押");
+  const pool = project.pools.find((x) => x.id === String(pool_id));
+  if (!pool) return fail(res, 404, "质押池不存在");
+  const amt = Number(amount);
+  if (!(amt > 0)) return fail(res, 400, "质押数量必须大于 0");
+  let pos = findPosition(Number(req.user.sub), project.id, pool.id);
+  if (!pos) {
+    pos = {
+      id: nextId(),
+      user_id: Number(req.user.sub),
+      project_id: project.id,
+      pool_id: pool.id,
+      staked: 0,
+      rewards: 0,
+      last_accrual_at: new Date().toISOString(),
+    };
+    launchPositions.push(pos);
+  }
+  pos.staked = r6(pos.staked + amt);
+  ok(res, pos, 201);
+});
+
+app.post("/api/v1/launchpad/unstake", (req, res) => {
+  const { position_id, amount } = req.body || {};
+  const pos = launchPositions.find(
+    (x) => x.id === Number(position_id) && x.user_id === Number(req.user.sub)
+  );
+  if (!pos) return fail(res, 404, "仓位不存在");
+  const amt = amount == null ? pos.staked : Number(amount); // 缺省全额赎回
+  if (!(amt > 0) || amt > pos.staked) return fail(res, 400, "赎回数量无效");
+  pos.staked = r6(pos.staked - amt);
+  ok(res, pos);
+});
+
+app.post("/api/v1/launchpad/harvest", (req, res) => {
+  const { position_id } = req.body || {};
+  const pos = launchPositions.find(
+    (x) => x.id === Number(position_id) && x.user_id === Number(req.user.sub)
+  );
+  if (!pos) return fail(res, 404, "仓位不存在");
+  const project = launchProjects.find((p) => p.id === pos.project_id);
+  if (project) settleRewards(pos, project);
+  if (pos.rewards <= 0) return fail(res, 409, "暂无可领取的奖励");
+  const claimed = pos.rewards;
+  pos.rewards = 0;
+  ok(res, { ...pos, claimed }, 200);
+});
+
 // ---------- 挂载管理后台业务路由 ----------
 app.use(buildAdminApp());
 

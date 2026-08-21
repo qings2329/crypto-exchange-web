@@ -409,6 +409,46 @@ export const api = {
     });
   },
 
+  // ---- 理财（Earn Hub）----
+  earnProducts: (term?: "flexible" | "fixed" | string) =>
+    request<{ products: EarnProduct[] }>(withQuery("/api/v1/earn/products", { term })).then((d) => d.products ?? []),
+  earnSubscriptions: async () => {
+    const d = await request<{ subscriptions: EarnSubscription[] }>("/api/v1/earn/subscriptions");
+    return d.subscriptions ?? [];
+  },
+  earnSubscribe: (payload: { product_id: number; amount: number; agreed: boolean }) =>
+    request<EarnSubscription>("/api/v1/earn/subscribe", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  earnRedeem: (id: number) =>
+    request<EarnSubscription>(`/api/v1/earn/subscriptions/${id}/redeem`, { method: "POST" }),
+
+  // ---- 新币挖矿（Launchpool）----
+  launchProjects: async () => {
+    const d = await request<{ projects: LaunchProject[] }>("/api/v1/launchpad/projects");
+    return d.projects ?? [];
+  },
+  launchPositions: async () => {
+    const d = await request<{ positions: LaunchPosition[] }>("/api/v1/launchpad/positions");
+    return d.positions ?? [];
+  },
+  launchStake: (payload: { project_id: number; pool_id: string; amount: number }) =>
+    request<LaunchPosition>("/api/v1/launchpad/stake", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  launchUnstake: (payload: { position_id: number; amount?: number }) =>
+    request<LaunchPosition>("/api/v1/launchpad/unstake", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  launchHarvest: (position_id: number) =>
+    request<LaunchPosition & { claimed: number }>("/api/v1/launchpad/harvest", {
+      method: "POST",
+      body: JSON.stringify({ position_id }),
+    }),
+
   // ---- 杠杆 ----
   marginAccounts: () => request<any[]>("/api/v1/margin/accounts"),
   marginLiqPrice: () => request("/api/v1/margin/liq-price"),
@@ -691,6 +731,55 @@ export interface Kline {
   l: number;
   c: number;
   v: number;
+}
+
+// ---- 理财（Earn）----
+export interface EarnProduct {
+  id: number;
+  name: string;
+  asset: string;
+  term_days: number; // 0 = 活期
+  apy: number; // 0.065 = 6.5%
+  min_amount: number;
+  max_amount: number;
+  status: string;
+}
+export interface EarnSubscription {
+  id: number;
+  product_id: number;
+  asset: string;
+  amount: number;
+  apy: number;
+  term_days: number;
+  start_at: string;
+  status: "active" | "redeemed";
+  accrued?: number; // 服务端按读取时刻实时累计
+  redeemed_amount?: number;
+}
+
+// ---- 新币挖矿（Launchpool）----
+export type LaunchStatus = "upcoming" | "ongoing" | "ended";
+export interface LaunchPool {
+  id: string; // "bnb" | "fdusd"
+  asset: string;
+  apy: number;
+}
+export interface LaunchProject {
+  id: number;
+  name: string;
+  token: string;
+  total_supply: string;
+  starts_at: string;
+  ends_at: string;
+  status: LaunchStatus;
+  pools: LaunchPool[];
+}
+export interface LaunchPosition {
+  id: number;
+  project_id: number;
+  pool_id: string;
+  staked: number;
+  rewards: number;
 }
 
 // ---- OTC 领域类型（对齐 /api/v1/otc 后端契约）----

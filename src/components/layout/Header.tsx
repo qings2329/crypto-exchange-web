@@ -15,6 +15,8 @@ const LINKS: { path: string; key: string; role?: "operator" | "admin"; auth?: bo
   { path: "/wallet", key: "nav.wallet" },
   { path: "/lending", key: "nav.lending" },
   { path: "/wealth", key: "nav.wealth" },
+  { path: "/earn", key: "nav.earn" },
+  { path: "/launchpad", key: "nav.launchpad" },
   { path: "/bot", key: "nav.bot" },
   { path: "/referral", key: "nav.referral" },
   { path: "/security", key: "nav.security", auth: true },

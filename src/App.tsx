@@ -18,6 +18,8 @@ const TradeHall = lazy(() => import("./pages/TradeHall").then((m) => ({ default:
 const SecurityCenter = lazy(() => import("./pages/SecurityCenter").then((m) => ({ default: m.SecurityCenter })));
 const KycPage = lazy(() => import("./pages/KycPage").then((m) => ({ default: m.KycPage })));
 const OtcPage = lazy(() => import("./pages/OtcPage").then((m) => ({ default: m.OtcPage })));
+const EarnPage = lazy(() => import("./pages/EarnPage").then((m) => ({ default: m.EarnPage })));
+const LaunchpadPage = lazy(() => import("./pages/LaunchpadPage").then((m) => ({ default: m.LaunchpadPage })));
 const Markets = lazy(() => import("./pages/Markets").then((m) => ({ default: m.Markets })));
 const Orders = lazy(() => import("./pages/Orders").then((m) => ({ default: m.Orders })));
 const Wallet = lazy(() => import("./pages/Wallet").then((m) => ({ default: m.Wallet })));
@@ -63,6 +65,8 @@ const PAGES: Record<string, React.ComponentType> = {
   "/futures/manage": Futures,
   "/options": Options,
   "/otc": OtcPage,
+  "/earn": EarnPage,
+  "/launchpad": LaunchpadPage,
   "/otc/manage": Otc,
   "/margin": Margin,
   "/wealth": Wealth,
