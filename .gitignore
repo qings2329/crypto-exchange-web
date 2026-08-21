@@ -56,6 +56,6 @@ Thumbs.db
 # local generated
 *.tsbuildinfo
 
-# server skeleton 本地安装产物（npm --prefix server install 生成）
-/server/node_modules
-/server/package-lock.json
+# mock 网关本地安装产物（npm --prefix mock install 生成）
+/mock/node_modules
+/mock/package-lock.json

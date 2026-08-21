@@ -1,8 +1,8 @@
-// 统一业务网关（开发后端，内存 mock，零额外依赖：仅 express + ws）。
+// 统一 mock 网关（仅前端开发联调用，内存数据，重启即清空；生产后端为 crypto-exchange Go 网关）。
 //
 // 整合所有前端 client.ts 调用的 /api/v1/* 业务接口 + 行情 WebSocket，
 // 单一进程监听 :8787，前端 Vite 代理 /api -> :8787 即可全量联调（无需再分别启动多个骨架服务）。
-// 注意：仅本项目的开发后端用此端口；避免占用宿主机上其他服务常用的 :8080。
+// 注意：仅本项目的开发 mock 用此端口；避免占用宿主机上其他服务常用的 :8080。
 //
 // 整合范围：
 //   - 鉴权（gateway-auth）：登录/刷新/登出/网关 Bearer 校验/服务端 RBAC
@@ -11,7 +11,7 @@
 //     合约资金流水、理财、公告、API Key、监控上报与聚合
 //   - WebSocket：/api/v1/spot/ws（深度+成交）、/api/v1/market/ws（Ticker）、/api/v1/market/kline/ws（K线）
 //
-// 运行：  cd server && npm install && npm run start:gateway
+// 运行：  npm run dev:mock
 //         （默认监听 :8787；与前端 vite dev 的代理目标一致）
 
 import express from "express";

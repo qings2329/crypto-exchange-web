@@ -17,8 +17,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // REST 与 WebSocket 都走网关（ws:true 支持升级）。
-      // 默认 :8787（见 server/gateway.mjs）；可用 BACKEND_TARGET 环境变量覆盖（例如本地 mock 跑在别的端口时）。
+      // REST 与 WebSocket 都走后端（ws:true 支持升级）。
+      // 开发默认指向仓库内 mock 网关 :8787（见 mock/gateway.mjs，仅联调用）；
+      // 对接真实后端（crypto-exchange Go 网关）时用 BACKEND_TARGET 覆盖。
       "/api": { target: process.env.BACKEND_TARGET || "http://localhost:8787", ws: true },
     },
   },

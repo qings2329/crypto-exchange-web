@@ -1,9 +1,9 @@
 {
-  "name": "crypto-exchange-monitor-skeleton",
+  "name": "crypto-exchange-web-mock",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "监控后端接口骨架示例（含零依赖 http 版与 Express 版，内存存储）",
+  "description": "前端开发联调用 mock 网关（内存数据，非生产后端；生产后端为 crypto-exchange Go 项目）",
   "scripts": {
     "start": "node monitor-server.mjs",
     "start:express": "node monitor-express.mjs",

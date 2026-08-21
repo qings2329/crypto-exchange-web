@@ -70,14 +70,16 @@ npm run build
 npm run preview
 ```
 
-## 本地开发后端（统一网关）
+## 本地开发 Mock 网关（仅联调用）
 
-前端在开发期需要一个后端来提供 `/api/v1/*` 业务接口与行情 WebSocket。仓库内已提供一个**整合后的统一网关** `server/gateway.mjs`：单进程监听 `:8787`，覆盖前端 `src/api/client.ts` 调用的全部业务端点（现货深度/下单/订单/成交、行情 Ticker、K 线、OTC 广告/订单/对手方/沟通、钱包流水、合约、期权、杠杆、理财、风控、通知、用户资料与偏好/TFA/KYC、公告、API Key、管理总览/审计、监控上报与聚合），以及三类行情 WebSocket（`/api/v1/spot/ws`、`/api/v1/market/ws`、`/api/v1/market/kline/ws`）。
+> **重要**：本仓库的 `mock/` 目录只是**前端开发联调用的内存 mock**（Node + express + ws，无持久化，重启即重置），**不是生产后端**。生产后端是独立仓库 [`crypto-exchange`](../crypto-exchange)（Go 网关 + 撮合等核心服务）。前端通过 `BACKEND_TARGET` 切换对接目标，业务接口契约保持 `/api/v1/*` 不变。
 
-启动（会自动安装 `server/` 依赖并运行）：
+前端在开发期需要一个后端来提供 `/api/v1/*` 业务接口与行情 WebSocket。仓库内提供一个**整合后的 mock 网关** `mock/gateway.mjs`：单进程监听 `:8787`，覆盖前端 `src/api/client.ts` 调用的全部业务端点（现货深度/下单/订单/成交、行情 Ticker、K 线、OTC 广告/订单/对手方/沟通、钱包流水、合约、期权、杠杆、理财、风控、通知、用户资料与偏好/TFA/KYC、公告、API Key、管理总览/审计、监控上报与聚合），以及三类行情 WebSocket（`/api/v1/spot/ws`、`/api/v1/market/ws`、`/api/v1/market/kline/ws`）。
+
+启动（会自动安装 `mock/` 依赖并运行）：
 
 ```bash
-npm run dev:server
+npm run dev:mock
 ```
 
 随后在另一个终端启动前端即可（`vite` 代理 `/api` 指向 `:8787`）：
@@ -89,17 +91,17 @@ npm run dev
 说明：
 
 - 数据为**内存 mock**，无持久化，仅用于联调；重启即重置。
-- 登录演示账号（见 `server/gateway-auth.mjs` 顶部种子）：`admin@ce.dev` / `op@ce.dev` / `user@ce.dev`（密码分别为 `Admin@123` / `Op@123` / `User@123`）。角色分别为 `admin` / `operator` / `user`，对应前端 RBAC。
-- 之前分散的骨架服务（`kline-server.mjs` / `monitor-server.mjs` / `apikey-express.mjs` / `admin-api.mjs`）仍可作为独立服务运行（`npm --prefix server run start:*`），但**统一网关已覆盖其全部能力**，日常开发只需运行 `dev:server` 一个进程。
+- 登录演示账号（见 `mock/gateway-auth.mjs` 顶部种子）：`admin@ce.dev` / `op@ce.dev` / `user@ce.dev`（密码分别为 `Admin@123` / `Op@123` / `User@123`）。角色分别为 `admin` / `operator` / `user`，对应前端 RBAC。
+- 之前分散的骨架服务（`kline-server.mjs` / `monitor-server.mjs` / `apikey-express.mjs` / `admin-api.mjs`）仍可作为独立 mock 运行（`npm --prefix mock run start:*`），但**统一网关已覆盖其全部能力**，日常开发只需运行 `dev:mock` 一个进程。
 - 监控上报端点 `POST /api/v1/monitor/report`，聚合查询 `GET /api/v1/monitor/summary` 与 `GET /api/v1/monitor/events?limit=`（前端监控看板页读取）。
 
 ## 后端对接（Vite 代理）
 
-开发服务器通过 Vite 代理将 `/api` 转发到后端网关 `http://localhost:8787`，
+开发服务器通过 Vite 代理将 `/api` 转发到后端（默认指向本地 mock 网关 `http://localhost:8787`），
 REST 与 WebSocket（行情推送）共用该代理（`vite.config.ts` 中 `ws: true` 支持协议升级），
 因此前端统一使用相对路径调用，无需处理跨域。
 
-- 后端基地址：`http://localhost:8787`
+- 对接真实后端（crypto-exchange Go 网关）：`BACKEND_TARGET=http://<go-gateway>:<port> npm run dev`
 - API 前缀：`/api/v1/...`
 - WebSocket：`/api/v1/spot/ws`、`/api/v1/market/ws`
 
@@ -116,47 +118,47 @@ REST 与 WebSocket（行情推送）共用该代理（`vite.config.ts` 中 `ws: 
 
 ## 环境变量
 
-当前通过 Vite 代理硬编码指向 `localhost:8787`，如要对接其他后端地址，修改 `vite.config.ts` 中的 `server.proxy.target` 即可。如需运行时配置，可补充 `.env` 并配合 `import.meta.env`（已在 `.gitignore` 中忽略）。
+当前通过 Vite 代理默认指向 `localhost:8787`（本地 mock 网关），如要对接其他后端地址（如 crypto-exchange Go 网关），设置 `BACKEND_TARGET` 环境变量或修改 `vite.config.ts` 中的 `server.proxy.target` 即可。如需运行时配置，可补充 `.env` 并配合 `import.meta.env`（已在 `.gitignore` 中忽略）。
 
-以下变量可在启动各 `server/` 进程前设置，用于覆盖默认监听端口（开发后端统一网关已覆盖全部能力，日常只需关心 `GATEWAY_PORT` 与前端代理目标）：
+以下变量可在启动各 `mock/` 进程前设置，用于覆盖默认监听端口（mock 统一网关已覆盖全部能力，日常只需关心 `GATEWAY_PORT` 与前端代理目标）：
 
 | 变量 | 作用域 | 默认值 | 说明 |
 | ---- | ------ | ------ | ---- |
-| `GATEWAY_PORT` | `server/gateway.mjs` | `8787` | 统一网关监听端口；前端开发默认对接它 |
-| `BACKEND_TARGET` | `vite.config.ts` | `http://localhost:8787` | Vite 代理 `/api` 的目标地址（含协议与端口） |
-| `ADMIN_PORT` | `server/admin-api.mjs` | `8801` | 独立管理 API 骨架服务端口（统一网关已内置，无需单独运行） |
-| `KLINE_PORT` | `server/kline-server.mjs` | `8802` | 独立 K 线 WebSocket 骨架服务端口 |
-| `MONITOR_PORT` | `server/monitor-server.mjs` / `monitor-express.mjs` | `8803` | 独立监控骨架服务端口 |
-| `APIKEY_PORT` | `server/apikey-express.mjs` / `apikey-server.mjs` | `8804` | 独立 API Key 骨架服务端口 |
+| `GATEWAY_PORT` | `mock/gateway.mjs` | `8787` | mock 网关监听端口；前端开发默认对接它 |
+| `BACKEND_TARGET` | `vite.config.ts` | `http://localhost:8787` | Vite 代理 `/api` 的目标地址（含协议与端口）；对接真实后端时设置 |
+| `ADMIN_PORT` | `mock/admin-api.mjs` | `8801` | 独立管理 API 骨架服务端口（统一网关已内置，无需单独运行） |
+| `KLINE_PORT` | `mock/kline-server.mjs` | `8802` | 独立 K 线 WebSocket 骨架服务端口 |
+| `MONITOR_PORT` | `mock/monitor-server.mjs` / `monitor-express.mjs` | `8803` | 独立监控骨架服务端口 |
+| `APIKEY_PORT` | `mock/apikey-express.mjs` / `apikey-server.mjs` | `8804` | 独立 API Key 骨架服务端口 |
 | `MONITOR_API_KEY` | 监控 Express 版 | 未设置（关闭校验） | 设置后，`/api/v1/monitor/*` 请求须带 `X-Api-Key` 头 |
 
-> 说明：开发环境统一网关监听 `:8787`，但历史上曾与宿主机上其他服务常用的 `:8080` 冲突，因此本项目已整体迁移到 `:87xx` / `:88xx` 段，**不再占用 `:8080`**；生产环境的 Nginx 同样反向代理到后端网关 `:8787`（而非 `:8080`），开发 / 生产后端端口保持一致（见下文「部署」）。
+> 说明：开发环境 mock 网关监听 `:8787`，历史上曾与宿主机上其他服务常用的 `:8080` 冲突，因此本项目已整体迁移到 `:87xx` / `:88xx` 段，**不再占用 `:8080`**。
 
 ## 端口配置（开发 / 生产）
 
-本仓库所有端口分配如下，避免开发后端与宿主机其他进程（尤其是 `:8080`）争用：
+本仓库所有端口分配如下，避免开发 mock 与宿主机其他进程（尤其是 `:8080`）争用：
 
 ### 开发环境
 
 | 端口 | 服务 | 启动方式 | 备注 |
 | ---- | ---- | -------- | ---- |
 | `5173`（Vite 默认，占用时顺延 `5174`…） | 前端开发服务器 | `npm run dev` | Hash 路由 SPA，经 Vite 代理访问后端 |
-| `8787` | 统一后端网关（全量业务 + 行情 WS + 监控聚合） | `npm run dev:server` | **日常开发只需这一个后端进程** |
-| `8801` | 管理 API 骨架（独立） | `npm --prefix server run start:admin` | 统一网关已覆盖，可不选 |
-| `8802` | K 线 WS 骨架（独立） | `npm --prefix server run start:kline` | 统一网关已覆盖，可不选 |
-| `8803` | 监控骨架（独立） | `npm --prefix server run start`（零依赖）或 `start:express`（Express 版） | 统一网关已覆盖，可不选 |
-| `8804` | API Key 骨架（独立） | `npm --prefix server run start:apikey` | 统一网关已覆盖，可不选 |
+| `8787` | mock 统一网关（全量业务 + 行情 WS + 监控聚合，仅联调） | `npm run dev:mock` | **日常开发只需这一个 mock 进程**；对接真实后端时改用 `BACKEND_TARGET` |
+| `8801` | 管理 API 骨架（独立 mock） | `npm --prefix mock run start:admin` | 统一网关已覆盖，可不选 |
+| `8802` | K 线 WS 骨架（独立 mock） | `npm --prefix mock run start:kline` | 统一网关已覆盖，可不选 |
+| `8803` | 监控骨架（独立 mock） | `npm --prefix mock run start`（零依赖）或 `start:express`（Express 版） | 统一网关已覆盖，可不选 |
+| `8804` | API Key 骨架（独立 mock） | `npm --prefix mock run start:apikey` | 统一网关已覆盖，可不选 |
 
-> 前端通过 Vite 代理把 `/api`（REST 与 WebSocket 同前缀）转发到 `:8787`，因此前端代码始终使用相对路径，无需感知具体端口；若要对接别的后端，改 `vite.config.ts` 的 `proxy.target`（或设 `BACKEND_TARGET`）即可。
+> 前端通过 Vite 代理把 `/api`（REST 与 WebSocket 同前缀）转发到目标后端，因此前端代码始终使用相对路径，无需感知具体端口；若要对接别的后端，改 `vite.config.ts` 的 `proxy.target`（或设 `BACKEND_TARGET`）即可。
 
 ### 生产环境
 
 | 端口 | 服务 | 说明 |
 | ---- | ---- | ---- |
 | `80`（或 `443`） | Nginx 静态托管 + 反向代理 | 对外暴露；`dist/` 静态资源 + `/api` 反向代理 |
-| `8787` | 后端网关（生产部署实例，即 `server/gateway.mjs`） | Nginx `location /api { proxy_pass http://localhost:8787 }` 转发；可用 `GATEWAY_PORT` 覆盖；WebSocket 的 `Upgrade`/`Connection` 头须透传 |
+| 按 crypto-exchange 部署为准 | 后端网关（[`crypto-exchange`](../crypto-exchange) Go 项目） | Nginx `location /api { proxy_pass http://<backend>; }` 转发；WebSocket 的 `Upgrade`/`Connection` 头须透传 |
 
-> 关键点：生产环境**不经过 Vite 代理**，必须由 Nginx（或你的网关）把 `/api` 反向代理到后端 `:8787`（即统一网关端口，可用 `GATEWAY_PORT` 覆盖），否则接口与行情 WS 都会 404。开发与生产均指向同一后端网关端口 `:8787`，避免与宿主机上其他进程占用的 `:8080` 争用。
+> 关键点：生产环境**不经过 Vite 代理**，也**绝不部署本仓库的 `mock/`**——必须由 Nginx（或你的网关）把 `/api` 反向代理到 crypto-exchange Go 后端的网关地址，否则接口与行情 WS 都会 404。WebSocket 的 `Upgrade`/`Connection` 头必须正确透传。
 
 ## 部署
 
@@ -185,9 +187,9 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # 将 /api 反向代理到后端网关（REST 与 WebSocket 同前缀）
+    # 将 /api 反向代理到后端网关（REST 与 WebSocket 同前缀；地址以 crypto-exchange 实际部署为准）
     location /api {
-        proxy_pass http://localhost:8787;
+        proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;       # 支持 WebSocket 升级
         proxy_set_header Connection "upgrade";
@@ -197,7 +199,7 @@ server {
 }
 ```
 
-> 关键点：生产环境**不会**经过 Vite 代理，因此需要由 Nginx（或你使用的网关）自行把 `/api` 反向代理到后端 `:8787`（即统一网关 `server/gateway.mjs` 的监听端口，可用 `GATEWAY_PORT` 环境变量覆盖），否则所有接口与行情 WS 都会 404。WebSocket 的 `Upgrade`/`Connection` 头必须正确透传。
+> 关键点：生产环境**不会**经过 Vite 代理，因此需要由 Nginx（或你使用的网关）自行把 `/api` 反向代理到 crypto-exchange Go 后端的网关监听地址（端口以其项目配置为准），否则所有接口与行情 WS 都会 404。WebSocket 的 `Upgrade`/`Connection` 头必须正确透传。**切勿把 `/api` 指到本仓库的 `mock/` 网关**——它只是开发联调工具，数据为内存假数据。
 
 ### 3. 其他托管方式
 
@@ -208,7 +210,7 @@ server {
 
 | 现象 | 可能原因 | 排查 / 解决 |
 | ---- | -------- | ----------- |
-| 页面能打开，但所有数据为空 / 接口报错 | 后端网关未启动或地址不对 | 确认后端在 `:8787` 监听（`npm run dev:server`）；开发环境检查 `vite.config.ts` 的 `proxy.target`，生产环境检查反向代理配置 |
+| 页面能打开，但所有数据为空 / 接口报错 | 后端未启动或地址不对 | 开发环境确认 mock 网关在 `:8787` 监听（`npm run dev:mock`）或 `BACKEND_TARGET` 指向真实后端；检查 `vite.config.ts` 的 `proxy.target`，生产环境检查反向代理配置 |
 | 接口返回 404（`/api/...`） | 生产环境未配置反向代理 | 在 Nginx（或网关）中增加 `location /api { proxy_pass ... }`，不要依赖 Vite 代理 |
 | WebSocket 连不上 / 行情不刷新 | `Upgrade` 头未透传，或后端 WS 地址错误 | 检查反向代理是否透传 `Upgrade`/`Connection`；确认 `wss://` 在 HTTPS 下可用 |
 | 一直跳回登录页 / 登录后立即失效 | `access_token` 过期且刷新失败 | 清除 `localStorage` 中的 `cx_access_token` 等键重新登录；确认后端 `/api/v1/user/refresh` 正常 |
@@ -285,7 +287,7 @@ server {
 
 前端的 `src/api/client.ts` 已定义 `api.monitorSummary()` / `api.monitorEvents()`，
 监控看板页会调用以下两个接口拉取**服务端聚合**数据（后端未实现时看板回退为「会话本地」视图）。
-这两个接口与上报端点 `POST /api/v1/monitor/report` 已由 `server/gateway.mjs` 实现（复用 `server/monitor-store.mjs` 的内存存储与聚合逻辑），看板「服务端聚合」区现已可正常展示：
+这两个接口与上报端点 `POST /api/v1/monitor/report` 已由 `mock/gateway.mjs` 实现（复用 `mock/monitor-store.mjs` 的内存存储与聚合逻辑），看板「服务端聚合」区现已可正常展示：
 
 **`GET /api/v1/monitor/summary`** — 聚合统计
 
@@ -338,20 +340,20 @@ server {
 > `vital` 类事件用 `value` 表示数值（毫秒或 CLS 无量纲），其余用 `status`/`code`。
 > 响应沿用项目统一的 `{ code, message, data }` 包裹（前端 `request()` 会自动解包 `data`）。
 > 上报侧对应 `initMonitor` 的 `endpoint`（默认 `POST /api/v1/monitor/report`），后端需同时提供写入与查询两端。
-> 可运行的骨架示例见 `server/`：
+> 可运行的骨架示例见 `mock/`：
 > - `monitor-server.mjs`（零依赖 Node 内置 http 版，`node monitor-server.mjs` 直接运行）
-> - `monitor-express.mjs`（Express 版，路由更易扩展中间件；`cd server && npm install && npm run start:express`）
+> - `monitor-express.mjs`（Express 版，路由更易扩展中间件；`cd mock && npm install && npm run start:express`）
 > - 两者共用 `monitor-store.mjs` 的内存存储与聚合逻辑，生产请替换为 DB/消息队列。
 > - Express 版内置 `X-Api-Key` 鉴权中间件：设置环境变量 `MONITOR_API_KEY` 后，所有 `/api/v1/monitor/*` 请求须带请求头 `X-Api-Key: <key>`（未设置该变量时关闭校验，仅演示用）。调用示例：
 >   ```bash
 >   curl -H 'X-Api-Key: secret123' http://localhost:8787/api/v1/monitor/summary
 >   ```
 >
-> 监控骨架的测试（`server/monitor-auth.test.mjs` 单元测试 + `server/monitor-auth.integration.test.mjs` 集成测试 + `server/monitor-e2e.mjs` 端到端脚本）已从根项目接入，
+> 监控骨架的测试（`mock/monitor-auth.test.mjs` 单元测试 + `mock/monitor-auth.integration.test.mjs` 集成测试 + `mock/monitor-e2e.mjs` 端到端脚本）已从根项目接入，
 > 零额外依赖（仅 Express 版需 `npm install`）。在仓库根目录运行：
 > ```bash
-> npm test            # 自动安装 server 依赖，依次执行 单元 → 集成 → 端到端 全部测试
-> npm run test:server # 仅单元 + 集成
+> npm test            # 自动安装 mock 依赖，依次执行 单元 → 集成 → 端到端 全部测试
+> npm run test:mock   # 仅单元 + 集成
 > npm run test:e2e    # 仅端到端
 > ```
 > 测试覆盖：鉴权纯函数、Express 中间件、真实启动 http / express 服务进程后的完整鉴权流程（无 key / 错误 key → 401，正确 key → 200，上报与聚合联动），以及端到端模拟前端上报报文并校验响应结构对齐前端类型。

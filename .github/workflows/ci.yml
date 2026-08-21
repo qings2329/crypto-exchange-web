@@ -24,8 +24,8 @@ jobs:
       - name: Type-check & build
         run: npm run build
 
-      - name: Server tests (unit + integration)
-        run: npm run test:server
+      - name: Mock server tests (unit + integration)
+        run: npm run test:mock
 
       - name: Frontend tests (Vitest)
         run: npm run test:fe

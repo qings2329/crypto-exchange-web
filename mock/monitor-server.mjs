@@ -2,7 +2,7 @@
 // 实现前端 initMonitor 上报 + 监控看板查询所需的三个端点。
 // 存储与聚合逻辑见 ./monitor-store.mjs（仅内存，生产请替换为 DB / 消息队列）。
 //
-// 运行：  node server/monitor-server.mjs   （默认监听 :8803/api/v1/monitor）
+// 运行：  node mock/monitor-server.mjs   （默认监听 :8803/api/v1/monitor）
 // 前端开发时与现有 /api 代理指向同一网关即可被 /api/v1/monitor/* 命中。
 
 import http from "node:http";
