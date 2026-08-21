@@ -11,12 +11,14 @@ import { cn } from "../../lib/utils";
 
 interface Props {
   symbol: string; // BTCUSDT
+  /** 初始 Tab（永续模式底部容器切换到委托/历史时使用） */
+  initialTab?: Tab;
 }
 
 type Tab = "open" | "history";
 
-export function OrdersPanel({ symbol }: Props) {
-  const [tab, setTab] = useState<Tab>("open");
+export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   // 注意：选择器必须返回稳定引用（Zustand v5），过滤放到组件内 useMemo
   const orders = useOrdersStore((s) => s.orders);
   const cancel = useOrdersStore((s) => s.cancel);

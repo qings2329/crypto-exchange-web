@@ -11,6 +11,8 @@ import { cn } from "../../lib/utils";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { useMockBalances } from "../../hooks/use-mock-balances";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
+import { leverageOf, marginModeOf, useFuturesStore } from "../../store/futures-store";
+import { LeverageMarginBar } from "./LeverageMarginBar";
 import { useToast } from "../Toast";
 
 export type OrderSide = TradeOrder["side"];
@@ -19,6 +21,8 @@ export type OrderType = TradeOrder["type"];
 interface Props {
   symbol: string; // BTCUSDT
   lastPrice?: number; // 行情最新价（市价单成交参考价）
+  /** spot=现货下单；perp=永续合约开仓（显示杠杆栏，提交即开仓） */
+  variant?: "spot" | "perp";
 }
 
 const MIN_NOTIONAL = 5; // 最小名义交易额（USDT）
@@ -29,11 +33,15 @@ function roundQty(q: number): number {
   return Math.floor(q / QTY_STEP) * QTY_STEP;
 }
 
-export function OrderPanel({ symbol, lastPrice }: Props) {
+export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
   const toast = useToast();
   const { isConnected } = useAccount();
   const balances = useMockBalances();
   const place = useOrdersStore((s) => s.place);
+  const openPosition = useFuturesStore((s) => s.open);
+  const perp = variant === "perp";
+  const leverage = useFuturesStore((s) => leverageOf(s, symbol));
+  const marginMode = useFuturesStore((s) => marginModeOf(s, symbol));
 
   const [side, setSide] = useState<OrderSide>("buy");
   const [orderType, setOrderType] = useState<OrderType>("limit");
@@ -44,7 +52,8 @@ export function OrderPanel({ symbol, lastPrice }: Props) {
 
   const base = symbol.replace(/USDT$/, "");
   const isBuy = side === "buy";
-  const available = balances ? (isBuy ? balances.usdt : balances.btc) : 0;
+  // 合约双边均以 USDT 计保证金；现货卖出消耗币余额
+  const available = balances ? (perp || isBuy ? balances.usdt : balances.btc) : 0;
 
   // 成交参考价：限价=输入价；市价=最新行情价
   const limitPrice = parseFloat(priceStr) || 0;
@@ -57,13 +66,18 @@ export function OrderPanel({ symbol, lastPrice }: Props) {
     const list: string[] = [];
     if (orderType === "limit" && !(limitPrice > 0)) list.push("Enter a valid price");
     if (!(qty > 0)) list.push("Enter an amount");
-    else {
+    else if (perp) {
+      // 合约：校验初始保证金（名义额/杠杆）不超过可用 USDT
+      const margin = total / leverage;
+      if (total < MIN_NOTIONAL) list.push(`Min order size ${MIN_NOTIONAL} USDT`);
+      else if (margin > available) list.push(`Insufficient margin ${available.toFixed(2)} USDT`);
+    } else {
       if (total < MIN_NOTIONAL) list.push(`Min order size ${MIN_NOTIONAL} USDT`);
       if (isBuy && total > available) list.push(`Insufficient ${available.toFixed(2)} USDT`);
       if (!isBuy && qty > available) list.push(`Insufficient ${base}`);
     }
     return list;
-  }, [orderType, limitPrice, qty, total, available, isBuy, base]);
+  }, [orderType, limitPrice, qty, total, available, isBuy, base, perp, leverage]);
   const valid = errors.length === 0 && isConnected;
 
   // 百分比 → 数量：买入按可用 USDT 折算，卖出直接按持仓数量
@@ -91,6 +105,23 @@ export function OrderPanel({ symbol, lastPrice }: Props) {
     setSubmitting(true);
     try {
       await new Promise((r) => setTimeout(r, 600)); // 模拟网络/上链延迟
+      if (perp) {
+        // 永续合约：提交即按参考价开仓（模拟即时成交）
+        openPosition({
+          symbol,
+          side: isBuy ? "long" : "short",
+          leverage,
+          marginMode,
+          entryPrice: effectivePrice,
+          qty,
+          margin: total / leverage,
+        });
+        toast.success(
+          `${isBuy ? "Long" : "Short"} ${leverage}x position opened (simulated) · ${fmtQty(qty)} ${symbol}`
+        );
+        reset();
+        return;
+      }
       const isMarket = orderType === "market";
       const order: TradeOrder = {
         id: `SIM-${Date.now().toString(36).toUpperCase()}`,
@@ -164,11 +195,14 @@ export function OrderPanel({ symbol, lastPrice }: Props) {
           ))}
         </div>
 
+        {/* 杠杆与保证金设置栏（仅永续合约模式） */}
+        {perp && <LeverageMarginBar symbol={symbol} />}
+
         {/* 可用余额 */}
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted">Available</span>
+          <span className="text-muted">{perp ? "Available Margin" : "Available"}</span>
           <span className="font-mono tabular-nums text-foreground">
-            {isConnected ? `${fmtQty(available)} ${isBuy ? "USDT" : base}` : "Connect wallet first"}
+            {isConnected ? `${fmtQty(available)} USDT` : "Connect wallet first"}
           </span>
         </div>
 
@@ -270,7 +304,9 @@ export function OrderPanel({ symbol, lastPrice }: Props) {
             ? "Connect Wallet"
             : submitting
               ? "Placing..."
-              : `${isBuy ? "Buy" : "Sell"} ${base}`}
+              : perp
+                ? `${isBuy ? "Open Long" : "Open Short"} ${base}`
+                : `${isBuy ? "Buy" : "Sell"} ${base}`}
         </button>
       </div>
     </div>

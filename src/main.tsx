@@ -14,9 +14,13 @@ initMonitor({
 
 // 开发环境暴露 store 引用，供 Playwright 冒烟测试直接种子数据（生产构建不含）。
 if (import.meta.env.DEV) {
-  void import("./store/orders-store").then((m) => {
-    (window as unknown as Record<string, unknown>).__ordersStore = m.useOrdersStore;
-  });
+  void Promise.all([import("./store/orders-store"), import("./store/futures-store")]).then(
+    ([orders, futures]) => {
+      const w = window as unknown as Record<string, unknown>;
+      w.__ordersStore = orders.useOrdersStore;
+      w.__futuresStore = futures.useFuturesStore;
+    }
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

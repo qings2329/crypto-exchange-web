@@ -16,18 +16,25 @@ import { OrderBook } from "../components/trade/OrderBook";
 import { RecentTrades } from "../components/trade/RecentTrades";
 import { OrderPanel } from "../components/trade/OrderPanel";
 import { OrdersPanel } from "../components/trade/OrdersPanel";
+import { PositionsPanel } from "../components/trade/PositionsPanel";
 import { StreamDot } from "../components/trade/StreamDot";
 import { Badge } from "../components/ui/badge";
 import { useTickerLive } from "../hooks/use-ticker-live";
 import { useOrdersStore } from "../store/orders-store";
 import { fmtPercent, fmtPrice, fmtQty } from "../lib/format";
+import { cn } from "../lib/utils";
 
 interface Props {
   symbol: string; // 形如 BTCUSDT
 }
 
+type MarketMode = "spot" | "perp";
+type BottomTab = "positions" | "orders" | "history";
+
 export function TradeHall({ symbol }: Props) {
   const [interval, setInterval] = useState<ChartInterval>("1m");
+  const [mode, setMode] = useState<MarketMode>("spot");
+  const [bottomTab, setBottomTab] = useState<BottomTab>("orders");
   const { ticker, status } = useTickerLive(symbol);
   const fillMatching = useOrdersStore((s) => s.fillMatching);
 
@@ -67,7 +74,25 @@ export function TradeHall({ symbol }: Props) {
             {base}
             <span className="text-muted">/{quote}</span>
           </h1>
-          <Badge variant="secondary">Spot</Badge>
+          {/* 现货 / 永续合约模式切换 */}
+          <div className="ml-1 flex gap-3 self-center" role="tablist" data-testid="mode-switch">
+            {(["spot", "perp"] as const).map((m) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                data-testid={`mode-${m}`}
+                className={cn(
+                  "relative pb-0.5 text-[13px] font-semibold capitalize transition-colors",
+                  mode === m ? "text-foreground" : "text-muted hover:text-foreground/80"
+                )}
+              >
+                {m === "perp" ? "Perp" : "Spot"}
+                {mode === m && <span className="absolute inset-x-1 -bottom-1 h-0.5 rounded-full bg-accent" />}
+              </button>
+            ))}
+          </div>
         </div>
 
         <span
@@ -107,14 +132,50 @@ export function TradeHall({ symbol }: Props) {
           </div>
         </aside>
 
-        {/* 左下：我的当前委托 / 历史订单 */}
+        {/* 左下：永续=持仓/委托/历史 Tab；现货=我的当前委托/历史订单 */}
         <section className="h-[300px] lg:h-auto lg:min-h-[260px] lg:[grid-area:orders]">
-          <OrdersPanel symbol={symbol} />
+          {mode === "perp" ? (
+            <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
+              <div className="flex gap-5 border-b border-border px-4 pt-2" role="tablist">
+                {(
+                  [
+                    { key: "positions", label: "Positions" },
+                    { key: "orders", label: "Open Orders" },
+                    { key: "history", label: "History" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.key}
+                    role="tab"
+                    aria-selected={bottomTab === t.key}
+                    onClick={() => setBottomTab(t.key)}
+                    data-testid={`bottom-tab-${t.key}`}
+                    className={cn(
+                      "relative pb-2 text-xs font-medium transition-colors",
+                      bottomTab === t.key ? "font-semibold text-foreground" : "text-muted hover:text-foreground"
+                    )}
+                  >
+                    {t.label}
+                    {bottomTab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent" />}
+                  </button>
+                ))}
+              </div>
+              <div className="min-h-0 flex-1">
+                {bottomTab === "positions" ? (
+                  <PositionsPanel symbol={symbol} />
+                ) : (
+                  <OrdersPanel symbol={symbol} initialTab={bottomTab === "history" ? "history" : "open"} />
+                )}
+              </div>
+            </div>
+          ) : (
+            <OrdersPanel symbol={symbol} />
+          )}
         </section>
 
         {/* 右下：下单面板 */}
         <section className="lg:[grid-area:panel]">
-          <OrderPanel symbol={symbol} lastPrice={last} />
+          <OrderPanel symbol={symbol} lastPrice={last} variant={mode} />
         </section>
       </div>
     </div>
