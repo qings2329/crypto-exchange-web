@@ -3,7 +3,7 @@
 // - 每行右侧累计量渐变进度条（宽度按两侧最大累计量归一化，右对齐）；
 // - tabular-nums 保证高频刷新不抖动。
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useDepthLive } from "../../hooks/use-depth-live";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { Skeleton } from "../ui/skeleton";
@@ -98,7 +98,8 @@ export function OrderBook({ symbol, rows = 10 }: Props) {
   );
 }
 
-function Row({
+/** 单行 memo 化：props 不变（价格/数量/累计/最大累计）时跳过重渲染，配合 100ms 节流刷出。 */
+const Row = memo(function Row({
   price,
   qty,
   total,
@@ -128,7 +129,7 @@ function Row({
       <span className="relative w-20 text-right text-muted">{fmtQty(total)}</span>
     </div>
   );
-}
+});
 
 function cnGradient(side: "ask" | "bid") {
   return [
