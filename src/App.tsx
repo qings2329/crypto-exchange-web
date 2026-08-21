@@ -17,6 +17,7 @@ const Trade = lazy(() => import("./pages/Trade").then((m) => ({ default: m.Trade
 const TradeHall = lazy(() => import("./pages/TradeHall").then((m) => ({ default: m.TradeHall })));
 const SecurityCenter = lazy(() => import("./pages/SecurityCenter").then((m) => ({ default: m.SecurityCenter })));
 const KycPage = lazy(() => import("./pages/KycPage").then((m) => ({ default: m.KycPage })));
+const OtcPage = lazy(() => import("./pages/OtcPage").then((m) => ({ default: m.OtcPage })));
 const Markets = lazy(() => import("./pages/Markets").then((m) => ({ default: m.Markets })));
 const Orders = lazy(() => import("./pages/Orders").then((m) => ({ default: m.Orders })));
 const Wallet = lazy(() => import("./pages/Wallet").then((m) => ({ default: m.Wallet })));
@@ -61,7 +62,8 @@ const PAGES: Record<string, React.ComponentType> = {
   "/wallet": Wallet,
   "/futures/manage": Futures,
   "/options": Options,
-  "/otc": Otc,
+  "/otc": OtcPage,
+  "/otc/manage": Otc,
   "/margin": Margin,
   "/wealth": Wealth,
   "/lending": Lending,
@@ -78,7 +80,7 @@ const PAGES: Record<string, React.ComponentType> = {
 
 // 各页面所需的最低角色。缺省为 user（仅登录即可），运营/管理类页面提升为 operator/admin。
 const PAGE_ROLES: Record<string, Role> = {
-  "/otc": "operator",
+  "/otc/manage": "operator",
   "/risk": "admin",
   "/notifications": "admin",
   "/monitor": "admin",
