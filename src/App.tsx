@@ -75,15 +75,14 @@ const PAGE_ROLES: Record<string, Role> = {
   "/notifications": "admin",
   "/monitor": "admin",
   "/options": "admin",
-  "/futures": "admin",
   "/margin": "admin",
   "/announcements": "admin",
   "/admin": "admin",
   "/audit": "admin",
 };
 
-// 无需登录即可访问的公开页面（首页、公告、借贷、理财等展示型页面）。
-const PUBLIC_PAGES = new Set(["/home", "/announcements", "/lending", "/wealth"]);
+// 公开页面白名单见 src/lib/routes.ts（与 api/client 的 401 处理共享）。
+import { PUBLIC_PAGES } from "./lib/routes";
 
 function Router() {
   const hash = useHash();

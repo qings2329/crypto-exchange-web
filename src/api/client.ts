@@ -2,6 +2,8 @@
 // 通过 Vite 代理（/api -> 网关 :8787）访问所有微服务；统一注入 Bearer Token，
 // 遇到 401 自动用 refresh_token 刷新并重试一次；统一解包 {code,message,data} 响应体。
 
+import { isPublicRoute } from "../lib/routes";
+
 const ACCESS = "cx_access_token";
 const REFRESH = "cx_refresh_token";
 const UID = "cx_user_id";
@@ -89,15 +91,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       res = await doFetch(next);
     } catch {
       // 刷新失败：会话已失效，清除并跳转登录（对接网关后的标准过期处理）。
+      // 公开页（首页/合约等）不强制跳转，避免浏览体验被打断。
       tokenStore.clear();
-      if (typeof location !== "undefined") location.hash = "/login";
+      if (typeof location !== "undefined" && !isPublicRoute()) location.hash = "/login";
       throw new ApiError("登录已过期，请重新登录", 401, 401);
     }
   }
 
   // 无刷新令牌却收到 401（未登录态访问受保护资源）：跳转登录页重新鉴权。
-  // 登录接口自身的 401（凭证错误）除外，避免打断登录错误提示。
-  if (res.status === 401 && !tokenStore.refresh && !path.includes("/user/login")) {
+  // 登录接口自身的 401（凭证错误）除外，避免打断登录错误提示；
+  // 公开页（首页/合约等）保持匿名可浏览，仅由页面自身的 RequireRole 决定是否跳转。
+  if (res.status === 401 && !tokenStore.refresh && !path.includes("/user/login") && !isPublicRoute()) {
     if (typeof location !== "undefined") location.hash = "/login";
   }
 

@@ -9,6 +9,7 @@ import { cn } from "../../lib/utils";
 const LINKS: { path: string; key: string; role?: "operator" | "admin" }[] = [
   { path: "/home", key: "nav.home" },
   { path: "/trade", key: "nav.trade" },
+  { path: "/futures", key: "nav.futures" },
   { path: "/wallet", key: "nav.wallet" },
   { path: "/lending", key: "nav.lending" },
   { path: "/wealth", key: "nav.wealth" },

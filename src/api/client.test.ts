@@ -76,10 +76,18 @@ describe("api client", () => {
     expect(JSON.parse(opts.body as string)).toEqual({ symbol: "BTC_USDT", side: "buy", price: 100, qty: 1 });
   });
 
-  it("401 且无 refresh_token 时抛出 ApiError 并跳转登录页", async () => {
+  it("401 且无 refresh_token 时抛出 ApiError；受保护页跳转登录页", async () => {
+    location.hash = "#/wallet"; // 受保护路由
     const fetchMock = mockFetch(errJson(401, 401, "未授权"));
     await expect(api.spotOrders({})).rejects.toBeInstanceOf(ApiError);
     expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBeNull();
     expect(location.hash).toBe("#/login");
+  });
+
+  it("401 在公开页（首页/合约）不强制跳转登录", async () => {
+    location.hash = "#/home"; // 公开路由
+    mockFetch(errJson(401, 401, "未授权"));
+    await expect(api.spotOrders({})).rejects.toBeInstanceOf(ApiError);
+    expect(location.hash).toBe("#/home");
   });
 });
