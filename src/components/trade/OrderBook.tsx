@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import { useDepthLive } from "../../hooks/use-depth-live";
 import { fmtPrice, fmtQty } from "../../lib/format";
+import { Skeleton } from "../ui/skeleton";
 import { StreamDot } from "./StreamDot";
 import type { OrderBookLevel } from "../../types";
 
@@ -55,7 +56,7 @@ export function OrderBook({ symbol, rows = 10 }: Props) {
       </div>
 
       {!view ? (
-        <div className="grid flex-1 place-items-center text-xs text-muted">Waiting for depth stream...</div>
+        <SkeletonRows rows={rows} />
       ) : (
         <div className="min-h-0 flex-1 font-mono text-xs tabular-nums">
           {/* 卖盘 */}
@@ -136,4 +137,23 @@ function cnGradient(side: "ask" | "bid") {
       ? "bg-gradient-to-l from-sell/25 to-sell/5"
       : "bg-gradient-to-l from-buy/25 to-buy/5",
   ].join(" ");
+}
+
+/** 深度流未就绪时的骨架屏：模拟卖盘/价差/买盘结构。 */
+function SkeletonRows({ rows }: { rows: number }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" aria-hidden data-testid="ob-skeleton">
+      <div className="flex flex-col justify-end gap-[5px] px-3 pb-1.5">
+        {Array.from({ length: Math.min(rows, 5) }, (_, i) => (
+          <Skeleton key={`sa-${i}`} className="ml-auto h-3 w-full max-w-[75%]" />
+        ))}
+      </div>
+      <Skeleton className="mx-3 my-1 h-6 shrink-0" />
+      <div className="flex flex-col gap-[5px] px-3 pt-1.5">
+        {Array.from({ length: Math.min(rows, 5) }, (_, i) => (
+          <Skeleton key={`sb-${i}`} className="ml-auto h-3 w-full max-w-[75%]" />
+        ))}
+      </div>
+    </div>
+  );
 }

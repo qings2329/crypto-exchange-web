@@ -20,6 +20,7 @@ import { fetchKlines } from "../../services/binance";
 import { useKlineLive } from "../../hooks/use-kline-live";
 import { fmtPrice } from "../../lib/format";
 import { cn } from "../../lib/utils";
+import { Skeleton } from "../ui/skeleton";
 import { StreamDot } from "./StreamDot";
 import type { Kline } from "../../types";
 
@@ -198,9 +199,19 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
 
       <div className="relative min-h-0 flex-1">
         <div ref={wrapRef} className="absolute inset-0" />
-        {(isLoading || isError) && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center text-xs text-muted">
-            {isLoading ? "Loading klines..." : "Failed to load klines (network/region restricted)"}
+        {isLoading && (
+          <div className="absolute inset-0 flex flex-col gap-3 p-4" aria-hidden data-testid="chart-skeleton">
+            <div className="flex flex-1 items-end gap-2">
+              {[38, 62, 45, 80, 55, 70, 48, 88, 60, 74, 52, 66, 42, 78, 58].map((h, i) => (
+                <Skeleton key={i} className="flex-1" style={{ height: `${h}%` }} />
+              ))}
+            </div>
+            <Skeleton className="h-4 w-40" />
+          </div>
+        )}
+        {isError && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center text-xs text-sell">
+            Failed to load klines (network/region restricted)
           </div>
         )}
       </div>

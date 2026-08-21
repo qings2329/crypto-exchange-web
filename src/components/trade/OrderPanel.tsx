@@ -2,34 +2,23 @@
 // - Buy/Sell Tab + Limit/Market 类型切换；
 // - 百分比滑条与 25/50/75/100 快捷档，按可用余额反算数量；
 // - 实时校验（价格/数量/最小名义额/余额）+ 预估交易额；
-// - 提交为本地模拟撮合（600ms 延迟），成功后回调 onPlaced 并弹 toast。
-//   接真实链时把 submit() 替换为合约 writeContract / 后端 API 即可。
+// - 提交写入 orders-store：市价单立即 filled，限价单进入当前委托（open），
+//   行情穿越限价时自动撮合。接真实链时把 submit() 替换为合约 writeContract / 后端 API 即可。
 
 import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { cn } from "../../lib/utils";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { useMockBalances } from "../../hooks/use-mock-balances";
+import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { useToast } from "../Toast";
 
-export type OrderSide = "buy" | "sell";
-export type OrderType = "limit" | "market";
-
-export interface SimulatedOrder {
-  id: string;
-  symbol: string;
-  side: OrderSide;
-  type: OrderType;
-  price: number;
-  qty: number;
-  total: number;
-  ts: number;
-}
+export type OrderSide = TradeOrder["side"];
+export type OrderType = TradeOrder["type"];
 
 interface Props {
   symbol: string; // BTCUSDT
   lastPrice?: number; // 行情最新价（市价单成交参考价）
-  onPlaced?: (order: SimulatedOrder) => void;
 }
 
 const MIN_NOTIONAL = 5; // 最小名义交易额（USDT）
@@ -40,10 +29,11 @@ function roundQty(q: number): number {
   return Math.floor(q / QTY_STEP) * QTY_STEP;
 }
 
-export function OrderPanel({ symbol, lastPrice, onPlaced }: Props) {
+export function OrderPanel({ symbol, lastPrice }: Props) {
   const toast = useToast();
   const { isConnected } = useAccount();
   const balances = useMockBalances();
+  const place = useOrdersStore((s) => s.place);
 
   const [side, setSide] = useState<OrderSide>("buy");
   const [orderType, setOrderType] = useState<OrderType>("limit");
@@ -101,7 +91,8 @@ export function OrderPanel({ symbol, lastPrice, onPlaced }: Props) {
     setSubmitting(true);
     try {
       await new Promise((r) => setTimeout(r, 600)); // 模拟网络/上链延迟
-      const order: SimulatedOrder = {
+      const isMarket = orderType === "market";
+      const order: TradeOrder = {
         id: `SIM-${Date.now().toString(36).toUpperCase()}`,
         symbol,
         side,
@@ -110,9 +101,16 @@ export function OrderPanel({ symbol, lastPrice, onPlaced }: Props) {
         qty,
         total,
         ts: Date.now(),
+        // 市价单按最新价立即成交；限价单挂入当前委托，行情穿越时自动撮合
+        status: isMarket ? "filled" : "open",
+        settledTs: isMarket ? Date.now() : undefined,
       };
-      toast.success(`${isBuy ? "Buy" : "Sell"} order filled (simulated) · ${order.id}`);
-      onPlaced?.(order);
+      place(order);
+      toast.success(
+        isMarket
+          ? `${isBuy ? "Buy" : "Sell"} order filled (simulated) · ${order.id}`
+          : `${isBuy ? "Buy" : "Sell"} order placed (simulated) · ${order.id}`
+      );
       reset();
     } finally {
       setSubmitting(false);

@@ -93,17 +93,16 @@ function Router() {
   if (path === "/register") return <Register />;
 
   // /trade/:SYMBOL —— 交易大厅（如 #/trade/BTCUSDT）
+  // 全宽终端布局：不套 .content 容器，由 TradeHall 自管内边距
   const hall = path.match(/^\/trade\/([a-z0-9]{5,20})$/i);
   if (hall) {
     return (
       <Layout>
-        <div className="content">
-          <ErrorBoundary>
-            <Suspense fallback={<div className="page muted">{""}</div>}>
-              <TradeHall symbol={hall[1].toUpperCase()} />
-            </Suspense>
-          </ErrorBoundary>
-        </div>
+        <ErrorBoundary>
+          <Suspense fallback={<div className="page muted">{""}</div>}>
+            <TradeHall symbol={hall[1].toUpperCase()} />
+          </Suspense>
+        </ErrorBoundary>
       </Layout>
     );
   }

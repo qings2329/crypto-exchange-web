@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTradesLive } from "../../hooks/use-trades-live";
 import { fmtPrice, fmtQty, fmtTime } from "../../lib/format";
 import { cn } from "../../lib/utils";
+import { Skeleton } from "../ui/skeleton";
 import { StreamDot } from "./StreamDot";
 
 interface Props {
@@ -53,7 +54,11 @@ export function RecentTrades({ symbol, max = 30 }: Props) {
         )}
       >
         {trades.length === 0 ? (
-          <div className="grid h-full place-items-center text-muted">Waiting for trades...</div>
+          <div className="flex-1 space-y-[7px] p-3" aria-hidden data-testid="trades-skeleton">
+            {Array.from({ length: 8 }, (_, i) => (
+              <Skeleton key={i} className={cn("ml-auto h-3", i % 3 === 0 ? "w-full" : i % 3 === 1 ? "w-11/12" : "w-10/12")} />
+            ))}
+          </div>
         ) : (
           trades.map((t) => (
             <div key={t.id} className="flex items-center px-3 py-[3px] hover:bg-panel-2/40" data-testid="trade-row">
