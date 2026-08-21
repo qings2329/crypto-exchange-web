@@ -26,3 +26,9 @@ export function fmtTime(ms: number): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+
+/** 紧凑大数：1.23B / 45.6M / 789K（成交额等场景） */
+export function fmtCompact(v: number): string {
+  if (!Number.isFinite(v)) return "--";
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v);
+}

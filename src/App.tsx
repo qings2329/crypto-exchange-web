@@ -15,6 +15,7 @@ import { Register } from "./pages/Register";
 // 其余页面进入对应路由时才加载对应 chunk（见 README 性能优化）。
 const Trade = lazy(() => import("./pages/Trade").then((m) => ({ default: m.Trade })));
 const TradeHall = lazy(() => import("./pages/TradeHall").then((m) => ({ default: m.TradeHall })));
+const Markets = lazy(() => import("./pages/Markets").then((m) => ({ default: m.Markets })));
 const Wallet = lazy(() => import("./pages/Wallet").then((m) => ({ default: m.Wallet })));
 const Futures = lazy(() => import("./pages/Futures").then((m) => ({ default: m.Futures })));
 const Options = lazy(() => import("./pages/Options").then((m) => ({ default: m.Options })));
@@ -47,6 +48,7 @@ function useHash() {
 
 const PAGES: Record<string, React.ComponentType> = {
   "/home": Home,
+  "/markets": Markets,
   "/announcements": Announcements,
   "/history": History,
   "/trade": Trade,
