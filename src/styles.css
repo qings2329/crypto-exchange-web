@@ -23,7 +23,8 @@ input,button,select,textarea{font-family:inherit}
 
 /* Trade Layout */
 .trade{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
-.header{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+.trade-topbar{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+.trade-topbar .logo{font-weight:700;font-size:15px;color:var(--accent)}
 .symbol{color:var(--muted);font-size:13px;font-weight:600}
 .ticker{display:flex;align-items:baseline;gap:12px;padding:8px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
 .ticker .last{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}

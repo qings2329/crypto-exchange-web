@@ -9,7 +9,7 @@ export function Trade() {
   const symbol = "BTC_USDT";
   return (
     <div className="trade">
-      <div className="header">
+      <div className="trade-topbar">
         <Header symbol={symbol} />
         <TickerBar symbol={symbol} />
       </div>
