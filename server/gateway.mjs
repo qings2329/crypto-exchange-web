@@ -138,6 +138,31 @@ const wealthProducts = [
 ];
 const wealthHoldings = [];
 
+// 初始会话 / 登录历史（演示用户 user_id=3）
+{
+  const now = new Date();
+  const s1 = {
+    id: crypto.randomUUID(), user_id: 3, ip: "116.233.45.67",
+    ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36",
+    location: "上海", current: true,
+    created_at: new Date(now - 86400000 * 3).toISOString(),
+    last_active_at: now.toISOString(),
+  };
+  const s2 = {
+    id: crypto.randomUUID(), user_id: 3, ip: "220.181.38.148",
+    ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gecko/20100101 Firefox/127.0",
+    location: "北京", current: false,
+    created_at: new Date(now - 86400000 * 7).toISOString(),
+    last_active_at: new Date(now - 86400000 * 5).toISOString(),
+  };
+  ensureSessions(3).push(s1, s2);
+  loginHistory.push(
+    { id: crypto.randomUUID(), user_id: 3, ip: "116.233.45.67", ua: s1.ua, location: "上海", success: true, created_at: s1.created_at },
+    { id: crypto.randomUUID(), user_id: 3, ip: "42.120.74.101", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", location: "杭州", success: false, created_at: new Date(now - 86400000 * 2).toISOString() },
+    { id: crypto.randomUUID(), user_id: 3, ip: "220.181.38.148", ua: s2.ua, location: "北京", success: true, created_at: s2.created_at },
+  );
+}
+
 const announcements = [
   { id: nextId(), level: "info", title: "欢迎使用 crypto-exchange", content: "现货/OTC/合约等模块已开放联调。", active: true, published_at: new Date().toISOString(), created_at: new Date().toISOString() },
   { id: nextId(), level: "maintenance", title: "计划内系统维护", content: "本周末 02:00-03:00 进行升级维护。", active: true, published_at: new Date().toISOString(), created_at: new Date().toISOString() },
@@ -153,6 +178,39 @@ function genSecret() {
 }
 function hashSecret(secret) {
   return crypto.createHash("sha256").update(String(secret)).digest("base64url");
+}
+
+// 登录历史 / 会话 / 防钓鱼码 内存存储
+const loginHistory = [];
+const sessions = new Map(); // userId -> UserSession[]
+const antiPhishing = new Map(); // userId -> code string
+function ensureSessions(userId) {
+  let arr = sessions.get(userId);
+  if (!arr) {
+    arr = [];
+    sessions.set(userId, arr);
+  }
+  return arr;
+}
+function mockLoginEntry(userId, success) {
+  const ips = ["116.233.45.67", "220.181.38.148", "42.120.74.101", "183.6.66.12", "114.88.32.11"];
+  const uas = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148",
+  ];
+  const locs = ["上海", "北京", "深圳", "杭州", "广州"];
+  const entry = {
+    id: crypto.randomUUID(),
+    user_id: userId,
+    ip: ips[Math.floor(Math.random() * ips.length)],
+    ua: uas[Math.floor(Math.random() * uas.length)],
+    location: locs[Math.floor(Math.random() * locs.length)],
+    success,
+    created_at: new Date().toISOString(),
+  };
+  loginHistory.push(entry);
+  return entry;
 }
 
 // ---------- 应用组装 ----------
@@ -244,6 +302,52 @@ app.post("/api/v1/user/kyc/submit", (req, res) => {
 });
 app.get("/api/v1/user/kyc", (req, res) => {
   ok(res, { kyc: extra(req.user.sub).kyc });
+});
+
+// ---------- 登录历史 ----------
+app.get("/api/v1/user/login-history", (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || "50", 10) || 50, 500);
+  const list = loginHistory
+    .filter((h) => h.user_id === req.user.sub)
+    .slice(-limit)
+    .reverse();
+  ok(res, { entries: list });
+});
+
+// ---------- 会话管理 ----------
+app.get("/api/v1/user/sessions", (req, res) => {
+  const list = ensureSessions(req.user.sub);
+  ok(res, { sessions: list });
+});
+app.delete("/api/v1/user/sessions/:id", (req, res) => {
+  const arr = ensureSessions(req.user.sub);
+  const idx = arr.findIndex((s) => s.id === req.params.id);
+  if (idx === -1) return fail(res, 404, "会话不存在");
+  if (arr[idx].current) return fail(res, 400, "不能注销当前会话");
+  arr.splice(idx, 1);
+  ok(res, { ok: true });
+});
+app.delete("/api/v1/user/sessions", (req, res) => {
+  const arr = ensureSessions(req.user.sub);
+  const before = arr.length;
+  const kept = arr.filter((s) => s.current);
+  sessions.set(req.user.sub, kept);
+  ok(res, { ok: true, revoked: before - kept.length });
+});
+
+// ---------- 防钓鱼码 ----------
+app.get("/api/v1/user/anti-phishing", (req, res) => {
+  ok(res, { code: antiPhishing.get(req.user.sub) || "" });
+});
+app.post("/api/v1/user/anti-phishing", (req, res) => {
+  const { code } = req.body || {};
+  if (code) {
+    antiPhishing.set(req.user.sub, code);
+    ok(res, { ok: true, message: "防钓鱼码已设置" });
+  } else {
+    antiPhishing.delete(req.user.sub);
+    ok(res, { ok: true, message: "防钓鱼码已清除" });
+  }
 });
 
 // ---------- 现货 ----------

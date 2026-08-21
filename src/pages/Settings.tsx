@@ -5,6 +5,9 @@ import {
   type UserPreferences,
   type UserKyc,
   type KycPayload,
+  type UserProfile,
+  type LoginHistoryEntry,
+  type UserSession,
 } from "../api/client";
 import { useI18n, LOCALES } from "../i18n";
 import { applyTheme, THEMES, type ThemeId } from "../lib/theme";
@@ -69,17 +72,35 @@ export function Settings() {
   });
   const [kycMsg, setKycMsg] = useState("");
 
+  // 账户信息
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // 登录历史
+  const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
+
+  // 会话管理
+  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [sessionMsg, setSessionMsg] = useState("");
+
+  // 防钓鱼码
+  const [phishingCode, setPhishingCode] = useState("");
+  const [phishingMsg, setPhishingMsg] = useState("");
+
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [me, p, k] = await Promise.all([
+        const [me, p, k, hist, sess, ph] = await Promise.all([
           api.userMe(),
           api.userGetPreferences(),
           api.userKycGet(),
+          api.loginHistory({ limit: 20 }),
+          api.sessions(),
+          api.antiPhishingGet(),
         ]);
+        setProfile(me);
         setNickname(me.nickname ?? "");
         setAvatar(me.avatar ?? "");
         setTfaEnabled(me.tfa_enabled);
@@ -90,6 +111,9 @@ export function Settings() {
         applyLang(merged.language);
         setTimeZone(merged.timezone || "");
         setKyc(k.kyc);
+        setLoginHistory(hist);
+        setSessions(sess);
+        setPhishingCode(ph.code || "");
         setErr("");
       } catch (e) {
         setErr((e as Error).message);
@@ -213,6 +237,37 @@ export function Settings() {
     }
   };
 
+  const revokeSession = async (id: string) => {
+    setSessionMsg("");
+    try {
+      await api.sessionRevoke(id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+    } catch (e) {
+      setSessionMsg(t("settings.sessionRevokeFail", { err: (e as Error).message }));
+    }
+  };
+
+  const revokeAllSessions = async () => {
+    setSessionMsg("");
+    try {
+      const r = await api.sessionRevokeAll();
+      setSessions((prev) => prev.filter((s) => s.current));
+      setSessionMsg(t("settings.sessionRevoked", { count: r.revoked }));
+    } catch (e) {
+      setSessionMsg(t("settings.sessionRevokeFail", { err: (e as Error).message }));
+    }
+  };
+
+  const savePhishing = async () => {
+    setPhishingMsg("");
+    try {
+      await api.antiPhishingSet(phishingCode);
+      setPhishingMsg(t("settings.antiPhishingSaved"));
+    } catch (e) {
+      setPhishingMsg(t("settings.antiPhishingFail", { err: (e as Error).message }));
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-head">
@@ -222,6 +277,22 @@ export function Settings() {
       {loading && <div className="mono">{t("common.loading")}</div>}
       {err && <div className="error">{t("common.loadError", { err })}</div>}
 
+      {/* 账户信息 */}
+      {profile && (
+        <section className="card">
+          <div className="card-head">
+            <h3>{t("settings.accountInfo")}</h3>
+          </div>
+          <div className="kv">
+            <div className="kv-row"><span className="kv-k">{t("settings.userId")}</span><span className="kv-v mono">{profile.user_id}</span></div>
+            <div className="kv-row"><span className="kv-k">{t("settings.email")}</span><span className="kv-v">{profile.email || "--"} {profile.email_verified ? <span className="ok" style={{ marginLeft: 8 }}>✓</span> : null}</span></div>
+            <div className="kv-row"><span className="kv-k">{t("settings.phone")}</span><span className="kv-v">{profile.phone || "--"} {profile.phone_verified ? <span className="ok" style={{ marginLeft: 8 }}>✓</span> : null}</span></div>
+            <div className="kv-row"><span className="kv-k">{t("settings.accountStatus")}</span><span className="kv-v ok">{t("settings.active")}</span></div>
+          </div>
+        </section>
+      )}
+
+      {/* 资料 */}
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.profile")}</h3>
@@ -246,6 +317,7 @@ export function Settings() {
         </div>
       </section>
 
+      {/* 修改密码 */}
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.pwd")}</h3>
@@ -268,6 +340,7 @@ export function Settings() {
         </div>
       </section>
 
+      {/* 两步验证 */}
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.tfa")}</h3>
@@ -326,6 +399,33 @@ export function Settings() {
         </div>
       </section>
 
+      {/* 防钓鱼码 */}
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("settings.antiPhishing")}</h3>
+          {phishingCode && <span className="ok">{phishingCode}</span>}
+        </div>
+        <div className="card-body">
+          <div className="form-hint">{t("settings.antiPhishingDesc")}</div>
+          <div className="form-field">
+            <label className="form-label">{t("settings.antiPhishingCode")}</label>
+            <input className="filter" value={phishingCode} onChange={(e) => setPhishingCode(e.target.value)} placeholder={t("settings.antiPhishingPh")} maxLength={20} />
+          </div>
+          <div className="card-actions">
+            <button className="btn primary" onClick={savePhishing}>
+              {t("settings.saveProfile")}
+            </button>
+            {phishingCode && (
+              <button className="btn danger" onClick={() => { setPhishingCode(""); }}>
+                {t("settings.antiPhishingClear")}
+              </button>
+            )}
+          </div>
+          {phishingMsg && <div className={isFail(phishingMsg, "settings.antiPhishingFail", t) ? "error" : "ok"}>{phishingMsg}</div>}
+        </div>
+      </section>
+
+      {/* KYC */}
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.kyc")}</h3>
@@ -406,6 +506,7 @@ export function Settings() {
         </div>
       </section>
 
+      {/* 偏好设置 */}
       <section className="card">
         <div className="card-head">
           <h3>{t("settings.prefs")}</h3>
@@ -474,6 +575,100 @@ export function Settings() {
           {prefMsg && (
             <div className={isFail(prefMsg, "settings.prefFail", t) ? "error" : "ok"}>{prefMsg}</div>
           )}
+        </div>
+      </section>
+
+      {/* 登录历史 */}
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("settings.loginHistory")}</h3>
+        </div>
+        <div className="table-wrap">
+          {loginHistory.length === 0 ? (
+            <div className="mono" style={{ padding: 12 }}>{t("settings.noHistory")}</div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("settings.loginIp")}</th>
+                  <th>{t("settings.loginLocation")}</th>
+                  <th>{t("settings.loginDevice")}</th>
+                  <th>{t("settings.loginTime")}</th>
+                  <th>{t("settings.accountStatus")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loginHistory.map((h) => (
+                  <tr key={h.id}>
+                    <td className="mono">{h.ip}</td>
+                    <td>{h.location}</td>
+                    <td className="cell-clamp" title={h.ua}>{h.ua.length > 40 ? h.ua.slice(0, 40) + "…" : h.ua}</td>
+                    <td className="mono">{new Date(h.created_at).toLocaleString()}</td>
+                    <td>
+                      <span className={h.success ? "ok" : "error"}>
+                        {h.success ? t("settings.loginSuccess") : t("settings.loginFailed")}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
+      {/* 会话管理 */}
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("settings.sessions")}</h3>
+          {sessions.filter((s) => !s.current).length > 0 && (
+            <button className="btn danger" onClick={revokeAllSessions}>
+              {t("settings.sessionRevokeAll")}
+            </button>
+          )}
+        </div>
+        <div className="card-body">
+          {sessions.length === 0 ? (
+            <div className="mono">{t("settings.noSessions")}</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>{t("settings.loginIp")}</th>
+                    <th>{t("settings.loginLocation")}</th>
+                    <th>{t("settings.loginDevice")}</th>
+                    <th>{t("settings.loginTime")}</th>
+                    <th>{t("settings.accountStatus")}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((s) => (
+                    <tr key={s.id}>
+                      <td className="mono">{s.ip}</td>
+                      <td>{s.location}</td>
+                      <td className="cell-clamp" title={s.ua}>{s.ua.length > 40 ? s.ua.slice(0, 40) + "…" : s.ua}</td>
+                      <td className="mono">{new Date(s.last_active_at).toLocaleString()}</td>
+                      <td>
+                        {s.current ? (
+                          <span className="ok">{t("settings.sessionCurrent")}</span>
+                        ) : null}
+                      </td>
+                      <td>
+                        {!s.current && (
+                          <button className="link-btn danger" onClick={() => revokeSession(s.id)}>
+                            {t("settings.sessionRevoke")}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {sessionMsg && <div className={isFail(sessionMsg, "settings.sessionRevokeFail", t) ? "error" : "ok"} style={{ marginTop: 8 }}>{sessionMsg}</div>}
         </div>
       </section>
     </div>

@@ -623,6 +623,33 @@ export const api = {
     );
     return d;
   },
+
+  // ---- 登录历史 ----
+  loginHistory: async (params?: { limit?: number }) => {
+    const d = await request<{ entries: LoginHistoryEntry[] }>(
+      withQuery("/api/v1/user/login-history", params as Record<string, string | number | undefined>)
+    );
+    return d.entries ?? [];
+  },
+
+  // ---- 会话管理 ----
+  sessions: async () => {
+    const d = await request<{ sessions: UserSession[] }>("/api/v1/user/sessions");
+    return d.sessions ?? [];
+  },
+  sessionRevoke: (id: string) =>
+    request<{ ok: boolean }>(`/api/v1/user/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  sessionRevokeAll: () =>
+    request<{ ok: boolean; revoked: number }>("/api/v1/user/sessions", { method: "DELETE" }),
+
+  // ---- 防钓鱼码 ----
+  antiPhishingGet: () =>
+    request<{ code: string }>("/api/v1/user/anti-phishing"),
+  antiPhishingSet: (code: string) =>
+    request<{ ok: boolean; message: string }>("/api/v1/user/anti-phishing", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
 };
 
 // ---------- 类型 ----------
@@ -778,6 +805,27 @@ export interface UserProfile {
   email_verified: boolean;
   phone_verified: boolean;
   kyc?: unknown;
+}
+
+// 登录历史条目（GET /api/v1/user/login-history）。
+export interface LoginHistoryEntry {
+  id: string;
+  ip: string;
+  ua: string;
+  location: string;
+  success: boolean;
+  created_at: string;
+}
+
+// 用户会话（GET /api/v1/user/sessions）。
+export interface UserSession {
+  id: string;
+  ip: string;
+  ua: string;
+  location: string;
+  current: boolean;
+  created_at: string;
+  last_active_at: string;
 }
 
 // 用户个人偏好设置（GET/PUT /api/v1/user/preferences）。
