@@ -1,11 +1,12 @@
 import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
 
 // 开发服务器通过代理把 /api 转发到后端网关（:8787），
 // 避免跨域，前端用相对路径调用即可。
 // 构建体积分析：设置 ANALYZE=true 时生成 dist/stats.html（见 README 性能优化）。
-const plugins: PluginOption[] = [react()];
+const plugins: PluginOption[] = [react(), tailwindcss()];
 if (process.env.ANALYZE) {
   plugins.push(
     visualizer({ filename: "dist/stats.html", gzipSize: true, brotliSize: true, template: "treemap" })

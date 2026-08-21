@@ -5,7 +5,8 @@ import { ConfirmProvider } from "./components/Confirm";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider, MonitorToasts } from "./components/Toast";
 import { I18nProvider } from "./i18n";
-import { NavBar } from "./components/NavBar";
+import { AppProviders } from "./components/providers";
+import { Layout } from "./components/layout/Layout";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 
@@ -102,30 +103,27 @@ function Router() {
   );
 
   return (
-    <>
-      <NavBar />
-      <main className="content">
-        {isPublic ? content : (
-          <RequireRole role={need}>{content}</RequireRole>
-        )}
-      </main>
-    </>
+    <Layout>
+      <div className="content">{isPublic ? content : <RequireRole role={need}>{content}</RequireRole>}</div>
+    </Layout>
   );
 }
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <I18nProvider>
-        <AuthProvider>
-          <ConfirmProvider>
-            <ToastProvider>
-              <Router />
-              <MonitorToasts />
-            </ToastProvider>
-          </ConfirmProvider>
-        </AuthProvider>
-      </I18nProvider>
+      <AppProviders>
+        <I18nProvider>
+          <AuthProvider>
+            <ConfirmProvider>
+              <ToastProvider>
+                <Router />
+                <MonitorToasts />
+              </ToastProvider>
+            </ConfirmProvider>
+          </AuthProvider>
+        </I18nProvider>
+      </AppProviders>
     </ErrorBoundary>
   );
 }

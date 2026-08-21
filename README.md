@@ -9,22 +9,44 @@
 - 框架：React 18
 - 语言：TypeScript（strict 模式）
 - 构建工具：Vite 5
+- 样式：Tailwind CSS v4（`@tailwindcss/vite`）+ 既有 CSS 变量设计系统（见「样式架构」）
+- UI 组件：Shadcn 风格组件（`src/components/ui/`，cva + Radix Slot + tailwind-merge）
+- 状态：Zustand（客户端状态 `src/store/`）+ TanStack Query（服务端状态，`AppProviders`）
+- 图表：Lightweight Charts（TradingView 官方轻量库）
+- 行情：Binance 公共行情 REST/WebSocket（`src/services/binance.ts`）+ 自建后端 WS
 - 路由：基于 URL hash 的轻量路由（`#/trade`、`#/wallet` …）
-- 状态：React Context（鉴权 `AuthProvider`）
 - 通信：`fetch` 封装的 API 客户端 + 原生 WebSocket（行情推送）
 
 ## 目录结构
 
 ```
 src/
-├── main.tsx              # 入口，挂载 <App/>
-├── App.tsx              # AuthProvider + 基于 hash 的路由
-├── api/client.ts        # API 客户端、Token 管理、WebSocket 助手、类型定义
-├── lib/auth.tsx         # 鉴权 Context（登录/登出/路由守卫）
-├── components/          # NavBar / Header / Ticker / OrderBook / OrderForm 等复用组件
-├── pages/               # 各业务页面（Trade / Wallet / Futures / Options / Otc / Margin / Wealth / Risk / Notifications / Login / Register）
-└── styles.css           # 全局样式
+├── main.tsx                # 入口：挂载 <App/>，引入 Tailwind 入口样式
+├── App.tsx                 # AppProviders + AuthProvider + hash 路由 + Layout 骨架
+├── api/client.ts           # 自建后端 API 客户端、Token 管理、WebSocket 助手
+├── services/binance.ts     # Binance 公共行情服务（REST + 组合 WS 流，自动重连）
+├── store/                  # Zustand 客户端状态
+│   ├── market-store.ts     #   自选列表 + 最新 Ticker 缓存
+│   └── ui-store.ts         #   全局 UI 开关
+├── hooks/                  # 复用 Hooks
+│   └── use-klines.ts       #   K 线查询（TanStack Query）
+├── types/index.ts          # 行情/交易领域类型（Ticker / Kline / OrderBook ...）
+├── components/
+│   ├── ui/                 # Shadcn 风格基础组件（button/card/badge/input/skeleton）
+│   ├── layout/             # Layout = Header（吸顶导航）+ Footer
+│   ├── providers.tsx       # TanStack Query 全局 Provider
+│   └── ...                 # NavBar / Ticker / OrderBook / OrderForm 等业务组件
+├── pages/                  # 各业务页面（Trade / Wallet / Futures / Options / Otc / Margin / Wealth / Risk / Notifications / Login / Register）
+├── styles/
+│   └── tailwind.css        # Tailwind v4 入口：层级策略 + @theme 令牌映射币安配色
+└── styles.css              # 既有全局样式（CSS 变量多主题，被 tailwind.css 以 legacy 层引入）
 ```
+
+## 样式架构（Tailwind v4 × 多主题）
+
+- **层级**：`theme < base < components < legacy < utilities`。旧 `styles.css` 整体置于 `legacy` 层（内部优先级不变），Tailwind utilities 位于最高层可覆盖旧类；不启用 preflight，避免破坏存量页面。
+- **主题令牌**：`src/styles/tailwind.css` 用 `@theme inline` 把 `bg-background` / `bg-card` / `text-muted` / `border-border` / `bg-accent`（币安黄 #FCD535）/ `bg-buy`（#0ECB81）/ `bg-sell`（#F6465D）等 utility 映射到既有 CSS 变量，自动跟随 `[data-theme]` 五套主题（dark/light/midnight/forest/solar）实时切换。
+- **默认暗黑**：默认主题为 Midnight Black（`#0B0E11` 底 + `#1E2329` 面板 + 币安金点缀）。
 
 ## 页面一览
 

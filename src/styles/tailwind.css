@@ -1,0 +1,52 @@
+/*
+ * Tailwind CSS v4 入口（与既有 styles.css 设计系统共存）。
+ *
+ * 层级策略：
+ *   theme < base < components < legacy < utilities
+ *   - 旧 styles.css 整体放入 legacy 层：内部规则优先级不变，仍可覆盖浏览器默认样式；
+ *   - Tailwind utilities 位于最高层，可覆盖任意旧类（新代码统一用 utility 优先）。
+ *   - 不引入 preflight，避免全局 reset 破坏存量页面。
+ *
+ * 主题令牌：
+ *   @theme inline 把 Tailwind 颜色令牌映射到 styles.css 的运行时 CSS 变量
+ *   （--bg / --panel / --accent / --buy / --sell ...），因此 bg-background、
+ *   text-muted、bg-buy 等 utility 会自动跟随 [data-theme] 五套主题切换。
+ */
+
+@layer theme, base, components, legacy, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "../styles.css" layer(legacy);
+
+/* dark: 变体对齐项目的 data-theme 暗色系主题 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="midnight"], [data-theme="forest"]));
+
+@theme inline {
+  /* 表面 / 文字 / 边框 —— 映射既有变量，随主题实时切换 */
+  --color-background: var(--bg);
+  --color-surface: var(--bg-2);
+  --color-card: var(--card);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-border: var(--border);
+  --color-foreground: var(--text);
+  --color-muted: var(--text-2);
+  --color-overlay: var(--overlay);
+
+  /* 币安品牌色 */
+  --color-accent: var(--accent); /* #FCD535 品牌黄 */
+  --color-accent-hover: var(--accent-hover); /* #F0B90B */
+  --color-buy: var(--buy); /* #0ECB81 涨/买 */
+  --color-sell: var(--sell); /* #F6465D 跌/卖 */
+  --color-buy-bg: var(--buy-bg);
+  --color-sell-bg: var(--sell-bg);
+  --color-tag-bg: var(--tag-bg);
+
+  /* 字体 */
+  --font-sans: var(--font);
+  --font-mono: var(--font-mono);
+
+  /* 动效 */
+  --ease-trading: cubic-bezier(0.16, 1, 0.3, 1);
+}

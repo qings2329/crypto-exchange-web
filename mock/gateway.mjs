@@ -138,31 +138,6 @@ const wealthProducts = [
 ];
 const wealthHoldings = [];
 
-// 初始会话 / 登录历史（演示用户 user_id=3）
-{
-  const now = new Date();
-  const s1 = {
-    id: crypto.randomUUID(), user_id: 3, ip: "116.233.45.67",
-    ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36",
-    location: "上海", current: true,
-    created_at: new Date(now - 86400000 * 3).toISOString(),
-    last_active_at: now.toISOString(),
-  };
-  const s2 = {
-    id: crypto.randomUUID(), user_id: 3, ip: "220.181.38.148",
-    ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gecko/20100101 Firefox/127.0",
-    location: "北京", current: false,
-    created_at: new Date(now - 86400000 * 7).toISOString(),
-    last_active_at: new Date(now - 86400000 * 5).toISOString(),
-  };
-  ensureSessions(3).push(s1, s2);
-  loginHistory.push(
-    { id: crypto.randomUUID(), user_id: 3, ip: "116.233.45.67", ua: s1.ua, location: "上海", success: true, created_at: s1.created_at },
-    { id: crypto.randomUUID(), user_id: 3, ip: "42.120.74.101", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", location: "杭州", success: false, created_at: new Date(now - 86400000 * 2).toISOString() },
-    { id: crypto.randomUUID(), user_id: 3, ip: "220.181.38.148", ua: s2.ua, location: "北京", success: true, created_at: s2.created_at },
-  );
-}
-
 const announcements = [
   { id: nextId(), level: "info", title: "欢迎使用 crypto-exchange", content: "现货/OTC/合约等模块已开放联调。", active: true, published_at: new Date().toISOString(), created_at: new Date().toISOString() },
   { id: nextId(), level: "maintenance", title: "计划内系统维护", content: "本周末 02:00-03:00 进行升级维护。", active: true, published_at: new Date().toISOString(), created_at: new Date().toISOString() },
@@ -192,6 +167,32 @@ function ensureSessions(userId) {
   }
   return arr;
 }
+
+// 初始会话 / 登录历史（演示用户 user_id=3）
+{
+  const now = new Date();
+  const s1 = {
+    id: crypto.randomUUID(), user_id: 3, ip: "116.233.45.67",
+    ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36",
+    location: "上海", current: true,
+    created_at: new Date(now - 86400000 * 3).toISOString(),
+    last_active_at: now.toISOString(),
+  };
+  const s2 = {
+    id: crypto.randomUUID(), user_id: 3, ip: "220.181.38.148",
+    ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gecko/20100101 Firefox/127.0",
+    location: "北京", current: false,
+    created_at: new Date(now - 86400000 * 7).toISOString(),
+    last_active_at: new Date(now - 86400000 * 5).toISOString(),
+  };
+  ensureSessions(3).push(s1, s2);
+  loginHistory.push(
+    { id: crypto.randomUUID(), user_id: 3, ip: "116.233.45.67", ua: s1.ua, location: "上海", success: true, created_at: s1.created_at },
+    { id: crypto.randomUUID(), user_id: 3, ip: "42.120.74.101", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", location: "杭州", success: false, created_at: new Date(now - 86400000 * 2).toISOString() },
+    { id: crypto.randomUUID(), user_id: 3, ip: "220.181.38.148", ua: s2.ua, location: "北京", success: true, created_at: s2.created_at },
+  );
+}
+
 function mockLoginEntry(userId, success) {
   const ips = ["116.233.45.67", "220.181.38.148", "42.120.74.101", "183.6.66.12", "114.88.32.11"];
   const uas = [
