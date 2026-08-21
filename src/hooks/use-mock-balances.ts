@@ -3,6 +3,7 @@
 
 import { useMemo } from "react";
 import { useAccount } from "wagmi";
+import { useAuth } from "../lib/auth";
 
 function seedFrom(address: string): number {
   let h = 2166136261;
@@ -16,6 +17,11 @@ function seedFrom(address: string): number {
 export interface MockBalances {
   usdt: number;
   btc: number;
+  eth: number;
+  /** 冻结金额（挂单占用），可用 = 总额 - 冻结 */
+  frozenUsdt: number;
+  frozenBtc: number;
+  frozenEth: number;
 }
 
 export function mockBalancesFor(address: string): MockBalances {
@@ -23,10 +29,29 @@ export function mockBalancesFor(address: string): MockBalances {
   // 注意用 >>>（无符号右移）：s 可能超过 2^31，>> 会按有符号处理产生负数
   const usdt = 5_000 + (s % 45_000) + ((s >>> 8) % 100) / 100;
   const btc = 0.05 + ((s >>> 4) % 900) / 1_000;
-  return { usdt: Math.round(usdt * 100) / 100, btc: Math.round(btc * 10_000) / 10_000 };
+  const eth = 0.8 + ((s >>> 6) % 1_200) / 100;
+  // 冻结比例确定性派生：USDT 0~8%，BTC/ETH 0~15%
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const r4 = (n: number) => Math.round(n * 10_000) / 10_000;
+  const frozenUsdt = r2(usdt * ((s >>> 12) % 800) / 10_000);
+  const frozenBtc = r4(btc * ((s >>> 16) % 1500) / 10_000);
+  const frozenEth = r4(eth * ((s >>> 20) % 1500) / 10_000);
+  return {
+    usdt: r2(usdt),
+    btc: r4(btc),
+    eth: r4(eth),
+    frozenUsdt,
+    frozenBtc,
+    frozenEth,
+  };
 }
 
 export function useMockBalances(): MockBalances | null {
   const { address } = useAccount();
-  return useMemo(() => (address ? mockBalancesFor(address) : null), [address]);
+  const { uid } = useAuth();
+  return useMemo(() => {
+    // 已连接钱包用地址派生；仅登录未连接时用会话 uid 派生（资产总览无需强制连接钱包）。
+    const seed = address ?? (uid ? `session-${uid}` : null);
+    return seed ? mockBalancesFor(seed) : null;
+  }, [address, uid]);
 }

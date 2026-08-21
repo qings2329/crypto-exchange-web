@@ -12,6 +12,13 @@ initMonitor({
   endpoint: "/api/v1/monitor/report",
 });
 
+// 开发环境暴露 store 引用，供 Playwright 冒烟测试直接种子数据（生产构建不含）。
+if (import.meta.env.DEV) {
+  void import("./store/orders-store").then((m) => {
+    (window as unknown as Record<string, unknown>).__ordersStore = m.useOrdersStore;
+  });
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

@@ -3,6 +3,7 @@ import { api, type LedgerEntry } from "../api/client";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
 import { isValidCryptoAddress, validateAmount } from "../lib/validate";
+import { AssetOverview } from "../components/wallet/AssetOverview";
 
 const BALANCE_EP = "/api/v1/futures/wallet/balance";
 const WITHDRAWS_EP = "/api/v1/futures/wallet/withdraws";
@@ -256,6 +257,9 @@ export function Wallet() {
           {loading ? t("common.loading") : t("common.refresh")}
         </button>
       </div>
+
+      {/* 资产总览：总资产折算 + 分布饼图 + 资产列表快捷操作 */}
+      <AssetOverview />
 
       <section className="card">
         <h3>{t("wallet.balance")}</h3>
