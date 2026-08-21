@@ -196,10 +196,8 @@
   "otc.appealed": "Appeal submitted. Customer service will step in.",
   "otc.paidMarked": "Payment marked. Waiting for the seller to release crypto.",
   "otc.completedToast": "Order completed. Assets delivered.",
-  "otc.status.unpaid": "Unpaid",
   "otc.status.paid": "Paid · Awaiting release",
   "otc.status.completed": "Completed",
-  "otc.status.appealing": "Under appeal",
   "otc.chatTitle": "Order Chat",
   "otc.chatPlaceholder": "Type a message…",
   "otc.send": "Send",
@@ -210,5 +208,12 @@
   "otc.expired": "Order expired. Please place a new one.",
   "otc.newOrder": "New Order",
   "otc.confirmTitle": "Confirm Order",
-  "otc.confirmCreate": "You will {side} {qty} {coin} at {price} {fiat}/{coin}. Continue?"
+  "otc.confirmCreate": "You will {side} {qty} {coin} at {price} {fiat}/{coin}. Continue?",
+  "otc.status.pending": "Pending Payment",
+  "otc.status.cancelled": "Cancelled",
+  "otc.status.disputed": "Under Appeal",
+  "otc.sellHint": "Sell order: you will receive the fiat transfer from the buyer. Release crypto only after confirming receipt.",
+  "otc.waitingRelease": "Payment marked, waiting for the counterparty to release crypto…",
+  "otc.loadFailed": "Load failed",
+  "otc.orderNotFound": "Order not found or already processed"
 }

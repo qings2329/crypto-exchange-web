@@ -595,6 +595,318 @@ app.get("/api/v1/monitor/events", (req, res) => {
   ok(res, recentEvents(limit));
 });
 
+// ---------- OTC（法币交易）----------
+// 内存版 P2P 后端：广告（商家种子）/ 报价 / 订单状态机（15 分钟付款超时自动取消）/ 聊天 / 申诉。
+const FIAT_RATES = { CNY: 7.23, USD: 1, EUR: 0.92 };
+const otcAds = [];
+const otcOrders = [];
+const otcMessages = new Map(); // orderId -> messages[]
+let otcSeq = 1;
+
+// 商家种子（user_id 9001+，带画像字段）
+const OTC_MERCHANTS = {
+  9001: { nickname: "CryptoPro·旗舰", verified: true, trades: 48210, success_rate: 99.2 },
+  9002: { nickname: "快速出金王", verified: false, trades: 12650, success_rate: 97.8 },
+  9003: { nickname: "金汇商行", verified: true, trades: 30120, success_rate: 99.6 },
+  9004: { nickname: "小熊换汇", verified: false, trades: 2100, success_rate: 95.4 },
+  9005: { nickname: "GlobalDesk", verified: true, trades: 15800, success_rate: 98.9 },
+  9006: { nickname: "StarFX", verified: false, trades: 4200, success_rate: 96.1 },
+  9007: { nickname: "鲸鱼量化", verified: true, trades: 28900, success_rate: 99.4 },
+  9008: { nickname: "闪电兑", verified: false, trades: 9800, success_rate: 97.2 },
+  9009: { nickname: "恒信支付", verified: true, trades: 20300, success_rate: 98.5 },
+  9010: { nickname: "OceanBridge", verified: true, trades: 11200, success_rate: 99.0 },
+};
+function seedOtcAds() {
+  const rows = [
+    [9001, "buy", "USDT", "CNY", -0.3, 100, 50000, 152340, ["bank", "alipay"]],
+    [9002, "buy", "USDT", "CNY", -0.1, 500, 200000, 88000, ["alipay", "wechat"]],
+    [9003, "buy", "USDT", "CNY", 0.2, 1000, 300000, 421000, ["bank"]],
+    [9004, "buy", "USDT", "CNY", 0.5, 100, 8000, 12000, ["wechat"]],
+    [9005, "buy", "USDT", "USD", -0.2, 50, 20000, 96000, ["bank"]],
+    [9006, "buy", "USDT", "USD", 0.4, 20, 5000, 33000, ["alipay", "bank"]],
+    [9007, "sell", "USDT", "CNY", 0.6, 1000, 500000, 210000, ["bank", "alipay"]],
+    [9008, "sell", "USDT", "CNY", 0.4, 100, 60000, 65000, ["wechat", "alipay"]],
+    [9009, "sell", "USDT", "CNY", 0.8, 500, 150000, 175000, ["bank"]],
+    [9010, "sell", "USDT", "USD", 0.5, 100, 30000, 88000, ["bank"]],
+    [9001, "buy", "BTC", "CNY", -0.5, 500, 2000000, 12.5, ["bank"]],
+    [9007, "sell", "BTC", "CNY", 0.9, 1000, 3000000, 18.8, ["bank", "alipay"]],
+  ];
+  for (const [uid, side, asset, fiat, premium, minAmt, maxAmt, available, methods] of rows) {
+    otcAds.push({
+      id: otcSeq++,
+      user_id: uid,
+      side,
+      asset,
+      fiat_currency: fiat,
+      premium, // 相对行情溢价 %
+      price: 0, // 读取时按实时行情计算
+      min_amount: minAmt,
+      max_amount: maxAmt,
+      available, // 可用数量（币）
+      payment_methods: methods.join(","),
+      status: "online",
+      created_at: new Date(Date.now() - 86400e3 * 30).toISOString(),
+    });
+  }
+}
+seedOtcAds();
+
+function otcAdPrice(ad) {
+  const base = ad.asset === "BTC" ? getMarket("BTCUSDT").price : getMarket("USDTUSDT").price;
+  const rate = FIAT_RATES[ad.fiat_currency] ?? 1;
+  return r2(base * rate * (1 + ad.premium / 100));
+}
+
+function otcAdView(ad) {
+  const m = OTC_MERCHANTS[ad.user_id] ?? { nickname: `商家${ad.user_id}`, verified: false, trades: 0, success_rate: 90 };
+  return {
+    ...ad,
+    price: otcAdPrice(ad),
+    available: r4(ad.available),
+    merchant: { user_id: ad.user_id, ...m },
+  };
+}
+
+// 法币报价：基准价 × 汇率
+app.get("/api/v1/otc/prices", (req, res) => {
+  const asset = String(req.query.asset || "USDT").toUpperCase();
+  const fiat = String(req.query.fiat || "CNY").toUpperCase();
+  const base = asset === "BTC" ? getMarket("BTCUSDT").price : getMarket("USDTUSDT").price;
+  const rate = FIAT_RATES[fiat] ?? 1;
+  ok(res, { asset, fiat, base_price: r2(base * rate), fiat_rate: rate, updated_at: new Date().toISOString() });
+});
+
+// 广告列表（公开）：支持 side/asset/fiat/method/amount 过滤
+app.get("/api/v1/otc/advertisements", (req, res) => {
+  const { side, asset, fiat, method, amount } = req.query;
+  let list = otcAds.filter((a) => a.status === "online");
+  if (side) list = list.filter((a) => a.side === side);
+  if (asset) list = list.filter((a) => a.asset === String(asset).toUpperCase());
+  if (fiat) list = list.filter((a) => a.fiat_currency === String(fiat).toUpperCase());
+  if (method && method !== "all") list = list.filter((a) => a.payment_methods.split(",").includes(String(method)));
+  if (amount) {
+    const amt = Number(amount);
+    if (Number.isFinite(amt)) list = list.filter((a) => amt >= a.min_amount && amt <= a.max_amount);
+  }
+  // 排序：买入单价升序、卖出降序
+  list.sort((a, b) => (a.side === "buy" ? otcAdPrice(a) - otcAdPrice(b) : otcAdPrice(b) - otcAdPrice(a)));
+  ok(res, { advertisements: list.map(otcAdView) });
+});
+
+app.post("/api/v1/otc/advertisements", (req, res) => {
+  const b = req.body || {};
+  if (!b.side || !b.asset || !b.fiat_currency || !(b.price > 0)) return fail(res, 400, "side/asset/fiat_currency/price 必填");
+  const ad = {
+    id: otcSeq++,
+    user_id: Number(req.user.sub),
+    side: b.side,
+    asset: String(b.asset).toUpperCase(),
+    fiat_currency: String(b.fiat_currency).toUpperCase(),
+    premium: 0,
+    price: r2(b.price),
+    min_amount: Number(b.min_amount ?? 1),
+    max_amount: Number(b.max_amount ?? 100000),
+    available: Number(b.max_amount ?? 100000),
+    payment_methods: String(b.payment_methods ?? "bank"),
+    status: "online",
+    created_at: new Date().toISOString(),
+  };
+  otcAds.push(ad);
+  ok(res, otcAdView(ad), 201);
+});
+
+// 接单下单：按法币金额成交，返回订单（含收款人掩码 + 15 分钟过期时间）
+const PAYEE_POOL = ["李*明", "王*芳", "张*伟", "陈*静", "刘*洋"];
+app.post("/api/v1/otc/orders/take", (req, res) => {
+  const { ad_id, fiat_amount, payment_method } = req.body || {};
+  const ad = otcAds.find((a) => a.id === Number(ad_id) && a.status === "online");
+  if (!ad) return fail(res, 404, "广告不存在或已下架");
+  const amount = Number(fiat_amount);
+  if (!(amount >= ad.min_amount && amount <= ad.max_amount)) return fail(res, 400, `金额需在 ${ad.min_amount} - ${ad.max_amount} ${ad.fiat_currency} 之间`);
+  const price = otcAdPrice(ad);
+  const cryptoAmount = r4(amount / price);
+  if (cryptoAmount > ad.available) return fail(res, 400, "超出商家可用数量");
+  ad.available = r4(ad.available - cryptoAmount);
+
+  const takerId = Number(req.user.sub);
+  const isBuy = ad.side === "buy"; // 用户买入 → 对手方（商家）是卖方收款人
+  const method = String(payment_method || ad.payment_methods.split(",")[0]);
+  const order = {
+    id: otcSeq++,
+    ad_id: ad.id,
+    maker_id: ad.user_id,
+    taker_id: takerId,
+    side: ad.side,
+    asset: ad.asset,
+    fiat_currency: ad.fiat_currency,
+    crypto_amount: cryptoAmount,
+    price,
+    fiat_amount: r2(amount),
+    payment_method: method,
+    status: "pending",
+    rating: 0,
+    expire_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    payee: isBuy
+      ? {
+          name: PAYEE_POOL[ad.user_id % PAYEE_POOL.length],
+          bank: method === "bank" ? "招商银行" : undefined,
+          account: method === "bank" ? `6225 88**** **** ${1000 + (ad.id % 9000)}` : `${method}_pay_${1000 + (ad.id % 9000)}`,
+        }
+      : undefined,
+    created_at: new Date().toISOString(),
+  };
+  otcOrders.unshift(order);
+  otcMessages.set(order.id, []);
+  ok(res, order, 201);
+});
+
+// 我的订单（参与方视角，附对手方昵称）
+function otcOrderView(o, userId) {
+  const counterpartyId = o.maker_id === userId ? o.taker_id : o.maker_id;
+  const cp = OTC_MERCHANTS[counterpartyId];
+  return { ...o, counterparty_nickname: cp?.nickname ?? `用户${counterpartyId}` };
+}
+app.get("/api/v1/otc/orders", (req, res) => {
+  const uid = Number(req.user.sub);
+  const list = otcOrders.filter((o) => o.maker_id === uid || o.taker_id === uid);
+  ok(res, { orders: list.map((o) => otcOrderView(o, uid)) });
+});
+
+function findMyOrder(req, res) {
+  const o = otcOrders.find((x) => x.id === Number(req.params.id));
+  if (!o) {
+    fail(res, 404, "订单不存在");
+    return null;
+  }
+  const uid = Number(req.user.sub);
+  if (o.maker_id !== uid && o.taker_id !== uid) {
+    fail(res, 403, "无权访问该订单");
+    return null;
+  }
+  return o;
+}
+
+app.post("/api/v1/otc/orders/:id/pay", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  if (o.status !== "pending") return fail(res, 409, "当前状态不可标记付款");
+  if (Date.now() > Date.parse(o.expire_at)) return fail(res, 410, "订单已超时");
+  o.status = "paid";
+  o.paid_at = new Date().toISOString();
+  // 模拟卖方 8 秒后自动放币
+  setTimeout(() => {
+    if (o.status === "paid") {
+      o.status = "completed";
+      o.completed_at = new Date().toISOString();
+      otcMessages.get(o.id)?.push({
+        id: otcSeq++,
+        order_id: o.id,
+        sender_id: o.maker_id,
+        content: "已收到付款，币已放出，感谢惠顾！",
+        created_at: new Date().toISOString(),
+      });
+    }
+  }, 8000);
+  ok(res, { ok: true });
+});
+
+app.post("/api/v1/otc/orders/:id/complete", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  if (o.status !== "paid") return fail(res, 409, "仅已付款订单可完成");
+  o.status = "completed";
+  o.completed_at = new Date().toISOString();
+  ok(res, { ok: true });
+});
+
+app.post("/api/v1/otc/orders/:id/cancel", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  if (o.status !== "pending") return fail(res, 409, "仅待付款订单可取消");
+  o.status = "cancelled";
+  const ad = otcAds.find((a) => a.id === o.ad_id);
+  if (ad) ad.available = r4(ad.available + o.crypto_amount); // 回滚额度
+  ok(res, { ok: true });
+});
+
+app.post("/api/v1/otc/orders/:id/dispute", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  if (o.status !== "pending" && o.status !== "paid") return fail(res, 409, "当前状态不可申诉");
+  o.status = "disputed";
+  o.dispute_reason = String(req.body?.reason ?? "");
+  ok(res, { ok: true });
+});
+
+// 聊天：拉取 + 发送（对方 1.5s 后罐头回复）
+app.get("/api/v1/otc/orders/:id/messages", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  ok(res, { messages: otcMessages.get(o.id) ?? [] });
+});
+const PEER_REPLIES = ["您好，请付款后点击「我已付款」", "收到转账后我会尽快确认放币", "请备注订单号，方便核对到账", "好的，正在处理中"];
+app.post("/api/v1/otc/orders/:id/messages", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  const content = String(req.body?.content ?? "").trim();
+  if (!content) return fail(res, 400, "消息不能为空");
+  const msg = {
+    id: otcSeq++,
+    order_id: o.id,
+    sender_id: Number(req.user.sub),
+    content,
+    created_at: new Date().toISOString(),
+  };
+  otcMessages.get(o.id)?.push(msg);
+  // 模拟对手方自动回复
+  const peerId = o.maker_id === Number(req.user.sub) ? o.taker_id : o.maker_id;
+  setTimeout(() => {
+    otcMessages.get(o.id)?.push({
+      id: otcSeq++,
+      order_id: o.id,
+      sender_id: peerId,
+      content: PEER_REPLIES[Math.floor(Math.random() * PEER_REPLIES.length)],
+      created_at: new Date().toISOString(),
+    });
+  }, 1500);
+  ok(res, msg, 201);
+});
+
+// 付款凭证
+const otcProofs = new Map(); // orderId -> proofs[]
+app.get("/api/v1/otc/orders/:id/proofs", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  ok(res, { proofs: otcProofs.get(o.id) ?? [] });
+});
+app.post("/api/v1/otc/orders/:id/proofs", (req, res) => {
+  const o = findMyOrder(req, res);
+  if (!o) return;
+  const proof = {
+    id: otcSeq++,
+    order_id: o.id,
+    filename: String(req.body?.filename ?? "proof.png"),
+    uploaded_by: Number(req.user.sub),
+    created_at: new Date().toISOString(),
+  };
+  if (!otcProofs.has(o.id)) otcProofs.set(o.id, []);
+  otcProofs.get(o.id).push(proof);
+  ok(res, proof, 201);
+});
+
+// 超时清扫：待付款且过期的订单每秒检查 → 自动取消并回滚额度
+setInterval(() => {
+  const now = Date.now();
+  for (const o of otcOrders) {
+    if (o.status === "pending" && Date.parse(o.expire_at) < now) {
+      o.status = "cancelled";
+      o.cancel_reason = "timeout";
+      const ad = otcAds.find((a) => a.id === o.ad_id);
+      if (ad) ad.available = r4(ad.available + o.crypto_amount);
+    }
+  }
+}, 1000).unref();
+
 // ---------- 挂载管理后台业务路由 ----------
 app.use(buildAdminApp());
 

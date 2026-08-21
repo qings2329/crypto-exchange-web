@@ -1,8 +1,9 @@
-// OTC 交易弹窗：两阶段。
-// ① 下单：单价（行情×溢价）+ 数量/金额联动 + 支付方式选择；
-// ② 订单：15 分钟付款倒计时、收款人信息一键复制、「我已付款」Confirm 确认、
-//    发起申诉、实时聊天（对方罐头话术模拟回复）；付款标记后 8s 模拟放币完成。
-import { useEffect, useRef, useState } from "react";
+// OTC 交易弹窗：两阶段（对接 /api/v1/otc 真实接口）。
+// ① 下单：单价（服务端实时计价）+ 数量/金额联动 + 支付方式选择 → POST /orders/take；
+// ② 订单：服务端 expire_at 驱动 15 分钟付款倒计时、收款人信息一键复制、
+//    「我已付款」Confirm 确认（POST /orders/{id}/pay）、申诉（/dispute）、
+//    聊天轮询（/messages）；订单状态 2s 轮询（卖方放币由后端模拟自动完成）。
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../Modal";
 import { Button } from "../ui/button";
@@ -10,119 +11,172 @@ import { Badge } from "../ui/badge";
 import { useToast } from "../Toast";
 import { useConfirm } from "../Confirm";
 import { useAuth } from "../../lib/auth";
-import { useOtcStore, type MerchantAd, type PayMethod } from "../../store/otc-store";
-import { fmtCountdown, qtyFromTotal, totalFromQty } from "../../lib/otc-utils";
+import { api, ApiError, type OtcAdView, type OtcMessage, type OtcOrder, type OtcOrderStatus } from "../../api/client";
+import type { PayMethod } from "./MethodIcon";
+import { fmtCountdown, msLeftFrom, qtyFromTotal, totalFromQty } from "../../lib/otc-utils";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { ChatDrawer } from "./ChatDrawer";
 import { MethodIcon } from "./MethodIcon";
 import { cn } from "../../lib/utils";
 
 interface Props {
-  ad: MerchantAd;
-  price: number; // 行情价 × 溢价
+  ad: OtcAdView;
   /** 从「进行中订单」浮条重开时传入，直接进入订单视图 */
-  initialTradeId?: string;
+  initialTradeId?: number;
   onClose: () => void;
 }
 
-const PEER_REPLIES = [
-  "您好，请付款后点击「我已付款」",
-  "收到转账后我会尽快确认放币",
-  "请备注订单号，方便核对到账",
-  "好的，正在处理中",
-];
+const TERMINAL: OtcOrderStatus[] = ["completed", "cancelled"];
 
-export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
+export function OtcTradeModal({ ad, initialTradeId, onClose }: Props) {
   const { t } = useTranslation();
   const toast = useToast();
   const confirm = useConfirm();
   const { uid } = useAuth();
   const authed = !!uid;
-  const createTradeRaw = useOtcStore((s) => s.createTrade);
-  const markPaid = useOtcStore((s) => s.markPaid);
-  const complete = useOtcStore((s) => s.complete);
-  const appeal = useOtcStore((s) => s.appeal);
-  const addMessage = useOtcStore((s) => s.addMessage);
 
-  const [tradeId, setTradeId] = useState<string | null>(initialTradeId ?? null);
-  // 从 store 派生实时订单（聊天/状态更新自动重渲染）
-  const trade = useOtcStore((s) => (tradeId ? s.trades.find((x) => x.id === tradeId) ?? null : null));
-  const [method, setMethod] = useState<PayMethod>(ad.methods[0]);
+  const price = ad.price; // 服务端按实时行情 × 汇率 × 溢价计算
+  const [order, setOrder] = useState<OtcOrder | null>(null);
+  const [method, setMethod] = useState<PayMethod>((ad.payment_methods.split(",")[0] as PayMethod) ?? "bank");
   const [totalStr, setTotalStr] = useState("");
   const [qtyStr, setQtyStr] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [appealing, setAppealing] = useState(false);
   const [appealText, setAppealText] = useState("");
+  const [messages, setMessages] = useState<OtcMessage[]>([]);
   const [now, setNow] = useState(Date.now());
-  const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevStatus = useRef<string | null>(null);
 
-  // 订单阶段：秒级倒计时
+  // 重开已有订单：拉取我的订单列表定位该单
   useEffect(() => {
-    if (!trade) return;
+    if (initialTradeId == null) return;
+    let alive = true;
+    api
+      .otcOrders()
+      .then((d) => {
+        if (!alive) return;
+        const o = d.find((x) => x.id === initialTradeId);
+        if (o) setOrder(o);
+        else toast.warning(t("otc.orderNotFound"));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [initialTradeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 订单状态轮询：2s（终态停止）
+  useEffect(() => {
+    if (!order || TERMINAL.includes(order.status)) return;
+    const id = setInterval(() => {
+      api
+        .otcOrders()
+        .then((d) => {
+          const fresh = d.find((x) => x.id === order.id);
+          if (fresh) setOrder(fresh);
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => clearInterval(id);
+  }, [order]);
+
+  // 状态迁移提示：paid → completed 时放币完成
+  useEffect(() => {
+    if (!order) return;
+    if (prevStatus.current === "paid" && order.status === "completed") toast.success(t("otc.completedToast"));
+    prevStatus.current = order.status;
+  }, [order?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 秒级倒计时
+  useEffect(() => {
+    if (!order) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [trade]);
+  }, [order]);
 
-  // 卸载清理模拟回复定时器
-  useEffect(() => () => {
-    if (replyTimer.current) clearTimeout(replyTimer.current);
+  // 聊天：订单打开即拉取 + 3s 轮询
+  const refreshMessages = useCallback((orderId: number) => {
+    api
+      .otcMessages(orderId)
+      .then(setMessages)
+      .catch(() => {});
   }, []);
-
-  // 标记付款后 8s 模拟对方放币
   useEffect(() => {
-    if (trade?.status !== "paid") return;
-    const id = setTimeout(() => {
-      complete(trade.id);
-      toast.success(t("otc.completedToast"));
-    }, 8000);
-    return () => clearTimeout(id);
-  }, [trade?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!order) return;
+    refreshMessages(order.id);
+    const id = setInterval(() => refreshMessages(order.id), 3000);
+    return () => clearInterval(id);
+  }, [order?.id, refreshMessages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const total = parseFloat(totalStr) || 0;
-  const qty = parseFloat(qtyStr) || 0;
-  const withinLimit = total >= ad.minLimit && total <= ad.maxLimit;
+  const withinLimit = total >= ad.min_amount && total <= ad.max_amount;
 
   const copy = async (text: string, label?: string) => {
     await navigator.clipboard?.writeText(text);
     toast.info(`${label ?? ""}${t("otc.copied")}`.trim());
   };
 
-  const submit = () => {
-    if (!(qty > 0)) return;
-    const created = createTradeRaw({
-      adId: ad.id,
-      merchant: ad.merchant,
-      side: ad.side,
-      coin: ad.coin,
-      fiat: ad.fiat,
-      price,
-      qty,
-      total,
-      method,
-    });
-    setTradeId(created.id);
-    setNow(Date.now());
+  const submit = async () => {
+    if (!(total > 0) || submitting) return;
+    setSubmitting(true);
+    try {
+      const created = await api.otcTakeOrder({ ad_id: ad.id, fiat_amount: total, payment_method: method });
+      setNow(Date.now());
+      prevStatus.current = created.status;
+      setOrder(created);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("otc.loadFailed"));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const sendChat = (text: string) => {
-    if (!trade) return;
-    addMessage(trade.id, { from: "me", text, ts: Date.now() });
-    if (replyTimer.current) clearTimeout(replyTimer.current);
-    replyTimer.current = setTimeout(() => {
-      addMessage(trade.id, {
-        from: "peer",
-        text: PEER_REPLIES[Math.floor(Math.random() * PEER_REPLIES.length)],
-        ts: Date.now(),
-      });
-    }, 1500);
+  const sendChat = async (text: string) => {
+    if (!order) return;
+    try {
+      await api.otcSendMessage(order.id, text);
+      refreshMessages(order.id);
+      // 对方罐头回复约 1.5s 后落库，稍后再刷一次
+      setTimeout(() => refreshMessages(order.id), 2000);
+    } catch {
+      /* 轮询会兜底 */
+    }
   };
 
-  const expired = trade ? now >= trade.expireAt : false;
-  const msLeft = trade ? trade.expireAt - now : 0;
+  const markPaid = async () => {
+    if (!order) return;
+    try {
+      await api.otcMarkPaid(order.id);
+      toast.success(t("otc.paidMarked"));
+      const d = await api.otcOrders();
+      const fresh = d.find((x) => x.id === order.id);
+      if (fresh) setOrder(fresh);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("otc.loadFailed"));
+    }
+  };
+
+  const dispute = async () => {
+    if (!order) return;
+    try {
+      await api.otcOpenDispute(order.id, appealText.trim());
+      toast.warning(t("otc.appealed"));
+      setAppealing(false);
+      const d = await api.otcOrders();
+      const fresh = d.find((x) => x.id === order.id);
+      if (fresh) setOrder(fresh);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("otc.loadFailed"));
+    }
+  };
+
   const isBuy = ad.side === "buy"; // 用户视角动作
 
   // ---------- 订单视图 ----------
-  if (trade) {
-    const statusKey = `otc.status.${trade.status}`;
+  if (order) {
+    const msLeft = msLeftFrom(order.expire_at, now);
+    const expired = order.status === "pending" && msLeft <= 0;
+    const statusKey = `otc.status.${order.status}`;
     return (
       <Modal title={t("otc.orderTitle")} onClose={onClose} width={760}>
         <div className="grid gap-4 p-1 lg:grid-cols-[1fr_260px]">
@@ -130,17 +184,17 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between rounded-lg bg-panel-2/40 px-3 py-2">
               <div className="text-xs text-muted">
-                <span className="font-mono text-foreground">{trade.id}</span>
+                <span className="font-mono text-foreground">#{order.id}</span>
                 <span className="mx-2">·</span>
-                {isBuy ? t("otc.buy") : t("otc.sell")} {fmtQty(trade.qty)} {trade.coin}
+                {isBuy ? t("otc.buy") : t("otc.sell")} {fmtQty(order.crypto_amount)} {order.asset}
               </div>
-              <Badge variant={trade.status === "completed" ? "success" : trade.status === "appealing" ? "danger" : "default"}>
+              <Badge variant={order.status === "completed" ? "success" : order.status === "disputed" || order.status === "cancelled" ? "danger" : "default"}>
                 {t(statusKey)}
               </Badge>
             </div>
 
-            {/* 15 分钟付款倒计时 */}
-            {trade.status === "unpaid" && (
+            {/* 15 分钟付款倒计时（服务端 expire_at 驱动） */}
+            {order.status === "pending" && (
               <div
                 className={cn(
                   "flex items-center justify-between rounded-lg border px-3 py-2.5",
@@ -161,34 +215,45 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
               </div>
             )}
 
-            {/* 收款人账户信息 + 一键复制 */}
-            <div className="rounded-lg border border-border p-3" data-testid="payee-info">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-semibold">{isBuy ? t("otc.payeeName") + " / " + t("otc.payeeAccount") : ""}</p>
-                <button
-                  onClick={() =>
-                    void copy(
-                      `${trade.payee.name} ${trade.payee.bank ?? ""} ${trade.payee.account}`.trim(),
-                      ""
-                    )
-                  }
-                  className="cursor-pointer text-xs font-medium text-accent hover:underline"
-                  data-testid="copy-all"
-                >
-                  {t("otc.copyAll")}
-                </button>
+            {/* 收款人账户信息 + 一键复制（买方订单由服务端返回掩码账号） */}
+            {isBuy && order.payee != null && (() => {
+              const payee = order.payee!;
+              return (
+              <div className="rounded-lg border border-border p-3" data-testid="payee-info">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold">{t("otc.payeeName") + " / " + t("otc.payeeAccount")}</p>
+                  <button
+                    onClick={() => {
+                      const p = order.payee;
+                      if (p) void copy(`${p.name} ${p.bank ?? ""} ${p.account}`.trim(), "");
+                    }}
+                    className="cursor-pointer text-xs font-medium text-accent hover:underline"
+                    data-testid="copy-all"
+                  >
+                    {t("otc.copyAll")}
+                  </button>
+                </div>
+                <dl className="space-y-1.5 text-xs">
+                  <Row label={t("otc.payeeName")} value={payee.name} onCopy={() => void copy(payee.name)} />
+                  {payee.bank && (() => {
+                    const bank = payee.bank;
+                    return <Row label={t("otc.payeeBank")} value={bank} onCopy={() => void copy(bank)} />;
+                  })()}
+                  <Row label={t("otc.payeeAccount")} value={payee.account} mono onCopy={() => void copy(payee.account)} />
+                  <Row label={t("otc.price")} value={`${fmtPrice(order.price)} ${order.fiat_currency}`} mono />
+                  <Row label={t("otc.total")} value={`${fmtPrice(order.fiat_amount)} ${order.fiat_currency}`} mono />
+                </dl>
               </div>
-              <dl className="space-y-1.5 text-xs">
-                <Row label={t("otc.payeeName")} value={trade.payee.name} onCopy={() => void copy(trade.payee.name)} />
-                {trade.payee.bank && <Row label={t("otc.payeeBank")} value={trade.payee.bank} onCopy={() => void copy(trade.payee.bank!)} />}
-                <Row label={t("otc.payeeAccount")} value={trade.payee.account} mono onCopy={() => void copy(trade.payee.account)} />
-                <Row label={t("otc.price")} value={`${fmtPrice(trade.price)} ${trade.fiat}`} mono />
-                <Row label={t("otc.total")} value={`${fmtPrice(trade.total)} ${trade.fiat}`} mono />
-              </dl>
-            </div>
+              );
+            })()}
+            {!isBuy && (
+              <p className="rounded-lg border border-border p-3 text-xs leading-relaxed text-muted" data-testid="sell-hint">
+                {t("otc.sellHint")}
+              </p>
+            )}
 
             {/* 操作区 */}
-            {trade.status === "unpaid" && !expired && (
+            {order.status === "pending" && !expired && (
               <div className="flex flex-col gap-2">
                 {!appealing ? (
                   <>
@@ -196,9 +261,7 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
                       data-testid="mark-paid"
                       onClick={() =>
                         void confirm({ message: t("otc.confirmPaid"), danger: true }).then((ok) => {
-                          if (!ok) return;
-                          markPaid(trade.id);
-                          toast.success(t("otc.paidMarked"));
+                          if (ok) void markPaid();
                         })
                       }
                     >
@@ -226,11 +289,7 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
                       size="sm"
                       disabled={!appealText.trim()}
                       data-testid="appeal-submit"
-                      onClick={() => {
-                        appeal(trade.id, appealText.trim());
-                        toast.warning(t("otc.appealed"));
-                        setAppealing(false);
-                      }}
+                      onClick={() => void dispute()}
                     >
                       {t("otc.appealSubmit")}
                     </Button>
@@ -238,11 +297,21 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
                 )}
               </div>
             )}
+
+            {/* 已付款待放币 / 终态提示 */}
+            {order.status === "paid" && (
+              <p className="rounded-lg bg-tag-bg px-3 py-2 text-xs text-muted">{t("otc.waitingRelease")}</p>
+            )}
+            {(expired || order.status === "cancelled") && (
+              <p className="rounded-lg bg-sell/10 px-3 py-2 text-xs text-sell">
+                {order.cancel_reason === "timeout" || expired ? t("otc.expired") : t("otc.status.cancelled")}
+              </p>
+            )}
           </div>
 
           {/* 右列：聊天 */}
           <div className="min-h-[320px] lg:h-[420px]">
-            <ChatDrawer messages={trade.chat} peerName={trade.merchant} onSend={sendChat} />
+            <ChatDrawer messages={messages} peerName={ad.merchant.nickname} myUid={uid == null ? null : Number(uid)} onSend={(x) => void sendChat(x)} />
           </div>
         </div>
       </Modal>
@@ -251,16 +320,16 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
 
   // ---------- 下单视图 ----------
   return (
-    <Modal title={`${isBuy ? t("otc.buy") : t("otc.sell")} ${ad.coin}`} onClose={onClose} width={460}>
+    <Modal title={`${isBuy ? t("otc.buy") : t("otc.sell")} ${ad.asset}`} onClose={onClose} width={460}>
       <div className="flex flex-col gap-3 p-1 text-sm">
         {/* 商家摘要 */}
         <div className="flex items-center justify-between rounded-lg bg-panel-2/40 px-3 py-2 text-xs">
           <span className="font-semibold text-foreground">
-            {ad.merchant}
-            {ad.verified && <span className="ml-1 text-accent">✓</span>}
+            {ad.merchant.nickname}
+            {ad.merchant.verified && <span className="ml-1 text-accent">✓</span>}
           </span>
           <span className="text-muted">
-            {t("otc.trades", { n: ad.trades.toLocaleString() })} · {t("otc.successRate", { r: ad.successRate })}
+            {t("otc.trades", { n: ad.merchant.trades.toLocaleString() })} · {t("otc.successRate", { r: ad.merchant.success_rate })}
           </span>
         </div>
 
@@ -268,13 +337,13 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
         <div className="flex items-baseline justify-between">
           <span className="text-xs text-muted">{t("otc.price")}</span>
           <span className={`font-mono text-xl font-bold tabular-nums ${isBuy ? "text-buy" : "text-sell"}`}>
-            {fmtPrice(price)} {ad.fiat}
+            {fmtPrice(price)} {ad.fiat_currency}
           </span>
         </div>
 
         {/* 金额 ↔ 数量联动 */}
         <label className="flex flex-col gap-1 text-xs text-muted">
-          {`${t("otc.total")} (${ad.fiat})`}
+          {`${t("otc.total")} (${ad.fiat_currency})`}
           <input
             inputMode="decimal"
             value={totalStr}
@@ -282,13 +351,13 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
               setTotalStr(e.target.value);
               setQtyStr(String(qtyFromTotal(parseFloat(e.target.value) || 0, price)));
             }}
-            placeholder={`${ad.minLimit} - ${ad.maxLimit.toLocaleString()}`}
+            placeholder={`${ad.min_amount} - ${ad.max_amount.toLocaleString()}`}
             data-testid="otc-total"
             className="h-9 w-full rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums text-foreground outline-none focus:border-accent"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
-          {`${t("otc.qty")} (${ad.coin})`}
+          {`${t("otc.qty")} (${ad.asset})`}
           <input
             inputMode="decimal"
             value={qtyStr}
@@ -305,7 +374,7 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
         <div className="flex flex-col gap-1 text-xs text-muted">
           {t("otc.payMethod")}
           <div className="flex gap-1.5">
-            {ad.methods.map((m) => (
+            {(ad.payment_methods.split(",").filter(Boolean) as PayMethod[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setMethod(m)}
@@ -323,18 +392,18 @@ export function OtcTradeModal({ ad, price, initialTradeId, onClose }: Props) {
 
         {total > 0 && !withinLimit && (
           <p className="text-xs text-sell" role="alert">
-            {`${ad.minLimit} - ${ad.maxLimit.toLocaleString()} ${ad.fiat}`}
+            {`${ad.min_amount} - ${ad.max_amount.toLocaleString()} ${ad.fiat_currency}`}
           </p>
         )}
 
         {authed ? (
           <Button
             variant={isBuy ? "buy" : "sell"}
-            disabled={!(qty > 0) || !withinLimit}
-            onClick={submit}
+            disabled={!(total > 0) || !withinLimit || submitting}
+            onClick={() => void submit()}
             data-testid="otc-submit"
           >
-            {`${isBuy ? t("otc.buy") : t("otc.sell")} ${ad.coin}`}
+            {`${isBuy ? t("otc.buy") : t("otc.sell")} ${ad.asset}`}
           </Button>
         ) : (
           <a

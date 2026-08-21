@@ -337,10 +337,20 @@ export const api = {
 
   // ---- OTC ----
   // 列表接口后端返回 {advertisements:[]}/{orders:[]}/{counterparties:[]}，此处解包为数组。
-  otcAds: async () => {
-    const d = await request<{ advertisements: OtcAd[] }>("/api/v1/otc/advertisements");
+  otcAds: async (params?: {
+    side?: OtcSide;
+    asset?: string;
+    fiat?: string;
+    method?: string;
+    amount?: number;
+  }) => {
+    const d = await request<{ advertisements: OtcAdView[] }>(
+      withQuery("/api/v1/otc/advertisements", params as Record<string, string | number | undefined>)
+    );
     return d.advertisements ?? [];
   },
+  otcPrices: (asset: string, fiat: string) =>
+    request<OtcPrice>(withQuery("/api/v1/otc/prices", { asset, fiat })),
   otcOrders: async () => {
     const d = await request<{ orders: OtcOrder[] }>("/api/v1/otc/orders");
     return d.orders ?? [];
@@ -742,6 +752,30 @@ export interface OtcOrder {
   paid_at?: string;
   completed_at?: string;
   updated_at?: string;
+  /** 15 分钟付款截止时间（ISO）；由服务端驱动超时取消 */
+  expire_at?: string;
+  /** 收款人信息（仅买方订单返回，账号掩码） */
+  payee?: { name: string; bank?: string; account: string };
+  /** 对手方昵称（列表视图附带） */
+  counterparty_nickname?: string;
+  dispute_reason?: string;
+  cancel_reason?: string;
+}
+
+/** 广告视图（含商家画像与实时单价，公开接口返回） */
+export interface OtcAdView extends OtcAd {
+  available: number; // 可用数量（币）
+  premium?: number; // 相对行情溢价 %
+  merchant: { user_id: number; nickname: string; verified: boolean; trades: number; success_rate: number };
+}
+
+/** 法币报价 */
+export interface OtcPrice {
+  asset: string;
+  fiat: string;
+  base_price: number;
+  fiat_rate: number;
+  updated_at: string;
 }
 
 // OTC 对手方信用/声誉记录（每对用户一条）。

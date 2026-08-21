@@ -196,10 +196,8 @@
   "otc.appealed": "申し立てを送信しました。カスタマーサービスが対応します。",
   "otc.paidMarked": "支払い済みマーク済み。相手の解放確認待ちです。",
   "otc.completedToast": "注文が完了し、資産が入金されました。",
-  "otc.status.unpaid": "未払い",
   "otc.status.paid": "支払い済み · 解放待ち",
   "otc.status.completed": "完了",
-  "otc.status.appealing": "申し立て処理中",
   "otc.chatTitle": "注文チャット",
   "otc.chatPlaceholder": "メッセージを入力…",
   "otc.send": "送信",
@@ -210,5 +208,12 @@
   "otc.expired": "注文が期限切れです。再度発注してください。",
   "otc.newOrder": "再注文",
   "otc.confirmTitle": "注文確認",
-  "otc.confirmCreate": "{price} {fiat}/{coin} で {qty} {coin} を{side}します。続行しますか？"
+  "otc.confirmCreate": "{price} {fiat}/{coin} で {qty} {coin} を{side}します。続行しますか？",
+  "otc.status.pending": "入金待ち",
+  "otc.status.cancelled": "キャンセル済み",
+  "otc.status.disputed": "申し立て処理中",
+  "otc.sellHint": "売却注文：買い手の送金を確認してから暗号資産をリリースしてください。",
+  "otc.waitingRelease": "入金済み、相手のリリース確認待ち…",
+  "otc.loadFailed": "読み込み失敗",
+  "otc.orderNotFound": "注文が存在しないか処理済みです"
 }

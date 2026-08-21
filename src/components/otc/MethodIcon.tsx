@@ -1,5 +1,5 @@
 // 支付方式小图标：微信=绿聊、支付宝=蓝支、银行卡=蓝卡（单色几何风）。
-import type { PayMethod } from "../../store/otc-store";
+export type PayMethod = "wechat" | "alipay" | "bank";
 
 export function MethodIcon({ method, className = "size-3.5" }: { method: PayMethod; className?: string }) {
   if (method === "wechat") {

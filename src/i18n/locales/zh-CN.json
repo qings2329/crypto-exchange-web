@@ -196,10 +196,8 @@
   "otc.appealed": "申诉已提交，客服将介入处理",
   "otc.paidMarked": "已标记付款，等待对方确认放币",
   "otc.completedToast": "订单已完成，资产已到账",
-  "otc.status.unpaid": "待付款",
   "otc.status.paid": "已付款 · 待放币",
   "otc.status.completed": "已完成",
-  "otc.status.appealing": "申诉处理中",
   "otc.chatTitle": "订单聊天",
   "otc.chatPlaceholder": "输入消息…",
   "otc.send": "发送",
@@ -210,5 +208,12 @@
   "otc.expired": "订单已超时，请重新下单",
   "otc.newOrder": "重新下单",
   "otc.confirmTitle": "确认下单",
-  "otc.confirmCreate": "将以 {price} {fiat}/{coin} 的价格{side} {qty} {coin}，确认继续？"
+  "otc.confirmCreate": "将以 {price} {fiat}/{coin} 的价格{side} {qty} {coin}，确认继续？",
+  "otc.status.pending": "待付款",
+  "otc.status.cancelled": "已取消",
+  "otc.status.disputed": "申诉处理中",
+  "otc.sellHint": "卖出订单：买家付款后您将收到法币转账，请确认到账后再放币。",
+  "otc.waitingRelease": "已标记付款，等待对方确认放币…",
+  "otc.loadFailed": "加载失败",
+  "otc.orderNotFound": "订单不存在或已被处理"
 }

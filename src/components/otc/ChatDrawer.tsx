@@ -1,17 +1,19 @@
 // OTC 订单聊天：消息流（我/对方左右分栏）+ 输入发送；新消息自动滚底。
-// 对方回复由父级模拟（延迟罐头话术），本组件只负责展示与发送回调。
+// 消息由父级轮询 /otc/orders/{id}/messages 获取，本组件只负责展示与发送回调。
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ChatMsg } from "../../store/otc-store";
+import type { OtcMessage } from "../../api/client";
 import { fmtTime } from "../../lib/format";
 
 interface Props {
-  messages: ChatMsg[];
+  messages: OtcMessage[];
   peerName: string;
+  /** 当前登录用户 id；null 表示未登录（不会出现，订单视图需登录） */
+  myUid: number | null;
   onSend: (text: string) => void;
 }
 
-export function ChatDrawer({ messages, peerName, onSend }: Props) {
+export function ChatDrawer({ messages, peerName, myUid, onSend }: Props) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -37,18 +39,21 @@ export function ChatDrawer({ messages, peerName, onSend }: Props) {
         {messages.length === 0 && (
           <p className="py-6 text-center text-xs text-muted">—</p>
         )}
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[80%] rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
-                m.from === "me" ? "rounded-br-sm bg-tag-bg text-foreground" : "rounded-bl-sm bg-panel-2 text-foreground"
-              }`}
-            >
-              {m.text}
-              <span className="ml-2 align-bottom text-[10px] text-muted">{fmtTime(m.ts)}</span>
+        {messages.map((m) => {
+          const mine = myUid != null && m.sender_id === myUid;
+          return (
+            <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[80%] rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
+                  mine ? "rounded-br-sm bg-tag-bg text-foreground" : "rounded-bl-sm bg-panel-2 text-foreground"
+                }`}
+              >
+                {m.content}
+                <span className="ml-2 align-bottom text-[10px] text-muted">{fmtTime(Date.parse(m.created_at ?? ""))}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="flex items-center gap-2 border-t border-border p-2">
         <input

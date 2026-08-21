@@ -196,10 +196,8 @@
   "otc.appealed": "申訴已提交，客服將介入處理",
   "otc.paidMarked": "已標記付款，等待對方確認放幣",
   "otc.completedToast": "訂單已完成，資產已到帳",
-  "otc.status.unpaid": "待付款",
   "otc.status.paid": "已付款 · 待放幣",
   "otc.status.completed": "已完成",
-  "otc.status.appealing": "申訴處理中",
   "otc.chatTitle": "訂單聊天",
   "otc.chatPlaceholder": "輸入訊息…",
   "otc.send": "發送",
@@ -210,5 +208,12 @@
   "otc.expired": "訂單已逾時，請重新下單",
   "otc.newOrder": "重新下單",
   "otc.confirmTitle": "確認下單",
-  "otc.confirmCreate": "將以 {price} {fiat}/{coin} 的價格{side} {qty} {coin}，確認繼續？"
+  "otc.confirmCreate": "將以 {price} {fiat}/{coin} 的價格{side} {qty} {coin}，確認繼續？",
+  "otc.status.pending": "待付款",
+  "otc.status.cancelled": "已取消",
+  "otc.status.disputed": "申訴處理中",
+  "otc.sellHint": "賣出訂單：買家付款後您將收到法幣轉帳，請確認到帳後再放幣。",
+  "otc.waitingRelease": "已標記付款，等待對方確認放幣…",
+  "otc.loadFailed": "載入失敗",
+  "otc.orderNotFound": "訂單不存在或已被處理"
 }

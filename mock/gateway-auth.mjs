@@ -149,6 +149,9 @@ const PUBLIC_PATHS = new Set([
   "/api/v1/user/send-code",
   "/api/v1/user/refresh",
   "/api/v1/user/logout",
+  // OTC 公开行情：广告列表与法币报价匿名可读（下单等写操作仍需登录）
+  "/api/v1/otc/advertisements",
+  "/api/v1/otc/prices",
 ]);
 function gateway(req, res, next) {
   if (PUBLIC_PATHS.has(req.path)) return next();
