@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
 import { usePermission } from "../../lib/rbac";
 import { useI18n, LOCALES } from "../../i18n";
@@ -28,7 +29,8 @@ const LINKS: { path: string; key: string; role?: "operator" | "admin" }[] = [
 export function Header() {
   const { uid, logout } = useAuth();
   const { role, hasRole } = usePermission();
-  const { t, locale, setLocale } = useI18n();
+  const { locale, setLocale } = useI18n();
+  const { t } = useTranslation();
   const current = (location.hash.replace(/^#/, "") || "/home").split("?")[0];
 
   return (
@@ -43,7 +45,8 @@ export function Header() {
         {/* 主导航：下划线 Tab */}
         <nav className="hidden h-full flex-1 items-center gap-1 lg:flex">
           {LINKS.filter((l) => !l.role || hasRole(l.role)).map((l) => {
-            const active = current === l.path;
+            // 前缀匹配：/trade 重定向到 /trade/BTCUSDT 后仍保持高亮
+            const active = current === l.path || current.startsWith(`${l.path}/`);
             return (
               <a
                 key={l.path}
@@ -101,16 +104,16 @@ export function Header() {
                 )}
               </span>
               <Button variant="ghost" size="sm" onClick={logout}>
-                {t("nav.logout")}
+                {t("header.logout")}
               </Button>
             </>
           ) : (
             <>
               <Button asChild variant="outline" size="sm">
-                <a href="#/login">{t("login.title")}</a>
+                <a href="#/login">{t("header.login")}</a>
               </Button>
               <Button asChild size="sm">
-                <a href="#/register">{t("register.title")}</a>
+                <a href="#/register">{t("header.register")}</a>
               </Button>
             </>
           )}

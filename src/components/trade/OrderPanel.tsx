@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { useMockBalances } from "../../hooks/use-mock-balances";
@@ -34,6 +35,7 @@ function roundQty(q: number): number {
 }
 
 export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
+  const { t } = useTranslation();
   const toast = useToast();
   const { isConnected } = useAccount();
   const balances = useMockBalances();
@@ -64,20 +66,20 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
   // 校验
   const errors = useMemo(() => {
     const list: string[] = [];
-    if (orderType === "limit" && !(limitPrice > 0)) list.push("Enter a valid price");
-    if (!(qty > 0)) list.push("Enter an amount");
+    if (orderType === "limit" && !(limitPrice > 0)) list.push(t("orderPanel.invalidPrice"));
+    if (!(qty > 0)) list.push(t("orderPanel.invalidAmount"));
     else if (perp) {
       // 合约：校验初始保证金（名义额/杠杆）不超过可用 USDT
       const margin = total / leverage;
-      if (total < MIN_NOTIONAL) list.push(`Min order size ${MIN_NOTIONAL} USDT`);
-      else if (margin > available) list.push(`Insufficient margin ${available.toFixed(2)} USDT`);
+      if (total < MIN_NOTIONAL) list.push(t("orderPanel.minSize", { min: MIN_NOTIONAL }));
+      else if (margin > available) list.push(t("orderPanel.insufficientMargin", { balance: available.toFixed(2) }));
     } else {
-      if (total < MIN_NOTIONAL) list.push(`Min order size ${MIN_NOTIONAL} USDT`);
-      if (isBuy && total > available) list.push(`Insufficient ${available.toFixed(2)} USDT`);
-      if (!isBuy && qty > available) list.push(`Insufficient ${base}`);
+      if (total < MIN_NOTIONAL) list.push(t("orderPanel.minSize", { min: MIN_NOTIONAL }));
+      if (isBuy && total > available) list.push(t("orderPanel.insufficientUsdt", { balance: available.toFixed(2) }));
+      if (!isBuy && qty > available) list.push(t("orderPanel.insufficientAsset", { asset: base }));
     }
     return list;
-  }, [orderType, limitPrice, qty, total, available, isBuy, base, perp, leverage]);
+  }, [t, orderType, limitPrice, qty, total, available, isBuy, base, perp, leverage]);
   const valid = errors.length === 0 && isConnected;
 
   // 百分比 → 数量：买入按可用 USDT 折算，卖出直接按持仓数量
@@ -116,9 +118,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
           qty,
           margin: total / leverage,
         });
-        toast.success(
-          `${isBuy ? "Long" : "Short"} ${leverage}x position opened (simulated) · ${fmtQty(qty)} ${symbol}`
-        );
+        toast.success(t("orderPanel.toastPositionOpened", { side: t(isBuy ? "orderPanel.openLong" : "orderPanel.openShort"), lev: leverage }));
         reset();
         return;
       }
@@ -137,10 +137,11 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
         settledTs: isMarket ? Date.now() : undefined,
       };
       place(order);
+      const sideLabel = t(isBuy ? "orderPanel.buy" : "orderPanel.sell");
       toast.success(
         isMarket
-          ? `${isBuy ? "Buy" : "Sell"} order filled (simulated) · ${order.id}`
-          : `${isBuy ? "Buy" : "Sell"} order placed (simulated) · ${order.id}`
+          ? t("orderPanel.toastOrderFilled", { side: sideLabel, id: order.id })
+          : t("orderPanel.toastOrderPlaced", { side: sideLabel, id: order.id })
       );
       reset();
     } finally {
@@ -162,11 +163,11 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
                 reset();
               }}
               className={cn(
-                "relative cursor-pointer py-2.5 text-[13px] font-semibold capitalize transition-colors",
+                "relative cursor-pointer py-2.5 text-[13px] font-semibold transition-colors",
                 active ? (s === "buy" ? "text-buy" : "text-sell") : "text-muted hover:text-foreground"
               )}
             >
-              {s}
+              {t(`orderPanel.${s}`)}
               {active && (
                 <span className={cn("absolute inset-x-6 bottom-0 h-0.5 rounded-full", s === "buy" ? "bg-buy" : "bg-sell")} />
               )}
@@ -178,19 +179,19 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
         {/* Limit / Market 切换 */}
         <div className="flex gap-1 rounded-lg bg-panel-2/50 p-0.5">
-          {(["limit", "market"] as const).map((t) => (
+          {(["limit", "market"] as const).map((ot) => (
             <button
-              key={t}
+              key={ot}
               onClick={() => {
-                setOrderType(t);
+                setOrderType(ot);
                 reset();
               }}
               className={cn(
-                "flex-1 cursor-pointer rounded-md py-1 text-xs font-medium capitalize transition-colors",
-                orderType === t ? "bg-card text-foreground shadow-sm" : "text-muted hover:text-foreground"
+                "flex-1 cursor-pointer rounded-md py-1 text-xs font-medium transition-colors",
+                orderType === ot ? "bg-card text-foreground shadow-sm" : "text-muted hover:text-foreground"
               )}
             >
-              {t}
+              {t(`orderPanel.${ot}`)}
             </button>
           ))}
         </div>
@@ -200,15 +201,15 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
 
         {/* 可用余额 */}
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted">{perp ? "Available Margin" : "Available"}</span>
+          <span className="text-muted">{perp ? t("orderPanel.availableMargin") : t("orderPanel.available")}</span>
           <span className="font-mono tabular-nums text-foreground">
-            {isConnected ? `${fmtQty(available)} USDT` : "Connect wallet first"}
+            {isConnected ? `${fmtQty(available)} USDT` : t("orderPanel.connectWalletFirst")}
           </span>
         </div>
 
         {/* 价格输入（市价单只读展示最新价） */}
         <label className="flex flex-col gap-1 text-xs text-muted">
-          Price (USDT)
+          {t("orderPanel.price")}
           {orderType === "limit" ? (
             <input
               inputMode="decimal"
@@ -219,7 +220,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
             />
           ) : (
             <div className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-panel-2/40 px-3 font-mono text-sm tabular-nums text-muted">
-              Market
+              {t("orderPanel.market")}
               <span className="text-foreground">{lastPrice !== undefined ? fmtPrice(lastPrice) : "--"}</span>
             </div>
           )}
@@ -227,7 +228,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
 
         {/* 数量输入 */}
         <label className="flex flex-col gap-1 text-xs text-muted">
-          Amount ({base})
+          {`${t("orderPanel.amount")} (${base})`}
           <input
             inputMode="decimal"
             placeholder={`0.00000`}
@@ -272,7 +273,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
 
         {/* 预估交易额 */}
         <div className="flex items-center justify-between rounded-lg bg-panel-2/30 px-3 py-2 text-xs">
-          <span className="text-muted">Est. Total</span>
+          <span className="text-muted">{t("orderPanel.total")}</span>
           <span className="font-mono font-semibold tabular-nums text-foreground">
             {total > 0 ? `${fmtPrice(total)} USDT` : "--"}
           </span>
@@ -301,12 +302,12 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
           )}
         >
           {!isConnected
-            ? "Connect Wallet"
+            ? t("orderPanel.connectWallet")
             : submitting
-              ? "Placing..."
+              ? t("orderPanel.placing")
               : perp
-                ? `${isBuy ? "Open Long" : "Open Short"} ${base}`
-                : `${isBuy ? "Buy" : "Sell"} ${base}`}
+                ? `${t(isBuy ? "orderPanel.openLong" : "orderPanel.openShort")} ${base}`
+                : `${t(isBuy ? "orderPanel.buy" : "orderPanel.sell")} ${base}`}
         </button>
       </div>
     </div>

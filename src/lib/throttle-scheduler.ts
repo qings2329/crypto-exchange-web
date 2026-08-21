@@ -2,7 +2,7 @@
 // 用于盘口/成交等高频流（100ms 推送）限制 React 渲染频率，杜绝每报文一刷。
 
 // 开发环境全局计数器：供冒烟测试测量真实 flush 次数（生产构建剔除）。
-declare const globalThis: typeof globalThis & { __throttleFlushes?: number };
+type FlushCounter = { __throttleFlushes?: number };
 
 export class ThrottleScheduler<T> {
   private pending: T | null = null;
@@ -38,8 +38,8 @@ export class ThrottleScheduler<T> {
     this.hasPending = false;
     this.lastFlushAt = Date.now();
     if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
-      (globalThis as { __throttleFlushes?: number }).__throttleFlushes =
-        ((globalThis as { __throttleFlushes?: number }).__throttleFlushes ?? 0) + 1;
+      const g = globalThis as FlushCounter;
+      g.__throttleFlushes = (g.__throttleFlushes ?? 0) + 1;
     }
     this.flush(value);
   }

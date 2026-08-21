@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import i18next from "./i18next";
 
-// 轻量国际化：不引入第三方依赖。
-// - 默认语言 zh-CN（中文），支持切换 en-US（英文）。
-// - 选择持久化到 localStorage；<html lang> 同步。
+// 轻量国际化（业务全量字典）+ react-i18next（核心文本 JSON 语言包）双轨：
+// - locale 单一来源在本 Provider，变化时同步 changeLanguage 到 i18next；
 // - t(key, vars?) 支持 {var} 插值；缺失 key 回退到 zh-CN，再回退到 key 本身，保证不白屏。
 
 export type Locale = "zh-CN" | "en-US" | "zh-TW" | "ja-JP";
@@ -3733,6 +3733,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, locale);
     if (typeof document !== "undefined") document.documentElement.lang = locale;
+    // 同步到 react-i18next（Header/下单面板/订单状态等已迁移至 JSON 语言包）
+    void i18next.changeLanguage(locale);
   }, [locale]);
 
   const t = (key: string, vars?: Record<string, string | number>) => {

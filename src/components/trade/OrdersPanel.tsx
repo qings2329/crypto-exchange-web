@@ -4,6 +4,7 @@
 // - 币安表格规范：粘性表头、行 hover 高亮、tabular-nums、买卖红绿。
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { useToast } from "../Toast";
 import { fmtPrice, fmtQty, fmtTime } from "../../lib/format";
@@ -18,6 +19,7 @@ interface Props {
 type Tab = "open" | "history";
 
 export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>(initialTab);
   // 注意：选择器必须返回稳定引用（Zustand v5），过滤放到组件内 useMemo
   const orders = useOrdersStore((s) => s.orders);
@@ -37,7 +39,7 @@ export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
 
   const onCancel = (o: TradeOrder) => {
     cancel(o.id);
-    toast.info(`Order canceled · ${o.id}`);
+    toast.info(`${t("ordersPanel.cancel")} · ${o.id}`);
   };
 
   return (
@@ -46,8 +48,8 @@ export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
       <div className="flex items-center gap-4 border-b border-border px-3">
         {(
           [
-            ["open", `Open Orders (${openOrders.length})`],
-            ["history", `Order History (${history.length})`],
+            ["open", t("ordersPanel.openOrders", { count: openOrders.length })],
+            ["history", t("ordersPanel.orderHistory", { count: history.length })],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -62,7 +64,7 @@ export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
             {tab === key && <span className="absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-accent" />}
           </button>
         ))}
-        <span className="ml-auto text-[11px] text-muted">Simulated matching</span>
+        <span className="ml-auto text-[11px] text-muted">{t("ordersPanel.simulated")}</span>
       </div>
 
       {/* 表格 */}
@@ -70,21 +72,21 @@ export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
         <table className="w-full border-collapse font-mono text-xs tabular-nums">
           <thead className="sticky top-0 z-10 bg-card">
             <tr className="text-[11px] text-muted">
-              <th className="px-3 py-2 text-left font-medium">Time</th>
-              <th className="px-3 py-2 text-left font-medium">Side</th>
-              <th className="px-3 py-2 text-left font-medium">Type</th>
-              <th className="px-3 py-2 text-right font-medium">Price (USDT)</th>
-              <th className="px-3 py-2 text-right font-medium">Amount ({base})</th>
-              <th className="px-3 py-2 text-right font-medium">Total (USDT)</th>
-              <th className="px-3 py-2 text-center font-medium">Status</th>
-              <th className="px-3 py-2 text-right font-medium">{tab === "open" ? "Action" : ""}</th>
+              <th className="px-3 py-2 text-left font-medium">{t("ordersPanel.time")}</th>
+              <th className="px-3 py-2 text-left font-medium">{t("ordersPanel.side")}</th>
+              <th className="px-3 py-2 text-left font-medium">{t("ordersPanel.type")}</th>
+              <th className="px-3 py-2 text-right font-medium">{t("orderPanel.price")}</th>
+              <th className="px-3 py-2 text-right font-medium">{`${t("orderPanel.amount")} (${base})`}</th>
+              <th className="px-3 py-2 text-right font-medium">{`${t("orderPanel.total")} (USDT)`}</th>
+              <th className="px-3 py-2 text-center font-medium">{t("ordersPanel.status")}</th>
+              <th className="px-3 py-2 text-right font-medium">{tab === "open" ? t("ordersPanel.action") : ""}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-10 text-center font-sans text-muted">
-                  {tab === "open" ? "No open orders — place a limit order to see it here" : "No order history yet"}
+                  {tab === "open" ? t("ordersPanel.noOpenOrders") : t("ordersPanel.noHistory")}
                 </td>
               </tr>
             ) : (
@@ -107,7 +109,7 @@ export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
                         onClick={() => onCancel(o)}
                         className="cursor-pointer rounded-md border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-sell hover:text-sell"
                       >
-                        Cancel
+                        {t("ordersPanel.cancel")}
                       </button>
                     )}
                   </td>
@@ -122,6 +124,7 @@ export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
 }
 
 function StatusBadge({ status }: { status: TradeOrder["status"] }) {
+  const { t } = useTranslation();
   const cls =
     status === "open"
       ? "bg-tag-bg text-accent"
@@ -129,8 +132,8 @@ function StatusBadge({ status }: { status: TradeOrder["status"] }) {
         ? "bg-buy-bg text-buy"
         : "bg-panel-2 text-muted";
   return (
-    <span className={cn("inline-block rounded px-1.5 py-0.5 text-[11px] font-medium capitalize", cls)}>
-      {status}
+    <span className={cn("inline-block rounded px-1.5 py-0.5 text-[11px] font-medium", cls)}>
+      {t(`orderStatus.${status}`)}
     </span>
   );
 }
