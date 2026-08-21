@@ -31,15 +31,17 @@ import { cn } from "../lib/utils";
 
 interface Props {
   symbol: string; // 形如 BTCUSDT
+  /** 初始市场模式：/futures 路由进入永续，/trade 进入现货 */
+  initialMode?: MarketMode;
 }
 
 type MarketMode = "spot" | "perp";
 type BottomTab = "positions" | "orders" | "history";
 
-export function TradeHall({ symbol }: Props) {
+export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   const { t } = useTranslation();
   const [interval, setInterval] = useState<ChartInterval>("1m");
-  const [mode, setMode] = useState<MarketMode>("spot");
+  const [mode, setMode] = useState<MarketMode>(initialMode);
   const [bottomTab, setBottomTab] = useState<BottomTab>("orders");
   const { ticker, status } = useTickerLive(symbol);
   const fillMatching = useOrdersStore((s) => s.fillMatching);

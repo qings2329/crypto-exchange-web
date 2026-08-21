@@ -1,13 +1,13 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
 import { usePermission } from "../../lib/rbac";
-import { useI18n, LOCALES } from "../../i18n";
+import { useI18n, LOCALES, type Locale } from "../../i18n";
 import { Button } from "../ui/button";
-import { WalletConnect } from "../web3/WalletConnect";
 import { cn } from "../../lib/utils";
 
 // 导航项与所需最低角色（与业务路由保持一致，管理入口仅对运营/管理员可见）。
-const LINKS: { path: string; key: string; role?: "operator" | "admin" }[] = [
+const LINKS: { path: string; key: string; role?: "operator" | "admin"; auth?: boolean }[] = [
   { path: "/home", key: "nav.home" },
   { path: "/trade", key: "nav.trade" },
   { path: "/futures", key: "nav.futures" },
@@ -17,8 +17,7 @@ const LINKS: { path: string; key: string; role?: "operator" | "admin" }[] = [
   { path: "/wealth", key: "nav.wealth" },
   { path: "/bot", key: "nav.bot" },
   { path: "/referral", key: "nav.referral" },
-  { path: "/history", key: "nav.history" },
-  { path: "/orders", key: "nav.orders" },
+  { path: "/security", key: "nav.security", auth: true },
 ];
 
 /**
@@ -44,7 +43,7 @@ export function Header() {
 
         {/* 主导航：下划线 Tab */}
         <nav className="hidden h-full flex-1 items-center gap-1 lg:flex">
-          {LINKS.filter((l) => !l.role || hasRole(l.role)).map((l) => {
+          {LINKS.filter((l) => (!l.role || hasRole(l.role)) && (!l.auth || uid)).map((l) => {
             // 前缀匹配：/trade 重定向到 /trade/BTCUSDT 后仍保持高亮
             const active = current === l.path || current.startsWith(`${l.path}/`);
             return (
@@ -76,22 +75,7 @@ export function Header() {
 
         {/* 右侧操作区 */}
         <div className="ml-auto flex items-center gap-2">
-          <WalletConnect />
-
-          <div className="hidden items-center rounded-lg border border-border p-0.5 sm:flex" role="group" aria-label={t("lang.label")}>
-            {LOCALES.map((lc) => (
-              <button
-                key={lc.value}
-                onClick={() => setLocale(lc.value)}
-                className={cn(
-                  "cursor-pointer rounded-md px-2 py-1 text-xs transition-colors",
-                  lc.value === locale ? "bg-panel-2 font-semibold text-foreground" : "text-muted hover:text-foreground"
-                )}
-              >
-                {lc.label}
-              </button>
-            ))}
-          </div>
+          <LanguageMenu locale={locale} onChange={setLocale} />
 
           {uid ? (
             <>
@@ -120,5 +104,61 @@ export function Header() {
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * 语言选择下拉菜单：当前语言触发器 + 四语言列表（激活项品牌黄 + ✓）。
+ * 点击外部自动收起。
+ */
+function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Locale) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const current = LOCALES.find((l) => l.value === locale);
+
+  return (
+    <div className="relative hidden sm:block" ref={ref} data-testid="lang-menu">
+      <Button variant="outline" size="sm" aria-label={t("lang.label")} onClick={() => setOpen((o) => !o)} data-testid="lang-trigger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" />
+        </svg>
+        {current?.label}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cn("size-3 transition-transform", open && "rotate-180")}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-xl">
+          {LOCALES.map((lc) => (
+            <button
+              key={lc.value}
+              onClick={() => {
+                onChange(lc.value);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-panel-2",
+                lc.value === locale ? "font-semibold text-accent" : "text-muted"
+              )}
+            >
+              {lc.label}
+              {lc.value === locale && <span>✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

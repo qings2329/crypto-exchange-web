@@ -6,8 +6,8 @@
 //   行情穿越限价时自动撮合。接真实链时把 submit() 替换为合约 writeContract / 后端 API 即可。
 
 import { useMemo, useState } from "react";
-import { useAccount } from "wagmi";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/utils";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { useMockBalances } from "../../hooks/use-mock-balances";
@@ -37,7 +37,8 @@ function roundQty(q: number): number {
 export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
   const { t } = useTranslation();
   const toast = useToast();
-  const { isConnected } = useAccount();
+  const { uid } = useAuth();
+  const authed = !!uid; // 中心化交易所：以站内登录态为准（Web3/DEX 能力后续版本接入）
   const balances = useMockBalances();
   const place = useOrdersStore((s) => s.place);
   const openPosition = useFuturesStore((s) => s.open);
@@ -80,12 +81,12 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
     }
     return list;
   }, [t, orderType, limitPrice, qty, total, available, isBuy, base, perp, leverage]);
-  const valid = errors.length === 0 && isConnected;
+  const valid = errors.length === 0 && authed;
 
   // 百分比 → 数量：买入按可用 USDT 折算，卖出直接按持仓数量
   const applyPct = (p: number) => {
     setPct(p);
-    if (!isConnected || !balances || p <= 0) return;
+    if (!authed || !balances || p <= 0) return;
     let q = 0;
     if (isBuy) {
       if (!(effectivePrice > 0)) return;
@@ -203,7 +204,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted">{perp ? t("orderPanel.availableMargin") : t("orderPanel.available")}</span>
           <span className="font-mono tabular-nums text-foreground">
-            {isConnected ? `${fmtQty(available)} USDT` : t("orderPanel.connectWalletFirst")}
+            {authed ? `${fmtQty(available)} USDT` : t("orderPanel.loginFirst")}
           </span>
         </div>
 
@@ -288,27 +289,34 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
           </ul>
         )}
 
-        {/* 提交按钮：买入实心绿底黑字 / 卖出实心红底白字（AGENTS.md 规范） */}
-        <button
-          onClick={submit}
-          disabled={!valid || submitting}
-          className={cn(
-            "mt-auto h-10 cursor-pointer rounded-lg text-sm font-semibold transition-all",
-            !isConnected || submitting || errors.length > 0
-              ? "cursor-not-allowed opacity-50"
-              : isBuy
-                ? "bg-buy text-black hover:bg-buy/90"
-                : "bg-sell text-white hover:bg-sell/90"
-          )}
-        >
-          {!isConnected
-            ? t("orderPanel.connectWallet")
-            : submitting
+        {/* 提交按钮：买入实心绿底黑字 / 卖出实心红底白字（AGENTS.md 规范）；未登录跳转登录页 */}
+        {authed ? (
+          <button
+            onClick={submit}
+            disabled={!valid || submitting}
+            className={cn(
+              "mt-auto h-10 cursor-pointer rounded-lg text-sm font-semibold transition-all",
+              submitting || errors.length > 0
+                ? "cursor-not-allowed opacity-50"
+                : isBuy
+                  ? "bg-buy text-black hover:bg-buy/90"
+                  : "bg-sell text-white hover:bg-sell/90"
+            )}
+          >
+            {submitting
               ? t("orderPanel.placing")
               : perp
                 ? `${t(isBuy ? "orderPanel.openLong" : "orderPanel.openShort")} ${base}`
                 : `${t(isBuy ? "orderPanel.buy" : "orderPanel.sell")} ${base}`}
-        </button>
+          </button>
+        ) : (
+          <a
+            href="#/login"
+            className="mt-auto grid h-10 place-items-center rounded-lg bg-accent text-sm font-semibold text-black transition-colors hover:bg-accent-hover"
+          >
+            {t("orderPanel.loginToTrade")}
+          </a>
+        )}
       </div>
     </div>
   );
