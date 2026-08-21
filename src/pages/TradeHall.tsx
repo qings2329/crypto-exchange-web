@@ -1,13 +1,15 @@
 // 交易大厅（/trade/BTCUSDT）
 // 布局（grid-cols-12，币安高密度风格）：
 // - 顶栏：交易对 + 最新价 + 24h 涨跌幅/高/低/量；
-// - 左 8 列：K 线图（周期切换 + WS 实时）；
-// - 右 4 列：订单簿 / 最新成交 上下堆叠。
+// - 左 6 列：K 线图（周期切换 + WS 实时）；
+// - 中 3 列：订单簿 / 最新成交 上下堆叠；
+// - 右 3 列：下单面板（钱包连接 + 模拟撮合）。
 
 import { useState } from "react";
 import { TradingViewChart, type ChartInterval } from "../components/trade/TradingViewChart";
 import { OrderBook } from "../components/trade/OrderBook";
 import { RecentTrades } from "../components/trade/RecentTrades";
+import { OrderPanel, type SimulatedOrder } from "../components/trade/OrderPanel";
 import { StreamDot } from "../components/trade/StreamDot";
 import { Badge } from "../components/ui/badge";
 import { useTickerLive } from "../hooks/use-ticker-live";
@@ -19,6 +21,7 @@ interface Props {
 
 export function TradeHall({ symbol }: Props) {
   const [interval, setInterval] = useState<ChartInterval>("1m");
+  const [lastOrder, setLastOrder] = useState<SimulatedOrder | null>(null);
   const { ticker, status } = useTickerLive(symbol);
 
   const base = symbol.replace(/USDT$/, "");
@@ -54,9 +57,9 @@ export function TradeHall({ symbol }: Props) {
         </dl>
       </div>
 
-      {/* 主区：左图右盘口 */}
-      <div className="grid grid-cols-12 gap-3">
-        <section className="col-span-12 h-[560px] xl:col-span-8">
+      {/* 主区：左图 / 中盘口 / 右下单 */}
+      <div className="grid grid-cols-12 items-start gap-3">
+        <section className="col-span-12 h-[560px] xl:col-span-6">
           <TradingViewChart
             symbol={symbol}
             interval={interval}
@@ -64,7 +67,7 @@ export function TradeHall({ symbol }: Props) {
           />
         </section>
 
-        <aside className="col-span-12 grid grid-rows-2 gap-3 xl:col-span-4">
+        <aside className="col-span-12 flex flex-col gap-3 md:col-span-6 xl:col-span-3">
           <div className="min-h-[300px]">
             <OrderBook symbol={symbol} />
           </div>
@@ -72,6 +75,21 @@ export function TradeHall({ symbol }: Props) {
             <RecentTrades symbol={symbol} />
           </div>
         </aside>
+
+        <section className="col-span-12 md:col-span-6 xl:sticky xl:top-[72px] xl:col-span-3">
+          <div className="min-h-[520px]">
+            <OrderPanel
+              symbol={symbol}
+              lastPrice={last}
+              onPlaced={setLastOrder}
+            />
+          </div>
+          {lastOrder && (
+            <p className="mt-2 truncate rounded-lg border border-buy/30 bg-buy-bg px-3 py-2 font-mono text-[11px] tabular-nums text-buy">
+              ✓ {lastOrder.side.toUpperCase()} {fmtQty(lastOrder.qty)} {base} @ {fmtPrice(lastOrder.price)} · {lastOrder.id}
+            </p>
+          )}
+        </section>
       </div>
     </div>
   );

@@ -152,8 +152,20 @@ export function parseTradeEvent(d: unknown): PublicTrade | null {
 }
 
 export function parseTickerEvent(d: unknown): Ticker | null {
-  const e = d as RawTicker & { e?: string };
-  if (!e || (e.e !== undefined && e.e !== "24hrTicker")) return null;
-  return mapTicker(e);
+  const e = d as Record<string, unknown>;
+  if (!e || typeof e !== "object" || e.e !== "24hrTicker") return null;
+  // WS @ticker 推送为短字段名（s/c/o/h/l/v/q/p/P），REST 为长字段名；此处归一化
+  const r: RawTicker = {
+    symbol: String(e.s ?? e.symbol ?? ""),
+    lastPrice: String(e.c ?? e.lastPrice ?? ""),
+    openPrice: String(e.o ?? e.openPrice ?? ""),
+    highPrice: String(e.h ?? e.highPrice ?? ""),
+    lowPrice: String(e.l ?? e.lowPrice ?? ""),
+    volume: String(e.v ?? e.volume ?? ""),
+    quoteVolume: String(e.q ?? e.quoteVolume ?? ""),
+    priceChange: String(e.p ?? e.priceChange ?? ""),
+    priceChangePercent: String(e.P ?? e.priceChangePercent ?? ""),
+  };
+  return mapTicker(r);
 }
 

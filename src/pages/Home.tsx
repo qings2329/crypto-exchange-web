@@ -6,6 +6,8 @@ import {
   type UserProfile,
 } from "../api/client";
 import { useI18n } from "../i18n";
+import { useTickerLive } from "../hooks/use-ticker-live";
+import { fmtPercent, fmtPrice, fmtQty } from "../lib/format";
 const LEVEL_KEY: Record<AnnouncementLevel, string> = {
   info: "ann.level.info",
   warning: "ann.level.warning",
@@ -14,15 +16,48 @@ const LEVEL_KEY: Record<AnnouncementLevel, string> = {
 
 const KYC_KEY = ["home.kyc.unverified", "home.kyc.reviewing", "home.kyc.verified", "home.kyc.rejected"];
 
-// 模拟市场数据（生产环境从 WebSocket/API 获取）
-const MARKET_DATA = [
-  { symbol: "BTC/USDT", pair: "BTC_USDT", price: "67,234.50", change: "+2.34", icon: "BTC" },
-  { symbol: "ETH/USDT", pair: "ETH_USDT", price: "3,456.78", change: "+1.87", icon: "ETH" },
-  { symbol: "BNB/USDT", pair: "BNB_USDT", price: "598.23", change: "-0.45", icon: "BNB" },
-  { symbol: "SOL/USDT", pair: "SOL_USDT", price: "178.90", change: "+5.12", icon: "SOL" },
-  { symbol: "XRP/USDT", pair: "XRP_USDT", price: "0.6234", change: "+0.89", icon: "XRP" },
-  { symbol: "DOGE/USDT", pair: "DOGE_USDT", price: "0.1567", change: "-1.23", icon: "DOGE" },
-];
+// 首页热门交易对：实时行情经 binance-ws 多路复用器订阅（单连接承载全部 @ticker 流）
+const HOT_PAIRS = [
+  { symbol: "BTCUSDT", icon: "BTC", label: "BTC/USDT" },
+  { symbol: "ETHUSDT", icon: "ETH", label: "ETH/USDT" },
+  { symbol: "BNBUSDT", icon: "BNB", label: "BNB/USDT" },
+  { symbol: "SOLUSDT", icon: "SOL", label: "SOL/USDT" },
+  { symbol: "XRPUSDT", icon: "XRP", label: "XRP/USDT" },
+  { symbol: "DOGEUSDT", icon: "DOGE", label: "DOGE/USDT" },
+] as const;
+
+// 单行行情：REST 种子 + WS 增量，涨跌红绿即时刷新
+function MarketRow({ symbol, icon, label }: { symbol: string; icon: string; label: string }) {
+  const { t } = useI18n();
+  const { ticker } = useTickerLive(symbol);
+  const up = (ticker?.priceChangePercent ?? 0) >= 0;
+  return (
+    <tr>
+      <td>
+        <div className="coin-name">
+          <span className="coin-icon">{icon}</span>
+          {label}
+        </div>
+      </td>
+      <td className="price mono" style={{ textAlign: "right" }}>
+        {ticker ? fmtPrice(ticker.lastPrice) : "--"}
+      </td>
+      <td className="mono" style={{ textAlign: "right" }}>
+        {ticker ? fmtQty(ticker.quoteVolume) : "--"}
+      </td>
+      <td style={{ textAlign: "right" }}>
+        <span className={`mono ${up ? "change-up" : "change-down"}`}>
+          {ticker ? fmtPercent(ticker.priceChangePercent) : "--"}
+        </span>
+      </td>
+      <td style={{ textAlign: "right" }}>
+        <a href={`#/trade/${symbol}`} className="trade-btn">
+          {t("home.mktTrade")}
+        </a>
+      </td>
+    </tr>
+  );
+}
 
 // 快捷入口配置
 const SHORTCUTS = [
@@ -80,33 +115,15 @@ export function Home() {
             <tr>
               <th>{t("home.mktPair")}</th>
               <th style={{ textAlign: "right" }}>{t("home.mktPrice")}</th>
+              <th style={{ textAlign: "right" }}>24h Vol(USDT)</th>
               <th style={{ textAlign: "right" }}>{t("home.mktChange")}</th>
               <th style={{ textAlign: "right" }}>{t("home.mktAction")}</th>
             </tr>
           </thead>
           <tbody>
-            {MARKET_DATA.map((m) => {
-              const isUp = m.change.startsWith("+");
-              return (
-                <tr key={m.pair}>
-                  <td>
-                    <div className="coin-name">
-                      <span className="coin-icon">{m.icon}</span>
-                      {m.symbol}
-                    </div>
-                  </td>
-                  <td className="price" style={{ textAlign: "right" }}>{m.price}</td>
-                  <td style={{ textAlign: "right" }}>
-                    <span className={isUp ? "change-up" : "change-down"}>{m.change}%</span>
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <a href={`#/trade?symbol=${m.pair}`} className="trade-btn">
-                      {t("home.mktTrade")}
-                    </a>
-                  </td>
-                </tr>
-              );
-            })}
+            {HOT_PAIRS.map((m) => (
+              <MarketRow key={m.symbol} {...m} />
+            ))}
           </tbody>
         </table>
       </div>

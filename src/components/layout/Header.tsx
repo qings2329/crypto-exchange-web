@@ -2,6 +2,7 @@ import { useAuth } from "../../lib/auth";
 import { usePermission } from "../../lib/rbac";
 import { useI18n, LOCALES } from "../../i18n";
 import { Button } from "../ui/button";
+import { WalletConnect } from "../web3/WalletConnect";
 import { cn } from "../../lib/utils";
 
 // 导航项与所需最低角色（与业务路由保持一致，管理入口仅对运营/管理员可见）。
@@ -69,6 +70,8 @@ export function Header() {
 
         {/* 右侧操作区 */}
         <div className="ml-auto flex items-center gap-2">
+          <WalletConnect />
+
           <div className="hidden items-center rounded-lg border border-border p-0.5 sm:flex" role="group" aria-label={t("lang.label")}>
             {LOCALES.map((lc) => (
               <button

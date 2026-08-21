@@ -6,6 +6,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider, MonitorToasts } from "./components/Toast";
 import { I18nProvider } from "./i18n";
 import { AppProviders } from "./components/providers";
+import { Web3Provider } from "./components/web3/Web3Provider";
 import { Layout } from "./components/layout/Layout";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -136,16 +137,18 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProviders>
-        <I18nProvider>
-          <AuthProvider>
-            <ConfirmProvider>
-              <ToastProvider>
-                <Router />
-                <MonitorToasts />
-              </ToastProvider>
-            </ConfirmProvider>
-          </AuthProvider>
-        </I18nProvider>
+        <Web3Provider>
+          <I18nProvider>
+            <AuthProvider>
+              <ConfirmProvider>
+                <ToastProvider>
+                  <Router />
+                  <MonitorToasts />
+                </ToastProvider>
+              </ConfirmProvider>
+            </AuthProvider>
+          </I18nProvider>
+        </Web3Provider>
       </AppProviders>
     </ErrorBoundary>
   );

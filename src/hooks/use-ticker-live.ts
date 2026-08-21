@@ -14,7 +14,9 @@ export function useTickerLive(symbol: string): { ticker: Ticker | null; status: 
     let alive = true;
     setTicker(null);
     fetchTickers([symbol])
-      .then((rows) => alive && rows[0] && setTicker(rows[0]))
+      .then((rows) => {
+        if (alive && rows[0]) setTicker(rows[0]);
+      })
       .catch(() => undefined);
     return () => {
       alive = false;
