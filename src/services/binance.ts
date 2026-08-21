@@ -3,10 +3,9 @@
 //
 // 注意：浏览器直连 binance.com 可能受地区网络限制，生产环境建议由后端/网关代理转发。
 
-import type { Kline, KlineInterval, OrderBook, Ticker } from "../types";
+import type { Kline, KlineInterval, OrderBook, PublicTrade, Ticker } from "../types";
 
 const REST_BASE = "https://api.binance.com";
-const WS_BASE = "wss://stream.binance.com:9443/stream";
 
 async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
   const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}` : "";
@@ -77,72 +76,84 @@ export async function fetchDepth(symbol: string, limit = 20): Promise<OrderBook>
   return { bids: toLevels(d.bids), asks: toLevels(d.asks) };
 }
 
+/** 拉取最近公共成交（用于 RecentTrades 首屏种子数据，时间倒序） */
+export async function fetchRecentTrades(symbol: string, limit = 30): Promise<PublicTrade[]> {
+  const rows = await get<{ id: number; price: string; qty: string; time: number; isBuyerMaker: boolean }[]>(
+    "/api/v3/trades",
+    { symbol, limit }
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    price: +r.price,
+    qty: +r.qty,
+    time: r.time,
+    isBuyerMaker: r.isBuyerMaker,
+  }));
+}
+
 /* --------------------------- WebSocket --------------------------- */
 
-export interface StreamHandlers {
-  onTicker?: (t: Ticker) => void;
-  onKline?: (k: Kline, isClosed: boolean) => void;
+/** 流名构造器（Binance 组合流小写规则） */
+export const klineStream = (symbol: string, interval: string) =>
+  `${symbol.toLowerCase()}@kline_${interval}`;
+export const depthStream = (symbol: string) => `${symbol.toLowerCase()}@depth10@100ms`;
+export const tradeStream = (symbol: string) => `${symbol.toLowerCase()}@trade`;
+export const tickerStream = (symbol: string) => `${symbol.toLowerCase()}@ticker`;
+
+/* ------------------------- WS 事件解析器 ------------------------- */
+
+interface RawKlineEvent {
+  e: "kline";
+  k: { t: number; o: string; h: string; l: string; c: string; v: string; x: boolean };
 }
 
-export interface MarketStream {
-  close: () => void;
-}
-
-/**
- * 订阅组合行情流（ticker + kline），带指数退避自动重连。
- * @param streams 形如 ["btcusdt@ticker", "ethusdt@ticker", "btcusdt@kline_1m"]
- */
-export function subscribeStreams(streams: string[], handlers: StreamHandlers): MarketStream {
-  const url = `${WS_BASE}?streams=${streams.join("/")}`;
-  let ws: WebSocket | null = null;
-  let retry = 0;
-  let closed = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const connect = () => {
-    if (closed) return;
-    ws = new WebSocket(url);
-    ws.onopen = () => (retry = 0);
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data as string) as { data?: Record<string, unknown>; stream?: string };
-        const d = msg.data;
-        if (!d) return;
-        if (d.e === "24hrTicker") {
-          handlers.onTicker?.(mapTicker(d as unknown as RawTicker));
-        } else if (d.e === "kline") {
-          const k = d.k as Record<string, unknown>;
-          handlers.onKline?.(
-            {
-              time: k.t as number,
-              open: +(k.o as string),
-              high: +(k.h as string),
-              low: +(k.l as string),
-              close: +(k.c as string),
-              volume: +(k.v as string),
-            },
-            Boolean(k.x)
-          );
-        }
-      } catch {
-        /* 忽略无法解析的报文 */
-      }
-    };
-    ws.onclose = () => {
-      if (closed) return;
-      const delay = Math.min(1000 * 2 ** retry++, 30_000);
-      timer = setTimeout(connect, delay);
-    };
-    ws.onerror = () => ws?.close();
-  };
-
-  connect();
-
+export function parseKlineEvent(d: unknown): { kline: Kline; closed: boolean } | null {
+  const e = d as RawKlineEvent;
+  if (!e || e.e !== "kline" || !e.k) return null;
   return {
-    close: () => {
-      closed = true;
-      if (timer) clearTimeout(timer);
-      ws?.close();
+    kline: {
+      time: e.k.t,
+      open: +e.k.o,
+      high: +e.k.h,
+      low: +e.k.l,
+      close: +e.k.c,
+      volume: +e.k.v,
     },
+    closed: Boolean(e.k.x),
   };
 }
+
+interface RawDepthEvent {
+  lastUpdateId: number;
+  bids: [string, string][];
+  asks: [string, string][];
+}
+
+export function parseDepthEvent(d: unknown): OrderBook | null {
+  const e = d as RawDepthEvent;
+  if (!e || !Array.isArray(e.bids) || !Array.isArray(e.asks)) return null;
+  const toLevels = (ls: [string, string][]) => ls.map(([p, q]) => [+p, +q] as [number, number]);
+  return { bids: toLevels(e.bids), asks: toLevels(e.asks) };
+}
+
+interface RawTradeEvent {
+  e: "trade";
+  t: number;
+  p: string;
+  q: string;
+  T: number;
+  m: boolean; // true=买方是挂单方（主动卖，红）；false=主动买（绿）
+}
+
+export function parseTradeEvent(d: unknown): PublicTrade | null {
+  const e = d as RawTradeEvent;
+  if (!e || e.e !== "trade") return null;
+  return { id: e.t, price: +e.p, qty: +e.q, time: e.T, isBuyerMaker: e.m };
+}
+
+export function parseTickerEvent(d: unknown): Ticker | null {
+  const e = d as RawTicker & { e?: string };
+  if (!e || (e.e !== undefined && e.e !== "24hrTicker")) return null;
+  return mapTicker(e);
+}
+

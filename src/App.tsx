@@ -13,6 +13,7 @@ import { Register } from "./pages/Register";
 // 路由级代码分割：各业务页面按需懒加载，首屏仅加载登录/注册等必要模块，
 // 其余页面进入对应路由时才加载对应 chunk（见 README 性能优化）。
 const Trade = lazy(() => import("./pages/Trade").then((m) => ({ default: m.Trade })));
+const TradeHall = lazy(() => import("./pages/TradeHall").then((m) => ({ default: m.TradeHall })));
 const Wallet = lazy(() => import("./pages/Wallet").then((m) => ({ default: m.Wallet })));
 const Futures = lazy(() => import("./pages/Futures").then((m) => ({ default: m.Futures })));
 const Options = lazy(() => import("./pages/Options").then((m) => ({ default: m.Options })));
@@ -89,6 +90,28 @@ function Router() {
 
   if (path === "/login") return <Login />;
   if (path === "/register") return <Register />;
+
+  // /trade/:SYMBOL —— 交易大厅（如 #/trade/BTCUSDT）
+  const hall = path.match(/^\/trade\/([a-z0-9]{5,20})$/i);
+  if (hall) {
+    return (
+      <Layout>
+        <div className="content">
+          <ErrorBoundary>
+            <Suspense fallback={<div className="page muted">{""}</div>}>
+              <TradeHall symbol={hall[1].toUpperCase()} />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+      </Layout>
+    );
+  }
+
+  // /trade —— 重定向到默认交易对
+  if (path === "/trade") {
+    location.hash = "#/trade/BTCUSDT";
+    return null;
+  }
 
   const Page = PAGES[path] ?? Home;
   const need = PAGE_ROLES[path] ?? "user";
