@@ -253,8 +253,19 @@ export const api = {
   },
 
   // ---- 合约 ----
-  futuresFunding: () => request("/api/v1/futures/funding"),
-  futuresIndex: () => request("/api/v1/futures/index"),
+  // GET /api/v1/futures/funding?symbol= 指数价/标记价/溢价 EMA/资金费率（契约对齐 Go）。
+  futuresFunding: (symbol: string) =>
+    request<{
+      symbol: string;
+      index_price: number;
+      mark_price: number;
+      premium_ema: number;
+      funding_rate: number;
+      last_settle_rate: number;
+      funding_interval: number;
+    }>(withQuery("/api/v1/futures/funding", { symbol })),
+  // GET /api/v1/futures/index 预言机聚合指数价。
+  futuresIndex: () => request<{ index_prices: Record<string, number>; raw_samples: unknown[] }>("/api/v1/futures/index"),
   futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
   // POST /api/v1/futures/wallet/deposit 充值（模拟链上确认后即时入账）。
   futuresDeposit: (payload: { asset: string; amount: number; network?: string }) =>
@@ -316,6 +327,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(p),
     }),
+  // PUT /api/v1/futures/tpsl 设置/清除持仓止盈止损（服务端持久化）。
+  futuresSetTpSl: (payload: { symbol: string; pos_side: "long" | "short"; tp?: number | null; sl?: number | null }) =>
+    request<{ symbol: string; pos_side: string; tp: number | null; sl: number | null }>("/api/v1/futures/tpsl", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   // GET /api/v1/futures/positions 本人持仓（服务端结构 {mark_price, positions, cross_balances}，字段为 Go 导出名）。
   futuresPositions: async (symbol?: string) => {
     const d = await request<{
@@ -331,6 +348,8 @@ export const api = {
         Mode: string;
         OpenTime: number;
         LiqPriceVal: number;
+        TP?: number | null;
+        SL?: number | null;
       }>;
       cross_balances: Record<string, number>;
     }>(withQuery("/api/v1/futures/positions", symbol ? { symbol } : undefined));

@@ -9,8 +9,20 @@ import zhCN from "./locales/zh-CN.json";
 import enUS from "./locales/en-US.json";
 import zhTW from "./locales/zh-TW.json";
 import jaJP from "./locales/ja-JP.json";
+// 业务全量字典（旧 DICTS）由 I18nProvider 模块经 mergeDicts 注入底层资源
+// （避免 i18next ↔ index 循环导入）：JSON 语言包为已迁移核心文本，同名键以 JSON 为准。
 
 export const I18NEXT_LOCALES = ["zh-CN", "en-US", "zh-TW", "ja-JP"] as const;
+
+export type Dict = Record<string, string>;
+
+/** 把业务字典并入对应语言资源（JSON 键优先覆盖）；幂等，可在 DICTS 就绪后调用。 */
+export function mergeDicts(dict: Record<string, Dict>) {
+  for (const [lng, d] of Object.entries(dict)) {
+    const existing = i18n.getResourceBundle(lng, "translation") ?? {};
+    i18n.addResourceBundle(lng, "translation", { ...d, ...existing }, true, true);
+  }
+}
 
 void i18n.use(initReactI18next).init({
   resources: {

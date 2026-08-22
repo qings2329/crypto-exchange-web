@@ -139,8 +139,17 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
         return;
       }
       const isMarket = orderType === "market";
+      // 先落服务端（POST /spot/order，契约对齐 Go spotapi.handleOrder），成功后本地镜像
+      let serverId = "";
+      try {
+        const r = await api.placeOrder(symbol, side, effectivePrice, qty);
+        serverId = String(r.order_id);
+      } catch (e) {
+        toast.error((e as Error).message || t("common.requestFailed"));
+        return;
+      }
       const order: TradeOrder = {
-        id: `SIM-${Date.now().toString(36).toUpperCase()}`,
+        id: `SPOT-${serverId}`,
         symbol,
         side,
         type: orderType,

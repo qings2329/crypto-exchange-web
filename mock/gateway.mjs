@@ -715,16 +715,78 @@ app.post("/api/v1/futures/order", (req, res) => {
   return ok(res, { order_id: String(oid), status: "accepted", realized_pnl: r2(pnl) });
 });
 
+// TP/SL：按 (uid, symbol, side) 持久化；Go 后端暂无条件单端点，契约预留 tpsl 字段
+const futuresTpSl = new Map(); // uid -> Map(`${symbol}|${side}` -> { tp, sl })
+
+app.put("/api/v1/futures/tpsl", (req, res) => {
+  const uid = req.user.sub;
+  const b = req.body || {};
+  const symbol = String(b.symbol || "").toUpperCase();
+  const side = b.pos_side;
+  const tp = b.tp == null ? null : Number(b.tp);
+  const sl = b.sl == null ? null : Number(b.sl);
+  if (!["long", "short"].includes(side)) return fail(res, 400, "pos_side 必须为 long/short");
+  if (tp != null && !(tp > 0)) return fail(res, 400, "tp 非法");
+  if (sl != null && !(sl > 0)) return fail(res, 400, "sl 非法");
+  if (tp == null && sl == null) return fail(res, 400, "tp/sl 至少填一项");
+  const pos = (futuresPosStore.get(uid) ?? []).find((p) => p.Symbol === symbol && p.Side === side);
+  if (!pos) return fail(res, 404, "position not found");
+  if (!futuresTpSl.has(uid)) futuresTpSl.set(uid, new Map());
+  futuresTpSl.get(uid).set(`${symbol}|${side}`, { tp, sl });
+  appendAudit(req.user, "futures.tpsl", `${symbol} ${side}`, `TP ${tp ?? "--"} / SL ${sl ?? "--"}`);
+  ok(res, { symbol, pos_side: side, tp, sl });
+});
+
 app.get("/api/v1/futures/positions", (req, res) => {
   const uid = req.user.sub;
   const symbol = req.query.symbol;
-  let list = futuresPosStore.get(uid) ?? [];
+  let list = (futuresPosStore.get(uid) ?? []).map((p) => {
+    const ts = futuresTpSl.get(uid)?.get(`${p.Symbol}|${p.Side}`);
+    return ts ? { ...p, TP: ts.tp, SL: ts.sl } : { ...p };
+  });
   if (symbol) list = list.filter((p) => p.Symbol === symbol.toString());
   ok(res, {
     mark_price: symbol ? futuresMarkPrice(symbol.toString()) : null,
     positions: list,
     cross_balances: {},
   });
+});
+
+// ---------- 合约资金费率/指数价（契约对齐 Go futuresapi handleFunding / handleIndex）----------
+// 指数价 = 行情最新价的确定性微扰（模拟多所聚合）；资金费率由溢价 EMA 派生。
+function indexPriceOf(symbol) {
+  const m = getMarket(symbol);
+  if (!m) return null;
+  const s = seedFrom(`idx-${symbol}`);
+  return r2(m.price * (1 + ((s >>> 3) % 7 - 3) / 10000));
+}
+
+app.get("/api/v1/futures/funding", (req, res) => {
+  const symbol = String(req.query.symbol || "").toUpperCase();
+  const idx = indexPriceOf(symbol);
+  if (idx == null) return fail(res, 400, "unknown symbol");
+  const m = getMarket(symbol);
+  const premium = r2((m.price - idx) / idx);
+  // clamp ±0.75%：对齐 Go futures.FundingRate 的利率+溢价封顶语义
+  const rate = Math.max(-0.0075, Math.min(0.0075, 0.0001 + premium));
+  ok(res, {
+    symbol,
+    index_price: idx,
+    mark_price: r2(m.price),
+    premium_ema: premium,
+    funding_rate: rate,
+    last_settle_rate: rate,
+    funding_interval: 28800,
+  });
+});
+
+app.get("/api/v1/futures/index", (_req, res) => {
+  const out = {};
+  for (const sym of ["BTCUSDT", "ETHUSDT"]) {
+    const px = indexPriceOf(sym);
+    if (px != null) out[sym] = px;
+  }
+  ok(res, { index_prices: out, raw_samples: [] });
 });
 
 // ---------- 交易机器人（契约对齐 Go internal/bot/handler.go）----------

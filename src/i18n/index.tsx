@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import i18next from "./i18next";
+import i18next, { mergeDicts } from "./i18next";
 
 // 轻量国际化（业务全量字典）+ react-i18next（核心文本 JSON 语言包）双轨：
 // - locale 单一来源在本 Provider，变化时同步 changeLanguage 到 i18next；
@@ -3730,6 +3730,9 @@ const jaJP: Dict = {
 };
 
 const DICTS: Record<Locale, Dict> = { "zh-CN": zhCN, "en-US": enUS, "zh-TW": zhTW, "ja-JP": jaJP };
+
+// 字典就绪后并入 i18next 资源（useI18n/useTranslation 同源的唯一真相）
+mergeDicts(DICTS);
 const STORAGE_KEY = "cx_locale";
 
 interface I18nValue {
@@ -3757,14 +3760,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     void i18next.changeLanguage(locale);
   }, [locale]);
 
-  const t = (key: string, vars?: Record<string, string | number>) => {
-    const dict = DICTS[locale] ?? zhCN;
-    let s: string | undefined = dict[key];
-    if (s == null) s = zhCN[key]; // 回退到中文
-    if (s == null) s = key; // 兜底
-    if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
-    return s;
-  };
+  // 统一真相源：委托 i18next（资源=DICTS∪JSON 语言包），与 useTranslation 输出完全一致。
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    vars ? i18next.t(key, { replace: vars }) : i18next.t(key);
 
   return <I18nCtx.Provider value={{ locale, setLocale: setLocaleState, t }}>{children}</I18nCtx.Provider>;
 }

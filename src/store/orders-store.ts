@@ -24,6 +24,8 @@ export interface TradeOrder {
 
 interface OrdersState {
   orders: TradeOrder[];
+  /** 服务端水合：用后端订单替换某交易对的本地镜像（服务端为真相源） */
+  hydrate: (symbol: string, orders: TradeOrder[]) => void;
   place: (order: TradeOrder) => void;
   cancel: (id: string) => void;
   fill: (id: string) => void;
@@ -47,6 +49,11 @@ export function findFillable(open: TradeOrder[], symbol: string, lastPrice: numb
 
 export const useOrdersStore = create<OrdersState>((set) => ({
   orders: [],
+
+  hydrate: (symbol, orders) =>
+    set((s) => ({
+      orders: [...orders, ...s.orders.filter((o) => o.symbol !== symbol)],
+    })),
 
   place: (order) => set((s) => ({ orders: [order, ...s.orders] })),
 

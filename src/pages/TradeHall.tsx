@@ -13,7 +13,9 @@
 // - 限价挂单随行情穿越自动撮合（orders-store.fillMatching）。
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { api } from "../api/client";
 import { TradingViewChart, type ChartInterval } from "../components/trade/TradingViewChart";
 import { OrderBook } from "../components/trade/OrderBook";
 import { RecentTrades } from "../components/trade/RecentTrades";
@@ -44,6 +46,13 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   const [mode, setMode] = useState<MarketMode>(initialMode);
   const [bottomTab, setBottomTab] = useState<BottomTab>("orders");
   const { ticker, status } = useTickerLive(symbol);
+  // 永续专属：指数价/标记价/资金费率（契约对齐 Go futuresapi.handleFunding）
+  const { data: funding } = useQuery({
+    queryKey: ["futures-funding", symbol],
+    queryFn: () => api.futuresFunding(symbol),
+    enabled: mode === "perp",
+    refetchInterval: 30_000,
+  });
   const fillMatching = useOrdersStore((s) => s.fillMatching);
   // lg+ 桌面终端布局；以下单实例分支挂载，避免双份 WS 订阅
   const isDesktop = useMediaQuery("(min-width: 1024px)");
@@ -91,12 +100,12 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
         {bottomTab === "positions" ? (
           <PositionsPanel symbol={symbol} />
         ) : (
-          <OrdersPanel symbol={symbol} initialTab={bottomTab === "history" ? "history" : "open"} />
+          <OrdersPanel symbol={symbol} market="perp" initialTab={bottomTab === "history" ? "history" : "open"} />
         )}
       </div>
     </div>
   ) : (
-    <OrdersPanel symbol={symbol} />
+    <OrdersPanel symbol={symbol} market="spot" />
   );
 
   // K 线图节点（桌面网格与移动端滑动视图共用同一实例位置，按断点二选一挂载）
@@ -172,6 +181,21 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
           <Stat label="24h High" value={ticker ? fmtPrice(ticker.highPrice) : "--"} />
           <Stat label="24h Low" value={ticker ? fmtPrice(ticker.lowPrice) : "--"} />
           <Stat label={`24h Volume (${base})`} value={ticker ? fmtQty(ticker.volume) : "--"} />
+          {mode === "perp" && (
+            <>
+              <Stat label="Index Price" value={funding ? fmtPrice(funding.index_price) : "--"} testId="index-price" />
+              <Stat
+                label="Funding / Countdown"
+                value={
+                  funding
+                    ? `${(funding.funding_rate * 100).toFixed(4)}% · ${String(Math.floor((funding.funding_interval % 3600) / 60)).padStart(2, "0")}:${String(funding.funding_interval % 60).padStart(2, "0")}`
+                    : "--"
+                }
+                tone={(funding?.funding_rate ?? 0) >= 0 ? "buy" : "sell"}
+                testId="funding-rate"
+              />
+            </>
+          )}
         </dl>
       </div>
 
@@ -216,11 +240,30 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  tone,
+  testId,
+}: {
+  label: string;
+  value: string;
+  tone?: "buy" | "sell";
+  testId?: string;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-muted">{label}</dt>
-      <dd className="font-mono font-semibold tabular-nums">{value}</dd>
+      <dd
+        data-testid={testId}
+        className={cn(
+          "font-mono font-semibold tabular-nums",
+          tone === "buy" && "text-buy",
+          tone === "sell" && "text-sell"
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

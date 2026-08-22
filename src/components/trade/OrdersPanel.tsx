@@ -3,8 +3,9 @@
 // - 历史订单：已成交 + 已撤销；
 // - 币安表格规范：粘性表头、行 hover 高亮、tabular-nums、买卖红绿。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { api } from "../../api/client";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { useToast } from "../Toast";
 import { fmtPrice, fmtQty, fmtTime } from "../../lib/format";
@@ -14,15 +15,69 @@ interface Props {
   symbol: string; // BTCUSDT
   /** 初始 Tab（永续模式底部容器切换到委托/历史时使用） */
   initialTab?: Tab;
+  /** 市场类型：决定拉取现货/合约订单服务端数据（缺省 spot） */
+  market?: "spot" | "perp";
 }
 
 type Tab = "open" | "history";
 
-export function OrdersPanel({ symbol, initialTab = "open" }: Props) {
+/** 服务端订单 → 本地镜像结构 */
+function toLocalOrder(o: {
+  id: number | string;
+  symbol: string;
+  side: string;
+  price: number;
+  qty: number;
+  status: string;
+  created_at?: number;
+}): TradeOrder {
+  const status = o.status === "open" || o.status === "filled" ? o.status : "canceled";
+  return {
+    id: `SRV-${o.id}`,
+    symbol: o.symbol,
+    side: o.side === "sell" ? "sell" : "buy",
+    type: "limit",
+    price: Number(o.price) || 0,
+    qty: Number(o.qty) || 0,
+    total: (Number(o.price) || 0) * (Number(o.qty) || 0),
+    ts: o.created_at ? Number(o.created_at) : Date.now(),
+    status,
+    settledTs: status !== "open" ? (o.created_at ? Number(o.created_at) : undefined) : undefined,
+  };
+}
+
+export function OrdersPanel({ symbol, initialTab = "open", market = "spot" }: Props) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>(initialTab);
   // 注意：选择器必须返回稳定引用（Zustand v5），过滤放到组件内 useMemo
   const orders = useOrdersStore((s) => s.orders);
+  const hydrate = useOrdersStore((s) => s.hydrate);
+
+  // 服务端为真相源：挂载即拉取，之后每 5s 轮询对账（本地乐观更新仅作即时反馈）
+  useEffect(() => {
+    let alive = true;
+    const pull = async () => {
+      try {
+        if (market === "perp") {
+          const list = await api.futuresOrders({ symbol });
+          if (!alive) return;
+          hydrate(symbol, (list ?? []).map(toLocalOrder));
+        } else {
+          const list = await api.spotOrders({ symbol });
+          if (!alive) return;
+          hydrate(symbol, (list ?? []).map(toLocalOrder));
+        }
+      } catch {
+        /* 未登录/网络失败时保留本地镜像 */
+      }
+    };
+    void pull();
+    const timer = setInterval(pull, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [symbol, market, hydrate]);
   const cancel = useOrdersStore((s) => s.cancel);
   const toast = useToast();
 

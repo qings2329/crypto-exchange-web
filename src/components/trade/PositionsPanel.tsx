@@ -218,10 +218,21 @@ function PositionRow({ pos }: { pos: Position }) {
         <TpSlModal
           pos={pos}
           onClose={() => setTpslOpen(false)}
-          onSave={(tp, sl) => {
-            setTpSl(pos.id, tp, sl);
-            setTpslOpen(false);
-            toast.success("TP/SL updated");
+          onSave={async (tp, sl) => {
+            try {
+              // 服务端持久化（PUT /futures/tpsl），成功后本地镜像；轮询水合不会丢失
+              await api.futuresSetTpSl({
+                symbol: pos.symbol,
+                pos_side: pos.side,
+                tp: tp ?? null,
+                sl: sl ?? null,
+              });
+              setTpSl(pos.id, tp, sl);
+              setTpslOpen(false);
+              toast.success("TP/SL updated");
+            } catch (e) {
+              toast.error((e as Error).message || "TP/SL update failed");
+            }
           }}
         />
       )}
