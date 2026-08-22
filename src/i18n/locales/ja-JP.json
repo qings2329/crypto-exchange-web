@@ -312,5 +312,6 @@
   "kyc.limitFutures": "先物取引",
   "kyc.entitled": "利用可",
   "kyc.notEntitled": "利用不可",
-  "kyc.compareItem": "特典項目"
+  "kyc.compareItem": "特典項目",
+  "security.verify.risk.apikey": "機密性の高い権限を含む API キーを作成または取り消そうとしています。確認のため認証を完了してください。"
 }

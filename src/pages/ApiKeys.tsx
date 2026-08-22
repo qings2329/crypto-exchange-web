@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type ApiKey, type ApiKeyPermission } from "../api/client";
 import { useI18n } from "../i18n";
+import { useSecureAction } from "../components/security/SecureActionProvider";
 import { formatDateTime } from "../lib/timezone";
 
 const PERMS: ApiKeyPermission[] = ["read", "trade", "withdraw"];
@@ -46,6 +47,7 @@ function parseIps(text: string): string[] {
 
 export function ApiKeys() {
   const { t } = useI18n();
+  const secureAction = useSecureAction();
   const [list, setList] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -158,6 +160,11 @@ export function ApiKeys() {
       setErr(t("apikeys.needPerm"));
       return;
     }
+    // 含提现权限的密钥属高危资产入口：滑块 + 二次验证后才能创建
+    if (form.permissions.includes("withdraw")) {
+      const ok = await secureAction.verify({ action: "apikey" });
+      if (!ok) return;
+    }
     setCreating(true);
     setErr("");
     try {
@@ -198,6 +205,9 @@ export function ApiKeys() {
 
   async function remove(k: ApiKey) {
     if (!confirm(t("apikeys.confirmRevoke", { label: k.label }))) return;
+    // 撤销密钥不可恢复：二次验证确认操作者身份
+    const ok = await secureAction.verify({ action: "apikey" });
+    if (!ok) return;
     setErr("");
     try {
       await api.apiKeyDelete(k.id);

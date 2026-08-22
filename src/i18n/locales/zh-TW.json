@@ -312,5 +312,6 @@
   "kyc.limitFutures": "合約交易",
   "kyc.entitled": "已開通",
   "kyc.notEntitled": "未開通",
-  "kyc.compareItem": "權益項"
+  "kyc.compareItem": "權益項",
+  "security.verify.risk.apikey": "您正在建立或撤銷含敏感權限的 API 密鑰。請完成二次驗證以確認操作。"
 }

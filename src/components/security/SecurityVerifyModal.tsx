@@ -14,7 +14,7 @@ import { useSecurityStore } from "../../store/security-store";
 import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/utils";
 
-export type SensitiveAction = "withdraw" | "password" | "unbind2fa" | "generic";
+export type SensitiveAction = "withdraw" | "password" | "unbind2fa" | "apikey" | "generic";
 
 interface Props {
   action: SensitiveAction;

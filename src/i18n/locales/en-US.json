@@ -312,5 +312,6 @@
   "kyc.limitFutures": "Futures trading",
   "kyc.entitled": "Enabled",
   "kyc.notEntitled": "Not enabled",
-  "kyc.compareItem": "Benefit"
+  "kyc.compareItem": "Benefit",
+  "security.verify.risk.apikey": "You are creating or revoking an API key with sensitive permissions. Verify to confirm."
 }
