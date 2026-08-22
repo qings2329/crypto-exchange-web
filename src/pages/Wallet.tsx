@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type LedgerEntry } from "../api/client";
+import { api, type AddressBookEntry, type LedgerEntry } from "../api/client";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
 import { isValidCryptoAddress, validateAmount } from "../lib/validate";
@@ -192,10 +192,63 @@ export function Wallet() {
   const [formMsg, setFormMsg] = useState("");
   const [addrErr, setAddrErr] = useState("");
   const [amtErr, setAmtErr] = useState("");
+  // ---- 地址簿（白名单）----
+  const [book, setBook] = useState<AddressBookEntry[]>([]);
+  const [whitelist, setWhitelist] = useState(false);
+  // ---- 首次地址核对：未在簿地址提交前需勾选"我已核对" ----
+  const [addrConfirmed, setAddrConfirmed] = useState(false);
+
+  const loadBook = useCallback(() => {
+    api
+      .addressBookList()
+      .then((r) => {
+        setBook(r.entries);
+        setWhitelist(r.whitelist_active);
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    loadBook();
+  }, [loadBook]);
+
+  // 当前输入地址是否已在白名单中
+  const addressInBook = useMemo(
+    () =>
+      book.some((x) => x.address.toLowerCase() === address.trim().toLowerCase()),
+    [book, address]
+  );
+  // 首次使用（非白名单地址）需要核对；白名单开启且未命中时直接禁止提交
+  const needConfirm = isValidCryptoAddress(address) && !addressInBook;
+  const addrBlocked = whitelist && isValidCryptoAddress(address) && !addressInBook;
 
   const onAddressChange = (v: string) => {
     setAddress(v);
+    setAddrConfirmed(false);
     if (addrErr) setAddrErr("");
+  };
+  // 从地址簿快捷填充
+  const pickFromBook = (e: AddressBookEntry) => {
+    setAddress(e.address);
+    setAsset(e.asset || asset);
+    setNetwork(e.network || network);
+    setAddrConfirmed(true); // 白名单内地址视为已核对
+    setAddrErr("");
+  };
+  // 保存当前地址到地址簿
+  const [savingBook, setSavingBook] = useState(false);
+  const saveToBook = async () => {
+    if (!isValidCryptoAddress(address)) return;
+    setSavingBook(true);
+    try {
+      await api.addressBookAdd({ asset: asset || "USDT", network: network || undefined, address: address.trim(), label: "" });
+      loadBook();
+      setAddrConfirmed(true);
+    } catch {
+      // 重复添加等错误静默；白名单刷新后 addrBlocked 自然解除
+      loadBook();
+    } finally {
+      setSavingBook(false);
+    }
   };
   const onAmountChange = (v: string) => {
     setAmount(v);
@@ -230,6 +283,14 @@ export function Wallet() {
     }
     if (!isValidCryptoAddress(address)) {
       setAddrErr(t("wallet.errAddress"));
+      return;
+    }
+    if (addrBlocked) {
+      setAddrErr(t("wallet.errWhitelist"));
+      return;
+    }
+    if (needConfirm && !addrConfirmed) {
+      setAddrErr(t("wallet.errNeedCheck"));
       return;
     }
     const amtRes = validateAmount(amount);
@@ -325,14 +386,42 @@ export function Wallet() {
                 <option key={a} value={a} />
               ))}
             </datalist>
+            {whitelist && (
+              <div className="ok" data-testid="withdraw-whitelist-hint">
+                🔒 {t("wallet.whitelistOn", { n: book.length })}
+              </div>
+            )}
             <label>
               {t("wallet.address")}
               <input value={address} onChange={(e) => onAddressChange(e.target.value)} placeholder={t("wallet.phAddress")} />
-              {address.length >= 8 && (
-                <div className="mono" data-testid="withdraw-address-masked">
-                  {t("wallet.addressConfirm")}{" "}
-                  <SecureText value={address} mask maskOpts={{ leading: 6, trailing: 6 }} />
+              {book.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }} data-testid="withdraw-book-chips">
+                  {book.slice(0, 4).map((e) => (
+                    <button type="button" key={e.id} className="btn" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => pickFromBook(e)} title={`${e.label} · ${e.network || ""} · ${e.address.slice(0, 10)}…`}>
+                      {e.label}
+                    </button>
+                  ))}
                 </div>
+              )}
+              {address.length >= 8 && (
+                <>
+                  <div className="mono" data-testid="withdraw-address-masked">
+                    {t("wallet.addressConfirm")}{" "}
+                    <SecureText value={address} mask maskOpts={{ leading: 6, trailing: 6 }} />
+                  </div>
+                  {/* 首次使用的地址：强制人工核对 */}
+                  {needConfirm && !addrBlocked && (
+                    <label className="checkbox" data-testid="withdraw-first-confirm">
+                      <input type="checkbox" checked={addrConfirmed} onChange={(e) => setAddrConfirmed(e.target.checked)} />
+                      {t("wallet.checkFirstUse")}
+                    </label>
+                  )}
+                  {!addressInBook && isValidCryptoAddress(address) && (
+                    <button type="button" className="btn" onClick={() => void saveToBook()} disabled={savingBook}>
+                      {savingBook ? t("common.loading") : t("wallet.saveToBook")}
+                    </button>
+                  )}
+                </>
               )}
               {addrErr && <div className="error">{addrErr}</div>}
             </label>

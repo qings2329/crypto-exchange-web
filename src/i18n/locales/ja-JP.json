@@ -313,5 +313,10 @@
   "kyc.entitled": "利用可",
   "kyc.notEntitled": "利用不可",
   "kyc.compareItem": "特典項目",
-  "security.verify.risk.apikey": "機密性の高い権限を含む API キーを作成または取り消そうとしています。確認のため認証を完了してください。"
+  "security.verify.risk.apikey": "機密性の高い権限を含む API キーを作成または取り消そうとしています。確認のため認証を完了してください。",
+  "wallet.whitelistOn": "🔒 ホワイトリスト有効（{n} 件）— 登録済みアドレスのみ送金可能",
+  "wallet.checkFirstUse": "アドレスを確認しました（初回使用時は必須）",
+  "wallet.saveToBook": "アドレス帳に保存",
+  "wallet.errWhitelist": "アドレスがホワイトリストにありません。先にアドレス帳へ追加してください",
+  "wallet.errNeedCheck": "初めてのアドレスです。確認チェックボックスに勾選してください"
 }

@@ -313,5 +313,10 @@
   "kyc.entitled": "已开通",
   "kyc.notEntitled": "未开通",
   "kyc.compareItem": "权益项",
-  "security.verify.risk.apikey": "您正在创建或撤销含敏感权限的 API 密钥。请完成二次验证以确认操作。"
+  "security.verify.risk.apikey": "您正在创建或撤销含敏感权限的 API 密钥。请完成二次验证以确认操作。",
+  "wallet.whitelistOn": "🔒 白名单已启用（{n} 个地址），仅可提到簿内地址",
+  "wallet.checkFirstUse": "我已仔细核对该地址无误（首次使用需确认）",
+  "wallet.saveToBook": "保存到地址簿",
+  "wallet.errWhitelist": "提现地址不在白名单内，请先在地址簿中添加",
+  "wallet.errNeedCheck": "首次使用的地址，请先勾选核对确认"
 }

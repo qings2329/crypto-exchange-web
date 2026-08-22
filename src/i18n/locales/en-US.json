@@ -313,5 +313,10 @@
   "kyc.entitled": "Enabled",
   "kyc.notEntitled": "Not enabled",
   "kyc.compareItem": "Benefit",
-  "security.verify.risk.apikey": "You are creating or revoking an API key with sensitive permissions. Verify to confirm."
+  "security.verify.risk.apikey": "You are creating or revoking an API key with sensitive permissions. Verify to confirm.",
+  "wallet.whitelistOn": "🔒 Whitelist enabled ({n} addresses) — only whitelisted addresses are allowed",
+  "wallet.checkFirstUse": "I have carefully verified this address (required for first use)",
+  "wallet.saveToBook": "Save to address book",
+  "wallet.errWhitelist": "Address not in whitelist. Add it to the address book first.",
+  "wallet.errNeedCheck": "First-time address: please tick the verification checkbox"
 }

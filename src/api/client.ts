@@ -296,6 +296,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  // ---- 提现地址簿（白名单） ----
+  // GET /api/v1/futures/wallet/address-book 白名单条目；whitelist_active 表示已启用白名单提现。
+  addressBookList: () =>
+    request<{ entries: AddressBookEntry[]; whitelist_active: boolean }>(
+      "/api/v1/futures/wallet/address-book"
+    ),
+  // POST 新增地址（同地址重复返回 409）。
+  addressBookAdd: (payload: { asset: string; network?: string; address: string; label?: string }) =>
+    request<AddressBookEntry>("/api/v1/futures/wallet/address-book", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // DELETE 移除地址。
+  addressBookRemove: (id: number) =>
+    request<{ ok: boolean }>(`/api/v1/futures/wallet/address-book/${id}`, { method: "DELETE" }),
+
   // GET /api/v1/futures/orders 本人合约订单（后端返回 {orders:[]}）。
   futuresOrders: async (params?: { symbol?: string; status?: string; limit?: number }) => {
     const d = await request<{ orders: OrderView[] }>(
@@ -1085,6 +1102,17 @@ export interface NotificationInput {
 }
 
 // ---------- 管理总览 ----------
+// 提现地址簿条目（GET/POST /api/v1/futures/wallet/address-book）。
+export interface AddressBookEntry {
+  id: number;
+  user_id: number;
+  asset: string;
+  network?: string;
+  address: string;
+  label: string;
+  added_at?: string;
+}
+
 // 后台总览 KPI（GET /api/v1/admin/overview 返回）。
 export interface AdminOverview {
   users_total: number;

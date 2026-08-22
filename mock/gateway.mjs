@@ -19,6 +19,13 @@ import http from "node:http";
 import { WebSocketServer } from "ws";
 import crypto from "node:crypto";
 import { authRouter, gateway, authorize, getUserById, roleAtLeast, users } from "./gateway-auth.mjs";
+
+// 与前端 src/lib/validate.ts 保持一致的地址校验
+function isValidCryptoAddress(s) {
+  const v = String(s ?? "").trim();
+  if (/^0x[a-fA-F0-9]{40}$/.test(v)) return true;
+  return /^[A-Za-z0-9]{25,90}$/.test(v) && !/\s/.test(v);
+}
 import { buildAdminApp, notFound } from "./admin-api.mjs";
 import { pushEvents, summary, recentEvents } from "./monitor-store.mjs";
 import { getSim, intervalToMs } from "./kline-server.mjs";
@@ -112,6 +119,24 @@ const spotTrades = [];
 const futuresOrders = [];
 const futuresTrades = [];
 const futuresWithdrawRecords = [];
+
+// ---------- 提现地址簿（白名单） ----------
+const addressBooks = new Map(); // userId -> [{ id, asset, network, address, label, added_at }]
+seedAddressBook(3);
+function seedAddressBook(userId) {
+  addressBooks.set(userId, [
+    { id: nextId(), user_id: userId, asset: "USDT", network: "ERC20", address: "0x8Ba1f109551bD432803012645Ac136ddd64DBA72", label: "MetaMask 主钱包", added_at: new Date(Date.now() - 7 * 86400e3).toISOString() },
+    { id: nextId(), user_id: userId, asset: "USDT", network: "TRC20", address: "TXk8L2nPQ7sYvVrH4mZcJdFgWq9bAu1E3yRiS5tD", label: "交易所冷钱包", added_at: new Date(Date.now() - 2 * 86400e3).toISOString() },
+  ]);
+}
+function bookOf(userId) {
+  let b = addressBooks.get(userId);
+  if (!b) {
+    b = [];
+    addressBooks.set(userId, b);
+  }
+  return b;
+}
 
 // ---------- 风控事件 / 审计日志（演示数据 + 处置联动） ----------
 const riskEvents = [
@@ -500,6 +525,28 @@ app.get("/api/v1/spot/trades", (req, res) => {
 });
 
 // ---------- 合约资金流水 ----------
+// 余额：与前端 use-mock-balances 同一确定性派生（seed = session-<uid>），保证两处数字一致
+function seedFrom(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+app.get("/api/v1/futures/wallet/balance", (req, res) => {
+  const s = seedFrom(`session-${req.user.sub}`);
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const r4 = (n) => Math.round(n * 10000) / 10000;
+  const usdt = 5000 + (s % 45000) + ((s >>> 8) % 100) / 100;
+  const btc = 0.05 + ((s >>> 4) % 900) / 1000;
+  const eth = 0.8 + ((s >>> 6) % 1200) / 100;
+  ok(res, [
+    { asset: "USDT", available: r2(usdt - usdt * (((s >>> 12) % 800) / 10000)), frozen: r2(usdt * (((s >>> 12) % 800) / 10000)) },
+    { asset: "BTC", available: r4(btc - btc * (((s >>> 16) % 1500) / 10000)), frozen: r4(btc * (((s >>> 16) % 1500) / 10000)) },
+    { asset: "ETH", available: r4(eth - eth * (((s >>> 20) % 1500) / 10000)), frozen: r4(eth * (((s >>> 20) % 1500) / 10000)) },
+  ]);
+});
 app.get("/api/v1/futures/wallet/ledger", (req, res) => {
   const { asset } = req.query;
   const entries = [
@@ -526,6 +573,12 @@ app.get("/api/v1/futures/trades", (req, res) => {
 });
 app.post("/api/v1/futures/wallet/withdraw", (req, res) => {
   const b = req.body || {};
+  // 白名单：已设置地址簿的用户只能提到簿内地址
+  const book = bookOf(req.user.sub);
+  if (book.length > 0) {
+    const hit = book.some((x) => x.address.toLowerCase() === String(b.address || "").trim().toLowerCase());
+    if (!hit) return fail(res, 403, "提现地址不在白名单内，请先在地址簿中添加并验证");
+  }
   const id = nextId();
   const rec = {
     id,
@@ -540,6 +593,35 @@ app.post("/api/v1/futures/wallet/withdraw", (req, res) => {
   futuresWithdrawRecords.push(rec);
   ok(res, { order_id: id, status: "pending" }, 201);
 });
+// ---------- 地址簿 ----------
+app.get("/api/v1/futures/wallet/address-book", (req, res) => {
+  const list = [...bookOf(req.user.sub)].sort((a, b) => b.id - a.id);
+  ok(res, { entries: list, whitelist_active: list.length > 0 });
+});
+app.post("/api/v1/futures/wallet/address-book", (req, res) => {
+  const b = req.body || {};
+  const address = String(b.address || "").trim();
+  const asset = String(b.asset || "").trim().toUpperCase();
+  const label = String(b.label || "").trim().slice(0, 40);
+  if (!asset) return fail(res, 400, "资产必填");
+  if (!isValidCryptoAddress(address)) return fail(res, 400, "地址格式不正确");
+  const book = bookOf(req.user.sub);
+  if (book.some((x) => x.address.toLowerCase() === address.toLowerCase()))
+    return fail(res, 409, "该地址已存在");
+  const entry = { id: nextId(), user_id: req.user.sub, asset, network: String(b.network || "").trim(), address, label: label || "未命名", added_at: new Date().toISOString() };
+  book.push(entry);
+  appendAudit(req.user, "addressbook.add", `ADDR #${entry.id}`, `${label} ${address.slice(0, 10)}…`);
+  ok(res, entry, 201);
+});
+app.delete("/api/v1/futures/wallet/address-book/:id", (req, res) => {
+  const book = bookOf(req.user.sub);
+  const i = book.findIndex((x) => x.id === Number(req.params.id));
+  if (i < 0) return fail(res, 404, "地址不存在");
+  const [rm] = book.splice(i, 1);
+  appendAudit(req.user, "addressbook.remove", `ADDR #${rm.id}`, rm.label);
+  ok(res, { ok: true });
+});
+
 // 提现记录列表：admin/operator 见全部，普通用户仅本人
 app.get("/api/v1/futures/wallet/withdraws", (req, res) => {
   const role = req.user.role ?? "user";
