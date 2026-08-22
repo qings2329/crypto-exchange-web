@@ -21,14 +21,13 @@ vi.mock("lightweight-charts", () => ({
   HistogramSeries: class {},
 }));
 
-// 实时流：直接 mock 掉，返回离线状态，避免建立 WS 连接。
-vi.mock("../../hooks/use-kline-live", () => ({
-  useKlineLive: vi.fn(() => "closed"),
-}));
-
-// REST 种子：mock fetchKlines 使其 reject，触发 useQuery 的 isError 分支。
-vi.mock("../../services/binance", () => ({
-  fetchKlines: vi.fn().mockRejectedValue(new Error("network down")),
+// REST 种子与实时流：均走自建后端（../../api/client），mock 使其 reject / 不建立连接，
+// 触发 useQuery 的 isError 分支，覆盖层渲染 InlineError。
+vi.mock("../../api/client", () => ({
+  api: {
+    getKline: vi.fn().mockRejectedValue(new Error("network down")),
+  },
+  connectKlineWS: vi.fn(() => () => {}),
 }));
 
 import { TradingViewChart } from "./TradingViewChart";

@@ -122,11 +122,11 @@ export function Wallet() {
   const { t } = useI18n();
   const secureAction = useSecureAction();
   const [balance, setBalance] = useState<unknown>(undefined);
-  const [balanceErr, setBalanceErr] = useState("");
+  const [balanceErr, setBalanceErr] = useState<unknown>(undefined);
   const [withdraws, setWithdraws] = useState<unknown>(undefined);
-  const [withdrawsErr, setWithdrawsErr] = useState("");
+  const [withdrawsErr, setWithdrawsErr] = useState<unknown>(undefined);
   const [ledger, setLedger] = useState<LedgerEntry[] | undefined>(undefined);
-  const [ledgerErr, setLedgerErr] = useState("");
+  const [ledgerErr, setLedgerErr] = useState<unknown>(undefined);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("");
 
@@ -139,21 +139,23 @@ export function Wallet() {
     ]);
     if (b.status === "fulfilled") {
       setBalance(b.value);
-      setBalanceErr("");
+      setBalanceErr(undefined);
     } else {
-      setBalanceErr((b.reason as Error).message);
+      // 传递错误对象而非仅 .message：保留 ApiError.status，
+      // 使 InlineError 按状态码判定（401=未登录 / 403=权限不足），而非脆弱的正则兜底。
+      setBalanceErr(b.reason);
     }
     if (w.status === "fulfilled") {
       setWithdraws(w.value);
-      setWithdrawsErr("");
+      setWithdrawsErr(undefined);
     } else {
-      setWithdrawsErr((w.reason as Error).message);
+      setWithdrawsErr(w.reason);
     }
     if (l.status === "fulfilled") {
       setLedger(l.value as LedgerEntry[]);
-      setLedgerErr("");
+      setLedgerErr(undefined);
     } else {
-      setLedgerErr((l.reason as Error).message);
+      setLedgerErr(l.reason);
     }
     setLoading(false);
   }, []);

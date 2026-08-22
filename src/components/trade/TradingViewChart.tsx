@@ -16,14 +16,13 @@ import {
   type Time,
 } from "lightweight-charts";
 import { useQuery } from "@tanstack/react-query";
-import { fetchKlines } from "../../services/binance";
-import { useKlineLive } from "../../hooks/use-kline-live";
+import { api, connectKlineWS, type Kline } from "../../api/client";
+import type { BinanceWsStatus } from "../../services/binance-ws";
 import { fmtPrice } from "../../lib/format";
 import { cn } from "../../lib/utils";
 import { Skeleton } from "../ui/skeleton";
 import { StreamDot } from "./StreamDot";
 import { InlineError } from "../InlineError";
-import type { Kline } from "../../types";
 
 export const INTERVALS = ["1m", "15m", "1h", "1d"] as const;
 export type ChartInterval = (typeof INTERVALS)[number];
@@ -56,10 +55,11 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
   const candlesRef = useRef<Kline[]>([]);
   const [themeVer, setThemeVer] = useState(0);
 
-  // REST 种子数据
+  // REST 种子数据：走自建后端 /api/v1/market/kline（经 Vite 代理），
+  // 而非直连 api.binance.com，规避受限网络下的地域封锁。
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["binanceKlines", symbol, interval, limit],
-    queryFn: () => fetchKlines(symbol, interval, limit),
+    queryKey: ["klines", symbol, interval, limit],
+    queryFn: () => api.getKline(symbol, interval, limit),
     staleTime: 60_000,
   });
 
@@ -74,18 +74,33 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     seededRef.current = true;
   }, [data]);
 
-  // WS 实时增量：合并最后一根/追加新根，仅 update 当前 bar
-  const wsStatus = useKlineLive(symbol, interval, (k) => {
-    const list = candlesRef.current;
-    if (list.length === 0) return; // 种子未到，REST 会带回最新一根
-    const last = list[list.length - 1];
-    if (k.time < last.time) return;
-    const next = k.time === last.time ? [...list.slice(0, -1), k] : [...list, k];
-    candlesRef.current = next;
-    if (!seededRef.current) return;
-    candleRef.current?.update(toCandle(k));
-    volRef.current?.update(toVolume(k));
-  });
+  // WS 实时增量：走自建后端 /api/v1/market/kline/ws（与 KLineChart 一致），
+  // 合并最后一根/追加新根，仅 update 当前 bar；连接状态驱动顶栏指示灯。
+  const [wsStatus, setWsStatus] = useState<BinanceWsStatus>("idle");
+  useEffect(() => {
+    setWsStatus("connecting");
+    const stop = connectKlineWS(
+      symbol,
+      interval,
+      (k) => {
+        const list = candlesRef.current;
+        if (list.length === 0) return; // 种子未到，REST 会带回最新一根
+        const last = list[list.length - 1];
+        if (k.t < last.t) return;
+        const next = k.t === last.t ? [...list.slice(0, -1), k] : [...list, k];
+        candlesRef.current = next;
+        if (!seededRef.current) return;
+        candleRef.current?.update(toCandle(k));
+        volRef.current?.update(toVolume(k));
+      },
+      () => setWsStatus("closed"),
+    );
+    setWsStatus("open");
+    return () => {
+      stop();
+      setWsStatus("closed");
+    };
+  }, [symbol, interval]);
 
   // 建图（一次）与销毁
   useEffect(() => {
@@ -164,7 +179,7 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     });
   }, [themeVer]);
 
-  const lastClose = candlesRef.current.at(-1)?.close;
+  const lastClose = candlesRef.current.at(-1)?.c;
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
@@ -221,13 +236,13 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
 }
 
 function toCandle(k: Kline): CandlestickData<Time> {
-  return { time: (k.time / 1000) as Time, open: k.open, high: k.high, low: k.low, close: k.close };
+  return { time: (k.t / 1000) as Time, open: k.o, high: k.h, low: k.l, close: k.c };
 }
 
 function toVolume(k: Kline): HistogramData<Time> {
   return {
-    time: (k.time / 1000) as Time,
-    value: k.volume,
-    color: k.close >= k.open ? "rgba(14,203,129,0.45)" : "rgba(246,70,93,0.45)",
+    time: (k.t / 1000) as Time,
+    value: k.v,
+    color: k.c >= k.o ? "rgba(14,203,129,0.45)" : "rgba(246,70,93,0.45)",
   };
 }

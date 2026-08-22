@@ -71,9 +71,12 @@ async function refreshAccessToken(): Promise<string> {
       body: JSON.stringify({ refresh_token: rt }),
     });
     const body = await res.json().catch(() => null);
-    if (!res.ok || !body?.access_token) throw new ApiError("刷新失败", body?.code ?? -1, res.status);
-    tokenStore.set(body.access_token as string, rt, tokenStore.uid ?? undefined);
-    return body.access_token as string;
+    // 后端响应体为 {code,message,data}，data 内含新签发的双令牌；
+    // 旧 refresh_token 已被网关轮转失效，必须回写 data.refresh_token，否则下次刷新必然失败。
+    const data = body?.data;
+    if (!res.ok || !data?.access_token) throw new ApiError("刷新失败", body?.code ?? -1, res.status);
+    tokenStore.set(data.access_token as string, data.refresh_token as string, tokenStore.uid ?? undefined, tokenStore.role ?? undefined);
+    return data.access_token as string;
   })();
   try {
     return await refreshing;

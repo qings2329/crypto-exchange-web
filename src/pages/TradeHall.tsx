@@ -24,6 +24,7 @@ import { OrdersPanel } from "../components/trade/OrdersPanel";
 import { PositionsPanel } from "../components/trade/PositionsPanel";
 import { StreamDot } from "../components/trade/StreamDot";
 import { MobileSwipeViews } from "../components/trade/MobileSwipeViews";
+import { SymbolSelect } from "../components/trade/SymbolSelect";
 import { Badge } from "../components/ui/badge";
 import { useTickerLive } from "../hooks/use-ticker-live";
 import { useMediaQuery } from "../hooks/use-media-query";
@@ -68,6 +69,12 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   }, [symbol, last, fillMatching]);
 
   const degraded = status === "reconnecting" || status === "closed";
+
+  // 切换交易对：保留当前 /trade 或 /futures 路由前缀，更新 hash 触发重新加载。
+  const onSymbolChange = (s: string) => {
+    const prefix = location.hash.toLowerCase().startsWith("#/futures") ? "futures" : "trade";
+    location.hash = `#/${prefix}/${s}`;
+  };
 
   // 委托区：永续=持仓/委托/历史 Tab；现货=我的当前委托/历史订单（桌面与移动端共用）
   const ordersSection = mode === "perp" ? (
@@ -143,6 +150,7 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
       {/* 行情顶栏 */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-card px-4 py-2.5">
         <div className="flex items-baseline gap-2">
+          <SymbolSelect value={symbol} onChange={onSymbolChange} />
           <h1 className="text-lg font-bold">
             {base}
             <span className="text-muted">/{quote}</span>
