@@ -642,6 +642,98 @@ app.get("/api/v1/futures/positions", (req, res) => {
   });
 });
 
+// ---------- 交易机器人（契约对齐 Go internal/bot/handler.go）----------
+const botStrategiesStore = new Map(); // uid -> strategies[]
+const botOrdersStore = new Map(); // strategy_id -> orders[]
+let botSeq = 300;
+
+function botGridState(symbol, lower, upper) {
+  const mark = getMarket(symbol)?.price ?? (lower + upper) / 2;
+  return {
+    levels: [], position: 0, pnl: r4(Math.random() * 120 - 30),
+    trade_count: Math.floor(seedFrom(`bot-${symbol}`) % 40),
+    last_price: r2(mark), prev_price: r2(mark * 0.999), initialized: true,
+  };
+}
+
+app.get("/api/v1/bot/strategies", (req, res) => {
+  const uid = req.user.sub;
+  let list = botStrategiesStore.get(uid);
+  if (!list) {
+    // 种子：user1 预置一条运行中的 BTCUSDT 网格
+    list = [];
+    if (uid === 3) {
+      const st = {
+        id: ++botSeq, user_id: uid, name: "BTC 震荡网格", market: "spot", symbol: "BTCUSDT",
+        side: "both", type: "grid",
+        params: { grid_lower: 60000, grid_upper: 72000, grid_num: 12, grid_step: 0.005, order_amount: 50 },
+        status: "active", grid_state: botGridState("BTCUSDT", 60000, 72000),
+        created_at: Math.floor(Date.now() / 1000) - 86400 * 3,
+      };
+      list.push(st);
+      botOrdersStore.set(st.id, [
+        { id: ++botSeq, strategy_id: st.id, user_id: uid, market: "spot", symbol: "BTCUSDT", side: "buy",
+          price: r2(getMarket("BTCUSDT")?.price * 0.998 ?? 67000), qty: r4(0.01 + Math.random() * 0.02),
+          client_oid: `grid-${st.id}-1`, exchange_order_id: `EX-${st.id}-1`, status: "filled",
+          created_at: Math.floor(Date.now() / 1000) - 3600 },
+        { id: ++botSeq, strategy_id: st.id, user_id: uid, market: "spot", symbol: "BTCUSDT", side: "sell",
+          price: r2(getMarket("BTCUSDT")?.price * 1.002 ?? 67500), qty: r4(0.01 + Math.random() * 0.02),
+          client_oid: `grid-${st.id}-2`, exchange_order_id: `EX-${st.id}-2`, status: "filled",
+          created_at: Math.floor(Date.now() / 1000) - 1800 },
+      ]);
+    }
+    botStrategiesStore.set(uid, list);
+  }
+  ok(res, { strategies: list });
+});
+
+app.post("/api/v1/bot/strategies", (req, res) => {
+  const uid = req.user.sub;
+  const b = req.body || {};
+  // Go handleCreateStrategy：user_token 必填（授权代下单凭证）
+  if (!b.user_token) return fail(res, 400, "user_token required");
+  const p = b.params || {};
+  const type = b.type === "dca" || b.type === "ma" ? b.type : "grid";
+  if (!b.name || !b.symbol) return fail(res, 400, "invalid body");
+  if (type === "grid" && !(p.grid_upper > p.grid_lower && p.grid_num > 0)) {
+    return fail(res, 400, "invalid grid params");
+  }
+  if (!(p.order_amount > 0)) return fail(res, 400, "invalid order_amount");
+  const st = {
+    id: ++botSeq, user_id: uid, name: String(b.name).slice(0, 64),
+    market: b.market === "futures" ? "futures" : "spot", symbol: String(b.symbol).toUpperCase(),
+    side: ["buy", "sell", "both"].includes(b.side) ? b.side : "both", type,
+    params: p, status: "stopped",
+    ...(type === "grid" ? { grid_state: botGridState(String(b.symbol).toUpperCase(), Number(p.grid_lower), Number(p.grid_upper)) } : {}),
+    created_at: Math.floor(Date.now() / 1000),
+  };
+  const list = botStrategiesStore.get(uid) ?? [];
+  list.unshift(st);
+  botStrategiesStore.set(uid, list);
+  ok(res, st);
+});
+
+app.post("/api/v1/bot/strategies/:id/start", (req, res) => {
+  const st = (botStrategiesStore.get(req.user.sub) ?? []).find((x) => x.id === Number(req.params.id));
+  if (!st) return fail(res, 404, "strategy not found");
+  st.status = "active";
+  ok(res, { id: st.id, status: st.status });
+});
+
+app.post("/api/v1/bot/strategies/:id/stop", (req, res) => {
+  const st = (botStrategiesStore.get(req.user.sub) ?? []).find((x) => x.id === Number(req.params.id));
+  if (!st) return fail(res, 404, "strategy not found");
+  st.status = "stopped";
+  ok(res, { id: st.id, status: st.status });
+});
+
+app.get("/api/v1/bot/strategies/:id/orders", (req, res) => {
+  const ids = (botStrategiesStore.get(req.user.sub) ?? []).map((x) => x.id);
+  const sid = Number(req.params.id);
+  if (!ids.includes(sid)) return fail(res, 404, "strategy not found");
+  ok(res, { orders: botOrdersStore.get(sid) ?? [] });
+});
+
 // ---------- 借贷（契约对齐 Go internal/lending/handler.go：金额为字符串数字）----------
 const lendingPools = [
   { id: 1, asset: "USDT", total_supply: "1200000", total_borrow: "540000", available: "660000", interest_rate: 0.032, collateral_req: 1.5 },

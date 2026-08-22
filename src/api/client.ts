@@ -256,11 +256,6 @@ export const api = {
   futuresFunding: () => request("/api/v1/futures/funding"),
   futuresIndex: () => request("/api/v1/futures/index"),
   futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
-  // POST /api/v1/futures/wallet/withdraws/:id/review 提现审核（需 admin 角色）。
-  // POST /api/v1/futures/wallet/withdraws/batch/review 批量提现审核（需 admin 角色）。
-  // POST /api/v1/futures/positions/:id/liquidate 强制平仓（需 admin 角色）。
-  // POST /api/v1/futures/positions/batch/liquidate 批量强制平仓（需 admin 角色）。
-  // GET /api/v1/futures/wallet/ledger 本人资金流水（后端返回 {entries:[]}）。
   walletLedger: async (params?: { asset?: string; limit?: number }) => {
     const d = await request<{ entries: LedgerEntry[] }>(
       withQuery("/api/v1/futures/wallet/ledger", params as Record<string, string | number | undefined>)
@@ -344,16 +339,6 @@ export const api = {
     return d.trades ?? [];
   },
 
-  // ---- 期权 ----
-  // POST /api/v1/options/contracts 上架合约（需 admin 角色）。
-  optionCreateContract: (payload: { underlying: string; quote: string; expiry: string; strike?: number }) =>
-    request<{ ok: boolean }>("/api/v1/options/contracts", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  // PUT /api/v1/options/contracts/:id 上/下架切换（需 admin 角色）。
-  // POST /api/v1/options/positions/:id/close 强平持仓（需 admin 角色）。
-  // POST /api/v1/options/positions/batch/close 批量强平持仓（需 admin 角色）。
 
   // ---- OTC ----
   // 列表接口后端返回 {advertisements:[]}/{orders:[]}/{counterparties:[]}，此处解包为数组。
@@ -465,8 +450,6 @@ export const api = {
       body: JSON.stringify({ position_id }),
     }),
 
-  // ---- 杠杆 ----
-  marginLiqPrice: () => request("/api/v1/margin/liq-price"),
 
   // ---- 理财 ----
   wealthProducts: () => request("/api/v1/wealth/products"),
