@@ -59,3 +59,4 @@ Thumbs.db
 # mock 网关本地安装产物（npm --prefix mock install 生成）
 /mock/node_modules
 /mock/package-lock.json
+client_paths.txt
