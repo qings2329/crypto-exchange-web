@@ -68,8 +68,8 @@ export function Settings() {
     real_name: "",
     id_type: "id_card",
     id_number: "",
-    doc_front: "",
-    doc_back: "",
+    doc_front_name: "",
+    doc_back_name: "",
   });
   const [kycMsg, setKycMsg] = useState("");
 
@@ -490,8 +490,8 @@ export function Settings() {
                 <label className="form-label">{t("settings.docFront")}</label>
                 <input
                   className="filter"
-                  value={kycForm.doc_front}
-                  onChange={(e) => setKycForm({ ...kycForm, doc_front: e.target.value })}
+                  value={kycForm.doc_front_name}
+                  onChange={(e) => setKycForm({ ...kycForm, doc_front_name: e.target.value })}
                   placeholder={t("settings.ph.url")}
                 />
               </div>
@@ -499,8 +499,8 @@ export function Settings() {
                 <label className="form-label">{t("settings.docBack")}</label>
                 <input
                   className="filter"
-                  value={kycForm.doc_back}
-                  onChange={(e) => setKycForm({ ...kycForm, doc_back: e.target.value })}
+                  value={kycForm.doc_back_name}
+                  onChange={(e) => setKycForm({ ...kycForm, doc_back_name: e.target.value })}
                   placeholder={t("settings.ph.url")}
                 />
               </div>

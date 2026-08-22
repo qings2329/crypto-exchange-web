@@ -302,5 +302,15 @@
   "security.verify.badFormat": "請輸入 6 位數字驗證碼",
   "security.verify.tooManyAttempts": "嘗試次數過多，操作已取消",
   "settings.pwdVerifyCancelled": "已取消安全驗證，密碼未修改",
-  "wallet.addressConfirm": "地址確認："
+  "wallet.addressConfirm": "地址確認：",
+  "kyc.submitFailed": "提交失敗，請稍後重試",
+  "kyc.submitting": "提交中…",
+  "kyc.rejectReasonLabel": "駁回原因",
+  "kyc.submittedAt": "提交時間",
+  "kyc.limitWithdraw": "每日提幣額度 (USDT)",
+  "kyc.limitFiat": "法幣 OTC 交易",
+  "kyc.limitFutures": "合約交易",
+  "kyc.entitled": "已開通",
+  "kyc.notEntitled": "未開通",
+  "kyc.compareItem": "權益項"
 }

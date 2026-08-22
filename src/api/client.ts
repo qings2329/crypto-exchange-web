@@ -214,8 +214,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  // GET /api/v1/user/kyc 获取已提交的 KYC 材料与状态。
-  userKycGet: () => request<{ kyc: UserKyc | null }>("/api/v1/user/kyc"),
+  // GET /api/v1/user/kyc 获取 KYC 记录与等级权益（服务端惰性落审）。
+  userKycGet: () =>
+    request<{ kyc: UserKyc | null; limits: KycLimits }>("/api/v1/user/kyc"),
 
   // ---- 现货 ----
   getDepth: (symbol: string) =>
@@ -972,8 +973,9 @@ export interface KycPayload {
   real_name: string;
   id_type: string; // id_card / passport / driver_license
   id_number: string;
-  doc_front?: string; // 证件正面（URL/引用）
-  doc_back?: string; // 证件背面
+  country?: string;
+  doc_front_name?: string;
+  doc_back_name?: string;
 }
 
 // KYC 提交材料与审核状态（GET /api/v1/user/kyc 的 kyc 字段）。
@@ -989,6 +991,16 @@ export interface UserKyc {
   submitted_at?: string;
   reviewed_at?: string;
   reviewer?: string;
+  country?: string;
+  level?: number;
+}
+
+// KYC 等级权益（服务端下发，避免前端硬编码额度）。
+export interface KycLimits {
+  level: number;
+  withdraw_daily_usdt: number;
+  fiat_otc: boolean;
+  futures: boolean;
 }
 
 // ---------- API 密钥 ----------

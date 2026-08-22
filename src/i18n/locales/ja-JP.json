@@ -302,5 +302,15 @@
   "security.verify.badFormat": "6 桁の数字コードを入力してください",
   "security.verify.tooManyAttempts": "試行回数が多すぎるため操作を中止しました",
   "settings.pwdVerifyCancelled": "認証をキャンセルしました。パスワードは未変更です",
-  "wallet.addressConfirm": "アドレス確認:"
+  "wallet.addressConfirm": "アドレス確認:",
+  "kyc.submitFailed": "送信に失敗しました。後でもう一度お試しください",
+  "kyc.submitting": "送信中…",
+  "kyc.rejectReasonLabel": "却下理由",
+  "kyc.submittedAt": "提出日時",
+  "kyc.limitWithdraw": "1日の出金上限 (USDT)",
+  "kyc.limitFiat": "法定通貨 OTC 取引",
+  "kyc.limitFutures": "先物取引",
+  "kyc.entitled": "利用可",
+  "kyc.notEntitled": "利用不可",
+  "kyc.compareItem": "特典項目"
 }

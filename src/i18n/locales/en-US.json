@@ -302,5 +302,15 @@
   "security.verify.badFormat": "Please enter a 6-digit code",
   "security.verify.tooManyAttempts": "Too many attempts, action cancelled",
   "settings.pwdVerifyCancelled": "Verification cancelled, password unchanged",
-  "wallet.addressConfirm": "Address check:"
+  "wallet.addressConfirm": "Address check:",
+  "kyc.submitFailed": "Submission failed, please try again later",
+  "kyc.submitting": "Submitting…",
+  "kyc.rejectReasonLabel": "Rejection reason",
+  "kyc.submittedAt": "Submitted at",
+  "kyc.limitWithdraw": "Daily withdrawal limit (USDT)",
+  "kyc.limitFiat": "Fiat OTC trading",
+  "kyc.limitFutures": "Futures trading",
+  "kyc.entitled": "Enabled",
+  "kyc.notEntitled": "Not enabled",
+  "kyc.compareItem": "Benefit"
 }

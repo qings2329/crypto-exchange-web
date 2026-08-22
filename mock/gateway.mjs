@@ -246,7 +246,7 @@ app.get("/api/v1/user/me", (req, res) => {
     nickname: e.nickname || u.nickname || u.username,
     avatar: e.avatar || "",
     status: u.status ?? 0,
-    kyc_level: u.kyc_level ?? 0,
+    kyc_level: e.kyc?.status === 2 ? 2 : u.kyc_level ?? 0,
     tfa_enabled: e.tfa.enabled,
     email_verified: u.email_verified ?? false,
     phone_verified: u.phone_verified ?? false,
@@ -295,14 +295,61 @@ app.post("/api/v1/user/tfa/disable", (req, res) => {
 });
 
 // ---------- KYC ----------
+// 等级权益：未认证 L0 / 高级认证 L2（演示）
+const KYC_LIMITS = {
+  0: { level: 0, withdraw_daily_usdt: 1000, fiat_otc: false, futures: false },
+  2: { level: 2, withdraw_daily_usdt: 50000, fiat_otc: true, futures: true },
+};
+const maskName = (s) => (s.length <= 2 ? s[0] + "*" : s[0] + "*".repeat(s.length - 2) + s.slice(-1));
+const maskIdNumber = (s) => "*".repeat(Math.max(0, s.length - 4)) + s.slice(-4);
+
 app.post("/api/v1/user/kyc/submit", (req, res) => {
   const e = extra(req.user.sub);
+  if (e.kyc?.status === 1) return fail(res, 409, "已有申请审核中，请耐心等待");
+  if (e.kyc?.status === 2) return fail(res, 409, "已完成高级认证，无需重复提交");
   const b = req.body || {};
-  e.kyc = { ...b, status: 1, submitted_at: new Date().toISOString() };
-  ok(res, { kyc_level: 1, message: "KYC 已提交，审核中" }, 201);
+  const realName = String(b.real_name || "").trim();
+  const idType = b.id_type === "passport" ? "passport" : "id_card";
+  const idNumber = String(b.id_number || "").trim();
+  const country = String(b.country || "").trim();
+  if (realName.length < 2) return fail(res, 400, "请输入真实姓名");
+  if (idNumber.length < 5) return fail(res, 400, "证件号码格式不正确");
+  if (!country) return fail(res, 400, "请选择国家/地区");
+  // 演示审核规则：证件号尾号 000 → 材料核验失败驳回；其余 10 秒后自动通过
+  const willReject = /000$/.test(idNumber);
+  e.kyc = {
+    user_id: req.user.sub,
+    real_name: maskName(realName),
+    id_type: idType,
+    id_number: maskIdNumber(idNumber),
+    country,
+    doc_front_name: String(b.doc_front_name || "").slice(0, 120),
+    doc_back_name: String(b.doc_back_name || "").slice(0, 120),
+    status: 1,
+    submitted_at: new Date().toISOString(),
+    review_at: Date.now() + 10_000,
+    _reject: willReject,
+  };
+  ok(res, { status: 1, message: "KYC 已提交，审核中" }, 201);
 });
 app.get("/api/v1/user/kyc", (req, res) => {
-  ok(res, { kyc: extra(req.user.sub).kyc });
+  const e = extra(req.user.sub);
+  const k = e.kyc;
+  // 惰性审核：到达审核时间点即落审（免定时器）
+  if (k && k.status === 1 && Date.now() >= k.review_at) {
+    k.status = k._reject ? 3 : 2;
+    k.reviewed_at = new Date().toISOString();
+    k.reviewer = "risk-system";
+    if (k._reject) k.reject_reason = "证件信息核验失败，请重新上传清晰的证件照片";
+    else k.level = 2;
+    delete k._reject;
+    delete k.review_at;
+  }
+  const approved = k?.status === 2;
+  ok(res, {
+    kyc: k ? { ...k } : null,
+    limits: KYC_LIMITS[approved ? 2 : 0],
+  });
 });
 
 // ---------- 登录历史 ----------

@@ -1,11 +1,15 @@
 // KYC 身份认证页（/kyc）：个人信息 → 证件上传 → 人脸识别 → 提交等待审核。
-// 状态机：none（分步填写）→ pending（8s 演示倒计时后自动 approve）→ approved / rejected。
-import { useEffect, useState } from "react";
+// 状态机由服务端驱动：GET /api/v1/user/kyc（惰性落审：pending 10s 后 approve / 尾号 000 reject），
+// 本页 4s 轮询 pending；权益额度来自响应 limits，不前端硬编码。
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StepIndicator } from "../components/kyc/StepIndicator";
 import { DocUpload } from "../components/kyc/DocUpload";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { api, ApiError, type KycLimits, type UserKyc } from "../api/client";
+import { useAuth } from "../lib/auth";
+import { useToast } from "../components/Toast";
 import { useKycStore, type IdDocType } from "../store/kyc-store";
 import { cn } from "../lib/utils";
 
@@ -13,7 +17,14 @@ const COUNTRIES = ["CN 中国大陆", "HK 中国香港", "TW 中国台湾", "SG 
 
 export function KycPage() {
   const { t } = useTranslation();
+  const { uid } = useAuth();
+  const toast = useToast();
   const kyc = useKycStore();
+
+  const [record, setRecord] = useState<UserKyc | null>(null);
+  const [limits, setLimits] = useState<KycLimits | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [fullName, setFullName] = useState(kyc.fullName ?? "");
   const [idType, setIdType] = useState<IdDocType>(kyc.idType ?? "id_card");
   const [idNumber, setIdNumber] = useState(kyc.idNumber ?? "");
@@ -21,49 +32,111 @@ export function KycPage() {
   const [formError, setFormError] = useState(false);
   const [scanning, setScanning] = useState(false);
 
-  // 演示：pending 8 秒后自动审核通过
+  const refresh = useCallback(async () => {
+    try {
+      const r = await api.userKycGet();
+      setRecord(r.kyc);
+      setLimits(r.limits);
+      return r.kyc;
+    } catch {
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (kyc.status !== "pending") return;
-    const id = setTimeout(() => kyc.approve(), 8000);
-    return () => clearTimeout(id);
-  }, [kyc.status]); // eslint-disable-line react-hooks/exhaustive-deps
+    void refresh();
+  }, [refresh, uid]);
+
+  // pending 轮询（4s），审核落定后停止
+  useEffect(() => {
+    if (record?.status !== 1) return;
+    const id = setInterval(() => void refresh(), 4000);
+    return () => clearInterval(id);
+  }, [record?.status, refresh]);
+
+  // 离开人脸步骤或提交落定后复位扫描态，避免重新认证时残留
+  useEffect(() => {
+    setScanning(false);
+  }, [kyc.step]);
 
   const infoValid =
     fullName.trim().length >= 2 && idNumber.trim().length >= 5 && country.length > 0;
   const docsValid = idType === "passport" ? !!kyc.front : !!kyc.front && !!kyc.back;
 
+  const submitReview = async () => {
+    setSubmitting(true);
+    try {
+      await api.userKycSubmit({
+        real_name: fullName.trim(),
+        id_type: idType,
+        id_number: idNumber.trim(),
+        country,
+        doc_front_name: kyc.front?.name ?? "",
+        doc_back_name: kyc.back?.name ?? "",
+      });
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("kyc.submitFailed"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ---------- 审核状态视图 ----------
-  if (kyc.status === "pending" || kyc.status === "approved" || kyc.status === "rejected") {
+  if (!loading && record && record.status !== 0) {
+    const st = record.status; // 1 pending / 2 approved / 3 rejected
     return (
-      <div className="mx-auto max-w-[640px] px-4 py-10">
+      <div className="mx-auto max-w-[720px] px-4 py-10">
         <div
-          className={`flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-12 text-center ${
-            kyc.status === "approved" ? "" : ""
-          }`}
+          className={cn(
+            "flex flex-col items-center gap-3 rounded-xl border bg-card px-6 py-12 text-center",
+            st === 2 ? "border-buy/40" : st === 3 ? "border-sell/40" : "border-border"
+          )}
           data-testid="kyc-status"
         >
-          <span className="text-5xl">
-            {kyc.status === "pending" ? "⏳" : kyc.status === "approved" ? "✅" : "❌"}
-          </span>
+          <span className="text-5xl">{st === 1 ? "⏳" : st === 2 ? "✅" : "❌"}</span>
           <h1 className="text-lg font-bold">
-            {kyc.status === "pending"
-              ? t("kyc.awaitReview")
-              : kyc.status === "approved"
-                ? t("kyc.levelApproved")
-                : t("kyc.rejectedTip")}
+            {st === 1 ? t("kyc.awaitReview") : st === 2 ? t("kyc.levelApproved") : t("kyc.rejectedTip")}
           </h1>
           <p className="max-w-[420px] text-sm text-muted">
-            {kyc.status === "pending"
+            {st === 1
               ? t("kyc.pendingTip")
-              : kyc.status === "approved"
+              : st === 2
                 ? t("kyc.approvedTip")
-                : t("kyc.rejectedTip")}
+                : record.reject_reason || t("kyc.rejectedTip")}
           </p>
-          {kyc.status === "pending" && (
-            <span className="size-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          {record.reject_reason && st === 3 && (
+            <p className="rounded-lg border border-sell/30 bg-sell/5 px-3 py-2 text-xs text-sell" data-testid="kyc-reject-reason">
+              {t("kyc.rejectReasonLabel")}: {record.reject_reason}
+            </p>
           )}
-          {(kyc.status === "rejected" || kyc.status === "approved") && (
-            <Button variant={kyc.status === "rejected" ? "default" : "outline"} size="sm" onClick={kyc.reset}>
+          {st === 1 && (
+            <>
+              <span className="size-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+              <p className="text-xs text-muted">
+                {t("kyc.submittedAt")}: {record.submitted_at ? new Date(record.submitted_at).toLocaleString() : "-"}
+              </p>
+            </>
+          )}
+          {st === 2 && (
+            <div className="mt-1 grid w-full max-w-[460px] grid-cols-3 gap-2 text-left" data-testid="kyc-limits">
+              <LimitCell label={t("kyc.limitWithdraw")} value={`$${limits?.withdraw_daily_usdt.toLocaleString() ?? "-"}`} testid="limit-withdraw" />
+              <LimitCell label={t("kyc.limitFiat")} value={limits?.fiat_otc ? t("kyc.entitled") : t("kyc.notEntitled")} ok={limits?.fiat_otc} />
+              <LimitCell label={t("kyc.limitFutures")} value={limits?.futures ? t("kyc.entitled") : t("kyc.notEntitled")} ok={limits?.futures} />
+            </div>
+          )}
+          {(st === 3 || st === 2) && st === 3 && (
+            <Button
+              variant="default"
+              size="sm"
+              data-testid="kyc-resubmit"
+              onClick={() => {
+                kyc.gotoStep(1);
+                setRecord(null);
+              }}
+            >
               {t("kyc.resubmit")}
             </Button>
           )}
@@ -167,7 +240,7 @@ export function KycPage() {
               )}
             </div>
             <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={kyc.reset}>
+              <Button variant="ghost" size="sm" onClick={() => kyc.gotoStep(1)}>
                 ← {t("kyc.prevStep")}
               </Button>
               <Button
@@ -198,18 +271,13 @@ export function KycPage() {
             </div>
             <p className="text-sm text-muted">{scanning ? t("kyc.faceScanning") : t("kyc.faceStart")}</p>
             {scanning && (
-              <Button
-                data-testid="kyc-submit"
-                onClick={() => {
-                  kyc.submit();
-                }}
-              >
-                {t("kyc.submitReview")}
+              <Button data-testid="kyc-submit" disabled={submitting} onClick={() => void submitReview()}>
+                {submitting ? t("kyc.submitting") : t("kyc.submitReview")}
               </Button>
             )}
             {!scanning && (
               <div className="flex w-full items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={() => useKycStore.setState({ step: 2 })}>
+                <Button variant="ghost" size="sm" onClick={() => kyc.gotoStep(2)}>
                   ← {t("kyc.prevStep")}
                 </Button>
                 <Button data-testid="kyc-face-start" onClick={() => setScanning(true)}>
@@ -221,11 +289,48 @@ export function KycPage() {
         )}
       </div>
 
-      {/* 当前等级 */}
+      {/* 当前等级与权益对比 */}
       <div className="mt-4 flex items-center gap-2 text-xs text-muted">
         {t("kyc.currentLevel")}:
-        <Badge variant="secondary">{t("kyc.levelNone")}</Badge>
+        <Badge variant="secondary">{limits?.level === 2 ? t("kyc.levelApproved") : t("kyc.levelNone")}</Badge>
+      </div>
+      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-card" data-testid="kyc-compare">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted">
+              <th className="px-4 py-2.5 text-left font-medium">{t("kyc.compareItem")}</th>
+              <th className="px-4 py-2.5 text-right font-medium">{t("kyc.levelNone")}</th>
+              <th className="px-4 py-2.5 text-right font-medium">{t("kyc.levelAdvanced")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <CompareRow label={t("kyc.limitWithdraw")} a="$1,000" b="$50,000" />
+            <CompareRow label={t("kyc.limitFiat")} a={t("kyc.notEntitled")} b={t("kyc.entitled")} bOk />
+            <CompareRow label={t("kyc.limitFutures")} a={t("kyc.notEntitled")} b={t("kyc.entitled")} bOk />
+          </tbody>
+        </table>
       </div>
     </div>
+  );
+}
+
+function LimitCell({ label, value, ok, testid }: { label: string; value: string; ok?: boolean; testid?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-panel-2/30 px-3 py-2.5">
+      <p className="truncate text-[11px] text-muted">{label}</p>
+      <p className={cn("mt-0.5 truncate font-mono text-sm font-semibold tabular-nums", ok === undefined ? "text-foreground" : ok ? "text-buy" : "text-muted")} data-testid={testid}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function CompareRow({ label, a, b, bOk }: { label: string; a: string; b: string; bOk?: boolean }) {
+  return (
+    <tr className="border-b border-border last:border-b-0 hover:bg-[#2B3139]/30">
+      <td className="px-4 py-2.5 text-muted">{label}</td>
+      <td className="px-4 py-2.5 text-right font-mono tabular-nums text-muted">{a}</td>
+      <td className={cn("px-4 py-2.5 text-right font-mono font-semibold tabular-nums", bOk ? "text-buy" : "text-foreground")}>{b}</td>
+    </tr>
   );
 }
