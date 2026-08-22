@@ -318,5 +318,10 @@
   "wallet.checkFirstUse": "I have carefully verified this address (required for first use)",
   "wallet.saveToBook": "Save to address book",
   "wallet.errWhitelist": "Address not in whitelist. Add it to the address book first.",
-  "wallet.errNeedCheck": "First-time address: please tick the verification checkbox"
+  "wallet.errNeedCheck": "First-time address: please tick the verification checkbox",
+  "page.announcements": "Announcements",
+  "ann.empty": "No announcements",
+  "ann.level.info": "Notice",
+  "ann.level.warning": "Alert",
+  "ann.level.maintenance": "Maintenance"
 }

@@ -253,32 +253,13 @@ export const api = {
   },
 
   // ---- 合约 ----
-  futuresPositions: () => request<any[]>("/api/v1/futures/positions"),
   futuresFunding: () => request("/api/v1/futures/funding"),
   futuresIndex: () => request("/api/v1/futures/index"),
   futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
-  futuresWithdraws: () => request<any[]>("/api/v1/futures/wallet/withdraws"),
   // POST /api/v1/futures/wallet/withdraws/:id/review 提现审核（需 admin 角色）。
-  futuresReviewWithdraw: (id: number, action: "approve" | "reject") =>
-    request<{ ok: boolean }>(`/api/v1/futures/wallet/withdraws/${id}/review`, {
-      method: "POST",
-      body: JSON.stringify({ action }),
-    }),
   // POST /api/v1/futures/wallet/withdraws/batch/review 批量提现审核（需 admin 角色）。
-  futuresBatchReviewWithdraw: (ids: number[], action: "approve" | "reject") =>
-    request<{ ok: boolean; count: number }>("/api/v1/futures/wallet/withdraws/batch/review", {
-      method: "POST",
-      body: JSON.stringify({ ids, action }),
-    }),
   // POST /api/v1/futures/positions/:id/liquidate 强制平仓（需 admin 角色）。
-  futuresLiquidatePosition: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/futures/positions/${id}/liquidate`, { method: "POST" }),
   // POST /api/v1/futures/positions/batch/liquidate 批量强制平仓（需 admin 角色）。
-  futuresBatchLiquidatePosition: (ids: number[]) =>
-    request<{ ok: boolean; count: number }>("/api/v1/futures/positions/batch/liquidate", {
-      method: "POST",
-      body: JSON.stringify({ ids }),
-    }),
   // GET /api/v1/futures/wallet/ledger 本人资金流水（后端返回 {entries:[]}）。
   walletLedger: async (params?: { asset?: string; limit?: number }) => {
     const d = await request<{ entries: LedgerEntry[] }>(
@@ -329,8 +310,6 @@ export const api = {
   },
 
   // ---- 期权 ----
-  optionContracts: () => request<any[]>("/api/v1/options/contracts"),
-  optionPositions: () => request<any[]>("/api/v1/options/positions"),
   // POST /api/v1/options/contracts 上架合约（需 admin 角色）。
   optionCreateContract: (payload: { underlying: string; quote: string; expiry: string; strike?: number }) =>
     request<{ ok: boolean }>("/api/v1/options/contracts", {
@@ -338,20 +317,8 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   // PUT /api/v1/options/contracts/:id 上/下架切换（需 admin 角色）。
-  optionSetContractStatus: (id: number, status: "open" | "closed") =>
-    request<{ ok: boolean }>(`/api/v1/options/contracts/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ status }),
-    }),
   // POST /api/v1/options/positions/:id/close 强平持仓（需 admin 角色）。
-  optionClosePosition: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/options/positions/${id}/close`, { method: "POST" }),
   // POST /api/v1/options/positions/batch/close 批量强平持仓（需 admin 角色）。
-  optionBatchClosePosition: (ids: number[]) =>
-    request<{ ok: boolean; count: number }>("/api/v1/options/positions/batch/close", {
-      method: "POST",
-      body: JSON.stringify({ ids }),
-    }),
 
   // ---- OTC ----
   // 列表接口后端返回 {advertisements:[]}/{orders:[]}/{counterparties:[]}，此处解包为数组。
@@ -372,10 +339,6 @@ export const api = {
   otcOrders: async () => {
     const d = await request<{ orders: OtcOrder[] }>("/api/v1/otc/orders");
     return d.orders ?? [];
-  },
-  otcCounterparties: async () => {
-    const d = await request<{ counterparties: OtcCounterparty[] }>("/api/v1/otc/counterparties");
-    return d.counterparties ?? [];
   },
   // 发布广告（字段对齐后端：fiat_currency / payment_methods 为逗号分隔字符串）
   otcCreateAd: (payload: OtcCreateAdPayload) =>
@@ -468,23 +431,10 @@ export const api = {
     }),
 
   // ---- 杠杆 ----
-  marginAccounts: () => request<any[]>("/api/v1/margin/accounts"),
   marginLiqPrice: () => request("/api/v1/margin/liq-price"),
   // POST /api/v1/margin/accounts/:id/adjust 调整账户余额（需 admin 角色）。
-  marginAdjustAccount: (id: number, delta: number, reason?: string) =>
-    request<{ ok: boolean }>(`/api/v1/margin/accounts/${id}/adjust`, {
-      method: "POST",
-      body: JSON.stringify({ delta, reason }),
-    }),
   // POST /api/v1/margin/accounts/:id/liquidate 强制平仓（需 admin 角色）。
-  marginLiquidate: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/margin/accounts/${id}/liquidate`, { method: "POST" }),
   // POST /api/v1/margin/accounts/batch/liquidate 批量强制平仓（需 admin 角色）。
-  marginBatchLiquidate: (ids: number[]) =>
-    request<{ ok: boolean; count: number }>("/api/v1/margin/accounts/batch/liquidate", {
-      method: "POST",
-      body: JSON.stringify({ ids }),
-    }),
 
   // ---- 理财 ----
   wealthProducts: () => request("/api/v1/wealth/products"),
@@ -527,13 +477,7 @@ export const api = {
       method: "DELETE",
       body: JSON.stringify({ ids }),
     }),
-  riskEvents: () => request<RiskEvent[]>("/api/v1/risk/events"),
   // POST /api/v1/risk/events/:id/resolve 处置事件（resolve=已处理 / ignore=忽略）。
-  riskResolveEvent: (id: number, status: "resolved" | "ignored") =>
-    request<{ ok: boolean }>(`/api/v1/risk/events/${id}/resolve`, {
-      method: "POST",
-      body: JSON.stringify({ status }),
-    }),
   // POST /api/v1/risk/events/batch/resolve 批量处置事件（需 admin 角色）。
   riskBatchResolveEvents: (ids: number[], status: "resolved" | "ignored") =>
     request<{ ok: boolean; count: number }>("/api/v1/risk/events/batch/resolve", {
@@ -544,23 +488,9 @@ export const api = {
   // ---- 通知 ----
   notifications: () => request<NotificationItem[]>("/api/v1/notification/admin/list"),
   // POST /api/v1/notification/admin 发布通知（需 admin 角色）。
-  notificationCreate: (payload: NotificationInput) =>
-    request<NotificationItem>("/api/v1/notification/admin", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
   // POST /api/v1/notification/admin/:id/recall 撤回已发通知（需 admin 角色）。
-  notificationRecall: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/notification/admin/${id}/recall`, { method: "POST" }),
   // DELETE /api/v1/notification/admin/:id 删除通知记录（需 admin 角色）。
-  notificationDelete: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/notification/admin/${id}`, { method: "DELETE" }),
   // DELETE /api/v1/notification/admin/batch 批量删除通知（需 admin 角色）。
-  notificationBatchDelete: (ids: number[]) =>
-    request<{ ok: boolean; count: number }>("/api/v1/notification/admin/batch", {
-      method: "DELETE",
-      body: JSON.stringify({ ids }),
-    }),
 
   // ---- 借贷 ----
   lendingPools: async () => {
@@ -613,14 +543,9 @@ export const api = {
 
   // ---- 管理总览 ----
   // GET /api/v1/admin/overview 后台总览 KPI（需 admin 角色）。
-  adminOverview: () => request<AdminOverview>("/api/v1/admin/overview"),
   // GET /api/v1/admin/audit 后台操作审计日志（需 admin 角色）。
-  adminAudit: () => request<AuditLog[]>("/api/v1/admin/audit"),
 
   // ---- 监控（服务端聚合，需后端实现 /api/v1/monitor/*）----
-  monitorSummary: () => request<MonitorSummaryRemote>("/api/v1/monitor/summary"),
-  monitorEvents: (limit = 50) =>
-    request<MonitorEventItem[]>("/api/v1/monitor/events?limit=" + limit),
 
   // ---- API 密钥 ----
   // GET /api/v1/user/api-keys 本人密钥列表（后端返回 {api_keys, total}），支持分页与筛选。
@@ -660,25 +585,9 @@ export const api = {
     return d.announcements ?? [];
   },
   // GET /api/v1/announcement/admin 管理后台全量列表（含草稿），解包为数组。
-  adminListAnnouncements: async () => {
-    const d = await request<{ announcements: Announcement[] }>("/api/v1/announcement/admin");
-    return d.announcements ?? [];
-  },
   // POST /api/v1/announcement/admin 创建公告（管理后台，需 admin 角色）。
-  adminCreateAnnouncement: (payload: AnnouncementInput) =>
-    request<Announcement>("/api/v1/announcement/admin", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
   // PUT /api/v1/announcement/admin/:id 更新公告（管理后台，需 admin 角色）。
-  adminUpdateAnnouncement: (id: number, payload: AnnouncementInput) =>
-    request<Announcement>(`/api/v1/announcement/admin/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
   // DELETE /api/v1/announcement/admin/:id 删除公告（管理后台，需 admin 角色）。
-  adminDeleteAnnouncement: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/announcement/admin/${id}`, { method: "DELETE" }),
 
   // ---- 邀请 ----
   referralCode: () =>

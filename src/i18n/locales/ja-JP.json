@@ -318,5 +318,10 @@
   "wallet.checkFirstUse": "アドレスを確認しました（初回使用時は必須）",
   "wallet.saveToBook": "アドレス帳に保存",
   "wallet.errWhitelist": "アドレスがホワイトリストにありません。先にアドレス帳へ追加してください",
-  "wallet.errNeedCheck": "初めてのアドレスです。確認チェックボックスに勾選してください"
+  "wallet.errNeedCheck": "初めてのアドレスです。確認チェックボックスに勾選してください",
+  "page.announcements": "お知らせ",
+  "ann.empty": "お知らせはありません",
+  "ann.level.info": "お知らせ",
+  "ann.level.warning": "注意",
+  "ann.level.maintenance": "メンテナンス"
 }

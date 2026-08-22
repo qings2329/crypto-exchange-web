@@ -62,17 +62,6 @@ export function Header() {
               </a>
             );
           })}
-          {hasRole("admin") && (
-            <a
-              href="#/admin"
-              className={cn(
-                "relative flex h-full items-center px-3 text-[13px] transition-colors",
-                current === "/admin" ? "font-bold text-accent" : "text-muted hover:text-foreground"
-              )}
-            >
-              {t("nav.overview")}
-            </a>
-          )}
         </nav>
 
         {/* 右侧操作区 */}
