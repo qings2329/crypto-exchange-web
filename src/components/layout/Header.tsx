@@ -15,7 +15,6 @@ const LINKS: { path: string; key: string; role?: "operator" | "admin"; auth?: bo
   { path: "/wallet", key: "nav.wallet" },
   { path: "/lending", key: "nav.lending" },
   { path: "/wealth", key: "nav.wealth" },
-  { path: "/earn", key: "nav.earn" },
   { path: "/launchpad", key: "nav.launchpad" },
   { path: "/bot", key: "nav.bot" },
   { path: "/referral", key: "nav.referral" },
@@ -102,6 +101,13 @@ export function Header() {
  * 语言选择下拉菜单：当前语言触发器 + 四语言列表（激活项品牌黄 + ✓）。
  * 点击外部自动收起。
  */
+const NATIVE_LABELS: Record<string, string> = {
+  "zh-CN": "简体中文",
+  "en-US": "English",
+  "zh-TW": "繁體中文",
+  "ja-JP": "日本語",
+};
+
 function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Locale) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -120,7 +126,7 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
 
   return (
     <div className="relative hidden sm:block" ref={ref} data-testid="lang-menu">
-      <Button variant="outline" size="sm" aria-label={t("lang.label")} onClick={() => setOpen((o) => !o)} data-testid="lang-trigger">
+      <Button variant="outline" size="sm" aria-label={t("lang.label")} onClick={() => setOpen((o) => !o)} data-testid="lang-trigger" className="gap-1.5 hover:border-accent/60 hover:text-accent">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
           <circle cx="12" cy="12" r="9" />
           <path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" />
@@ -131,23 +137,41 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
         </svg>
       </Button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-xl">
-          {LOCALES.map((lc) => (
-            <button
-              key={lc.value}
-              onClick={() => {
-                onChange(lc.value);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-panel-2",
-                lc.value === locale ? "font-semibold text-accent" : "text-muted"
-              )}
-            >
-              {lc.label}
-              {lc.value === locale && <span>✓</span>}
-            </button>
-          ))}
+        <div
+          data-testid="lang-dropdown"
+          className="lang-dropdown absolute right-0 top-full z-50 mt-1.5 w-44 origin-top-right overflow-hidden rounded-xl border border-border bg-card shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+        >
+          <div className="border-b border-border px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+            {t("lang.label")}
+          </div>
+          {LOCALES.map((lc) => {
+            const active = lc.value === locale;
+            return (
+              <button
+                key={lc.value}
+                onClick={() => {
+                  onChange(lc.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left transition-colors",
+                  active ? "bg-panel-2/60" : "hover:bg-panel-2/60"
+                )}
+              >
+                <span className={cn("text-sm", active ? "font-semibold text-accent" : "text-foreground")}>{lc.label}</span>
+                <span className="ml-auto flex items-center gap-1.5">
+                  {NATIVE_LABELS[lc.value] !== lc.label && (
+                    <span className="text-[11px] text-muted">{NATIVE_LABELS[lc.value]}</span>
+                  )}
+                  {active && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-3.5 text-accent">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

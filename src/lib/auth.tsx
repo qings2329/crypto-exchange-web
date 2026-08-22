@@ -27,6 +27,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (target: string, password: string) => {
     const res = await api.login(target, password);
+    // 用户前端仅允许普通用户：管理员/运营账户即使拿到令牌也拒绝进入（纵深防御，网关已同规则拦截）
+    if (res.role && res.role !== "user") {
+      throw new Error("该账户为管理/运营账户，请使用管理后台登录");
+    }
     tokenStore.set(res.access_token, res.refresh_token, String(res.user_id), res.role);
     setUid(String(res.user_id));
     if (res.role) setRole(res.role as Role);

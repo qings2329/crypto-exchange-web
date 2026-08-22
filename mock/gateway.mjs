@@ -534,26 +534,111 @@ function seedFrom(str) {
   }
   return h >>> 0;
 }
-app.get("/api/v1/futures/wallet/balance", (req, res) => {
-  const s = seedFrom(`session-${req.user.sub}`);
+// ---------- 钱包可变状态层 ----------
+// 基线余额由 uid 确定性派生；充值/提现/划转的真实变动以增量叠加，重启网关即重置（dev 语义）。
+const walletDelta = new Map(); // uid -> Map(ASSET -> { avail: +n, frozen: +n })
+const ledgerStore = new Map(); // uid -> ledger entries[]（新事件在前）
+
+function deltaOf(uid) {
+  if (!walletDelta.has(uid)) walletDelta.set(uid, new Map());
+  return walletDelta.get(uid);
+}
+
+function baseBalances(uid) {
+  const s = seedFrom(`session-${uid}`);
   const r2 = (n) => Math.round(n * 100) / 100;
   const r4 = (n) => Math.round(n * 10000) / 10000;
   const usdt = 5000 + (s % 45000) + ((s >>> 8) % 100) / 100;
   const btc = 0.05 + ((s >>> 4) % 900) / 1000;
   const eth = 0.8 + ((s >>> 6) % 1200) / 100;
-  ok(res, [
+  return [
     { asset: "USDT", available: r2(usdt - usdt * (((s >>> 12) % 800) / 10000)), frozen: r2(usdt * (((s >>> 12) % 800) / 10000)) },
     { asset: "BTC", available: r4(btc - btc * (((s >>> 16) % 1500) / 10000)), frozen: r4(btc * (((s >>> 16) % 1500) / 10000)) },
     { asset: "ETH", available: r4(eth - eth * (((s >>> 20) % 1500) / 10000)), frozen: r4(eth * (((s >>> 20) % 1500) / 10000)) },
+  ];
+}
+
+function walletOf(uid) {
+  const d = deltaOf(uid);
+  return baseBalances(uid).map((row) => {
+    const m = d.get(row.asset);
+    const round = row.asset === "USDT" ? (n) => Math.round(n * 100) / 100 : (n) => Math.round(n * 10000) / 10000;
+    return m
+      ? { asset: row.asset, available: round(row.available + m.avail), frozen: round(row.frozen + m.frozen) }
+      : row;
+  });
+}
+
+function seedLedger(uid) {
+  if (ledgerStore.has(uid)) return;
+  // 种子流水：与基线账户呼应
+  ledgerStore.set(uid, [
+    { id: nextId(), user_id: uid, asset: "USDT", delta: 1000, balance: 123456, biz_type: "deposit", ref: "dep_001", time: ns() },
+    { id: nextId(), user_id: uid, asset: "USDT", delta: -200, balance: 123256, biz_type: "withdraw", ref: "wd_002", time: ns() },
+    { id: nextId(), user_id: uid, asset: "BTC", delta: 0.01, balance: 0.51, biz_type: "transfer", ref: "tr_003", time: ns() },
   ]);
+}
+
+function pushLedger(uid, entry) {
+  seedLedger(uid);
+  ledgerStore.get(uid).unshift({ id: nextId(), user_id: uid, time: ns(), ...entry });
+}
+
+const WALLET_ASSETS = ["USDT", "BTC", "ETH"];
+
+app.get("/api/v1/futures/wallet/balance", (req, res) => {
+  ok(res, walletOf(req.user.sub));
+});
+
+// POST /api/v1/futures/wallet/deposit 充值：模拟链上确认后即时入账（CE 语义）。
+app.post("/api/v1/futures/wallet/deposit", (req, res) => {
+  const uid = req.user.sub;
+  const b = req.body || {};
+  const asset = String(b.asset || "").toUpperCase();
+  const amount = Number(b.amount);
+  if (!WALLET_ASSETS.includes(asset)) return fail(res, 400, "不支持的充值资产");
+  if (!(amount > 0)) return fail(res, 400, "充值金额必须大于 0");
+  const row = walletOf(uid).find((x) => x.asset === asset);
+  const m = deltaOf(uid);
+  const cur = m.get(asset) ?? { avail: 0, frozen: 0 };
+  cur.avail += amount;
+  m.set(asset, cur);
+  pushLedger(uid, { asset, delta: amount, balance: row.available + amount, biz_type: "deposit", ref: `dep_${Date.now().toString(36)}` });
+  appendAudit(req.user, "wallet.deposit", `${asset} ${amount}`, "模拟链上到账");
+  ok(res, { asset, available: row.available + amount, frozen: row.frozen }, 201);
+});
+
+// POST /api/v1/futures/wallet/transfer 内部划转：资金账户(可用) ⇄ 合约保证金(冻结)。
+app.post("/api/v1/futures/wallet/transfer", (req, res) => {
+  const uid = req.user.sub;
+  const b = req.body || {};
+  const asset = String(b.asset || "").toUpperCase();
+  const amount = Number(b.amount);
+  const dir = b.direction;
+  if (!WALLET_ASSETS.includes(asset)) return fail(res, 400, "不支持的划转资产");
+  if (!(amount > 0)) return fail(res, 400, "划转金额必须大于 0");
+  if (!["to_futures", "to_funding"].includes(dir)) return fail(res, 400, "direction 必须为 to_futures/to_funding");
+  const row = walletOf(uid).find((x) => x.asset === asset);
+  if (dir === "to_futures" && amount > row.available) return fail(res, 400, "可用余额不足");
+  if (dir === "to_funding" && amount > row.frozen) return fail(res, 400, "合约保证金不足");
+  const m = deltaOf(uid);
+  const cur = m.get(asset) ?? { avail: 0, frozen: 0 };
+  if (dir === "to_futures") {
+    cur.avail -= amount; cur.frozen += amount;
+  } else {
+    cur.avail += amount; cur.frozen -= amount;
+  }
+  m.set(asset, cur);
+  pushLedger(uid, { asset, delta: dir === "to_futures" ? -amount : amount, balance: dir === "to_futures" ? row.available - amount : row.available + amount, biz_type: "transfer", ref: `tr_${Date.now().toString(36)}` });
+  appendAudit(req.user, "wallet.transfer", `${asset} ${amount}`, dir);
+  const nr = walletOf(uid).find((x) => x.asset === asset);
+  ok(res, { asset, available: nr.available, frozen: nr.frozen }, 201);
 });
 app.get("/api/v1/futures/wallet/ledger", (req, res) => {
   const { asset } = req.query;
-  const entries = [
-    { id: nextId(), user_id: req.user.sub, asset: "USDT", delta: 1000, balance: 123456, biz_type: "deposit", ref: "dep_001", time: ns() },
-    { id: nextId(), user_id: req.user.sub, asset: "USDT", delta: -200, balance: 123256, biz_type: "withdraw", ref: "wd_002", time: ns() },
-    { id: nextId(), user_id: req.user.sub, asset: "BTC", delta: 0.01, balance: 0.51, biz_type: "transfer", ref: "tr_003", time: ns() },
-  ].filter((e) => !asset || e.asset === asset.toString());
+  const uid = req.user.sub;
+  seedLedger(uid);
+  const entries = ledgerStore.get(uid).filter((e) => !asset || e.asset === asset.toString());
   ok(res, { entries });
 });
 
@@ -913,6 +998,16 @@ app.post("/api/v1/futures/wallet/withdraw", (req, res) => {
     created_at: ns(),
   };
   futuresWithdrawRecords.push(rec);
+  // 余额联动：审核期间金额从可用划入冻结；approve 后扣除，reject 解冻
+  {
+    const m = deltaOf(req.user.sub);
+    const cur = m.get(rec.asset) ?? { avail: 0, frozen: 0 };
+    const row = walletOf(req.user.sub).find((x) => x.asset === rec.asset);
+    if (rec.amount > row.available) return fail(res, 400, "可用余额不足");
+    cur.avail -= rec.amount; cur.frozen += rec.amount;
+    m.set(rec.asset, cur);
+    pushLedger(req.user.sub, { asset: rec.asset, delta: -rec.amount, balance: row.available - rec.amount, biz_type: "withdraw", ref: `wd_${id}` });
+  }
   ok(res, { order_id: id, status: "pending" }, 201);
 });
 // ---------- 地址簿 ----------
@@ -961,6 +1056,12 @@ app.post("/api/v1/futures/wallet/withdraws/:id/review", authorize("admin"), (req
   if (!["approve", "reject"].includes(action)) return fail(res, 400, "action 必须为 approve/reject");
   w.status = action === "approve" ? "approved" : "rejected";
   w.reviewed_by = req.user.username;
+  // 审核通过即链上出金（冻结扣除）；驳回则解冻归还可用
+  const m = deltaOf(w.user_id);
+  const cur = m.get(w.asset) ?? { avail: 0, frozen: 0 };
+  cur.frozen -= w.amount;
+  if (action === "reject") cur.avail += w.amount;
+  m.set(w.asset, cur);
   appendAudit(req.user, "withdraw.review", `WD #${w.id}`, `${action} · ${w.amount} ${w.asset}`);
   ok(res, { ok: true });
 });
@@ -974,6 +1075,11 @@ app.post("/api/v1/futures/wallet/withdraws/batch/review", authorize("admin"), (r
     if (w && w.status === "pending") {
       w.status = action === "approve" ? "approved" : "rejected";
       w.reviewed_by = req.user.username;
+      const m = deltaOf(w.user_id);
+      const cur = m.get(w.asset) ?? { avail: 0, frozen: 0 };
+      cur.frozen -= w.amount;
+      if (action === "reject") cur.avail += w.amount;
+      m.set(w.asset, cur);
       count += 1;
     }
   }

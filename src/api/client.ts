@@ -256,6 +256,18 @@ export const api = {
   futuresFunding: () => request("/api/v1/futures/funding"),
   futuresIndex: () => request("/api/v1/futures/index"),
   futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
+  // POST /api/v1/futures/wallet/deposit 充值（模拟链上确认后即时入账）。
+  futuresDeposit: (payload: { asset: string; amount: number; network?: string }) =>
+    request<{ asset: string; available: number; frozen: number }>("/api/v1/futures/wallet/deposit", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // POST /api/v1/futures/wallet/transfer 内部划转：资金账户(可用) ⇄ 合约保证金(冻结)。
+  futuresTransfer: (payload: { asset: string; amount: number; direction: "to_futures" | "to_funding" }) =>
+    request<{ asset: string; available: number; frozen: number }>("/api/v1/futures/wallet/transfer", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   walletLedger: async (params?: { asset?: string; limit?: number }) => {
     const d = await request<{ entries: LedgerEntry[] }>(
       withQuery("/api/v1/futures/wallet/ledger", params as Record<string, string | number | undefined>)

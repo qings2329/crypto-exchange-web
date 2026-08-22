@@ -48,9 +48,7 @@ export function Login() {
         <div className="demo-accounts">
           <div className="demo-title">{t("login.demoAccounts")}</div>
           <ul>
-            <li><code>admin@ce.dev</code> / <code>Admin@123</code> · {t("login.role.admin")}</li>
-            <li><code>op@ce.dev</code> / <code>Op@123</code> · {t("login.role.operator")}</li>
-            <li><code>user@ce.dev</code> / <code>User@123</code> · {t("login.role.user")}</li>
+            <li><code>user1</code> / <code>User@123</code></li>
           </ul>
         </div>
         <div className="switch">

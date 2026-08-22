@@ -330,7 +330,17 @@ export function Wallet() {
       </div>
 
       {/* 资产总览：总资产折算 + 分布饼图 + 资产列表快捷操作 */}
-      <AssetOverview />
+      <AssetOverview
+        onWithdraw={(a) => {
+          // 与"申请提现"同链路：高危操作需二次验证通过才展开表单
+          void secureAction.verify({ action: "withdraw" }).then((ok) => {
+            if (!ok) return;
+            setAsset(a);
+            setShowForm(true);
+            setTimeout(() => document.getElementById("wallet-withdraw-section")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+          });
+        }}
+      />
 
       <section className="card">
         <h3>{t("wallet.balance")}</h3>
@@ -343,7 +353,7 @@ export function Wallet() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" id="wallet-withdraw-section">
         <div className="card-head">
           <h3>{t("wallet.withdraws")}</h3>
           <input
