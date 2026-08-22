@@ -1,0 +1,36 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`KLineChart 错误态快照 > K 线加载失败 → 渲染 InlineError（trade.klineErr） 1`] = `
+<DocumentFragment>
+  <div
+    class="kchart"
+  >
+    <div
+      class="kchart-head"
+    >
+      <span
+        class="kchart-title"
+      >
+        BTC_USDT · 1m
+      </span>
+      <span
+        class="dot"
+        title="离线"
+      />
+    </div>
+    <div
+      class="kchart-canvas-wrap"
+    >
+      <div
+        class="kchart-tip err"
+      >
+        <div
+          class="error"
+        >
+          加载 K 线失败：network down
+        </div>
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

@@ -7,6 +7,7 @@ import {
 } from "../api/client";
 import { useConfirm } from "../components/Confirm";
 import { useI18n } from "../i18n";
+import { InlineError } from "../components/InlineError";
 
 const STATUS_KEY: Record<string, string> = {
   active: "bot.status.active",
@@ -171,7 +172,7 @@ export function BotGrid() {
         </div>
       </div>
 
-      {err && <div className="error">{t("bot.fail", { err })}</div>}
+      <InlineError err={err} failKey="bot.fail" />
       {msg && <div className="ok">{msg}</div>}
 
       {/* Create form */}

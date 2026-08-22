@@ -1,0 +1,70 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TradingViewChart 错误态快照 > K 线加载失败 → 覆盖层渲染 InlineError（trade.klineErr） 1`] = `
+<DocumentFragment>
+  <div
+    class="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card"
+  >
+    <div
+      class="flex items-center justify-between border-b border-border px-3"
+    >
+      <div
+        class="flex items-center gap-0.5"
+      >
+        <button
+          class="relative cursor-pointer px-3 py-2.5 text-xs transition-colors font-bold text-accent"
+        >
+          1M
+          <span
+            class="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full bg-accent"
+          />
+        </button>
+        <button
+          class="relative cursor-pointer px-3 py-2.5 text-xs transition-colors text-muted hover:text-foreground"
+        >
+          15M
+        </button>
+        <button
+          class="relative cursor-pointer px-3 py-2.5 text-xs transition-colors text-muted hover:text-foreground"
+        >
+          1H
+        </button>
+        <button
+          class="relative cursor-pointer px-3 py-2.5 text-xs transition-colors text-muted hover:text-foreground"
+        >
+          1D
+        </button>
+      </div>
+      <div
+        class="flex items-center gap-3"
+      >
+        <span
+          class="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted"
+          title="OFFLINE"
+        >
+          <span
+            class="size-1.5 rounded-full bg-muted"
+          />
+          OFFLINE
+        </span>
+      </div>
+    </div>
+    <div
+      class="relative min-h-0 flex-1"
+    >
+      <div
+        class="absolute inset-0"
+      />
+      <div
+        class="pointer-events-none absolute inset-0 grid place-items-center text-xs text-sell"
+      >
+        <div
+          class="error"
+        >
+          加载 K 线失败：network down
+        </div>
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { JsonTable } from "./JsonTable";
 import { useSelection, BatchBar, type BatchAction } from "./Batch";
 import { useI18n } from "../i18n";
+import { InlineError } from "./InlineError";
 
 // 拉取一个 GET 端点并以 JsonTable 展示；reloadKey 变化即重新拉取。
 // 可选能力：searchable（客户端关键字筛选）、pageSize（分页）、sortable（点击表头排序）、
@@ -160,7 +161,7 @@ export function ApiTable({
           )}
         </div>
       </div>
-      {err && <div className="error">{t("common.loadError", { err })}</div>}
+      <InlineError err={err} />
       {!err && data === undefined && <div className="muted">{t("common.loading")}</div>}
       {!err && data !== undefined && (
         <>

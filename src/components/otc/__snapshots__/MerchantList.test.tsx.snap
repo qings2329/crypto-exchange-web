@@ -1,0 +1,110 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MerchantList 错误态快照 > OTC 广告加载失败 → 渲染 InlineError（默认 common.loadError） 1`] = `
+<DocumentFragment>
+  <div
+    class="flex flex-col gap-3"
+  >
+    <div
+      class="flex gap-5 border-b border-border px-1"
+    >
+      <button
+        class="relative cursor-pointer pb-2.5 text-[13px] transition-colors font-semibold text-accent"
+        data-testid="otc-tab-express"
+      >
+        快捷区
+        <span
+          class="absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-accent"
+        />
+      </button>
+      <button
+        class="relative cursor-pointer pb-2.5 text-[13px] transition-colors text-muted hover:text-foreground"
+        data-testid="otc-tab-p2p"
+      >
+        自选区 (C2C)
+      </button>
+    </div>
+    <div
+      class="rounded-xl border border-border bg-card p-4"
+      data-testid="express-panel"
+    >
+      <div
+        class="flex flex-wrap items-end gap-3"
+      >
+        <div
+          class="flex overflow-hidden rounded-lg border border-border"
+          role="group"
+        >
+          <button
+            class="cursor-pointer px-4 py-2 text-sm font-semibold transition-colors bg-buy text-black"
+            data-testid="express-buy"
+          >
+            买入
+          </button>
+          <button
+            class="cursor-pointer px-4 py-2 text-sm font-semibold transition-colors text-muted hover:text-foreground"
+            data-testid="express-sell"
+          >
+            卖出
+          </button>
+        </div>
+        <select
+          class="cursor-pointer rounded-lg border border-border bg-background font-mono text-sm text-foreground outline-none focus:border-accent h-9 px-2.5"
+        >
+          <option
+            value="USDT"
+          >
+            USDT
+          </option>
+          <option
+            value="BTC"
+          >
+            BTC
+          </option>
+        </select>
+        <select
+          class="cursor-pointer rounded-lg border border-border bg-background font-mono text-sm text-foreground outline-none focus:border-accent h-9 px-2.5"
+        >
+          <option
+            value="CNY"
+          >
+            CNY
+          </option>
+          <option
+            value="USD"
+          >
+            USD
+          </option>
+        </select>
+        <label
+          class="flex min-w-[180px] flex-1 flex-col gap-1 text-xs text-muted"
+        >
+          交易金额 (CNY)
+          <input
+            class="h-9 w-full rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums text-foreground outline-none focus:border-accent"
+            data-testid="express-amount"
+            inputmode="numeric"
+            placeholder="输入金额"
+            value=""
+          />
+        </label>
+      </div>
+    </div>
+    <div
+      class="overflow-hidden rounded-xl border border-border bg-card"
+      data-testid="merchant-list"
+    >
+      <div
+        class="py-12 text-center"
+        data-testid="ads-error"
+      >
+        <div
+          class="error"
+        >
+          加载失败：network down
+        </div>
+      </div>
+    </div>
+  </div>
+</DocumentFragment>
+`;

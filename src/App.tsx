@@ -23,7 +23,6 @@ const LaunchpadPage = lazy(() => import("./pages/LaunchpadPage").then((m) => ({ 
 const Markets = lazy(() => import("./pages/Markets").then((m) => ({ default: m.Markets })));
 const Orders = lazy(() => import("./pages/Orders").then((m) => ({ default: m.Orders })));
 const Wallet = lazy(() => import("./pages/Wallet").then((m) => ({ default: m.Wallet })));
-const Wealth = lazy(() => import("./pages/Wealth").then((m) => ({ default: m.Wealth })));
 const Settings = lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })));
 const ApiKeys = lazy(() => import("./pages/ApiKeys").then((m) => ({ default: m.ApiKeys })));
 const Home = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
@@ -55,7 +54,6 @@ const PAGES: Record<string, React.ComponentType> = {
   "/wallet": Wallet,
   "/otc": OtcPage,
   "/launchpad": LaunchpadPage,
-  "/wealth": Wealth,
   "/lending": Lending,
   "/bot": BotGrid,
   "/settings": Settings,

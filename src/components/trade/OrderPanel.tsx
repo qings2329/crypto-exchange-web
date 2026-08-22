@@ -6,7 +6,7 @@
 //   行情穿越限价时自动撮合。接真实链时把 submit() 替换为合约 writeContract / 后端 API 即可。
 
 import { useMemo, useState } from "react";
-import { api } from "../../api/client";
+import { api, ApiError } from "../../api/client";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/utils";
@@ -122,7 +122,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
             qty,
           });
         } catch (e) {
-          toast.error((e as Error).message || t("common.requestFailed"));
+          toast.error(e instanceof ApiError ? e : (e as Error).message || t("common.requestFailed"));
           return;
         }
         openPosition({
@@ -145,7 +145,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
         const r = await api.placeOrder(symbol, side, effectivePrice, qty);
         serverId = String(r.order_id);
       } catch (e) {
-        toast.error((e as Error).message || t("common.requestFailed"));
+        toast.error(e instanceof ApiError ? e : (e as Error).message || t("common.requestFailed"));
         return;
       }
       const order: TradeOrder = {

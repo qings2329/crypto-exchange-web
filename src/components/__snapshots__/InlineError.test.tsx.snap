@@ -1,0 +1,52 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`InlineError 渲染快照 > 401 unauthorized：请先登录 + 登录入口 1`] = `
+<DocumentFragment>
+  <div
+    class="error"
+  >
+    请先登录以查看
+    <a
+      class="ml-1 underline hover:text-accent"
+      href="#/login"
+    >
+      登录
+    </a>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`InlineError 渲染快照 > 403 forbidden：权限不足提示（无登录入口） 1`] = `
+<DocumentFragment>
+  <div
+    class="error"
+  >
+    权限不足，无法执行该操作
+    <span
+      class="ml-1 muted"
+    >
+      如需开通请联系管理员。
+    </span>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`InlineError 渲染快照 > 自定义 failKey（如 bot.fail，带原始报错） 1`] = `
+<DocumentFragment>
+  <div
+    class="error"
+  >
+    操作失败：boom
+  </div>
+</DocumentFragment>
+`;
+
+exports[`InlineError 渲染快照 > 默认加载失败（common.loadError，带原始报错） 1`] = `
+<DocumentFragment>
+  <div
+    class="error"
+  >
+    加载失败：network down
+  </div>
+</DocumentFragment>
+`;

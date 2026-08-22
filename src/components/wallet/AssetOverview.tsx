@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { fetchTickers } from "../../services/binance";
-import { api } from "../../api/client";
+import { api, ApiError } from "../../api/client";
 import { fmtPrice, fmtQty, fmtCompact } from "../../lib/format";
 import { useToast } from "../Toast";
+import { useI18n } from "../../i18n";
 import { Modal } from "../Modal";
 import { SecureText } from "../security/SecureText";
 
@@ -22,9 +23,10 @@ function Masked({ value, hidden }: { value: string; hidden: boolean }) {
 
 export function AssetOverview({ onWithdraw }: { onWithdraw?: (asset: string) => void }) {
   const toast = useToast();
+  const { t } = useI18n();
   const qc = useQueryClient();
   // 服务端余额（充值/提现/划转的真实账本），操作成功后 invalidate 刷新
-  const { data: balances } = useQuery({
+  const { data: balances, isLoading, isError, refetch } = useQuery({
     queryKey: ["wallet-balance"],
     queryFn: () => api.futuresWalletBalance() as Promise<WalletRow[]>,
     refetchInterval: 15_000,
@@ -87,8 +89,20 @@ export function AssetOverview({ onWithdraw }: { onWithdraw?: (asset: string) => 
         </button>
       </div>
 
-      {!balances || balances.length === 0 ? (
-        <p className="py-6 text-center text-xs text-gray-500">Connect wallet to view your assets.</p>
+      {isError ? (
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <p className="text-xs text-gray-500">Assets failed to load. Please try again.</p>
+          <button
+            onClick={() => void refetch()}
+            className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-slate-300 hover:border-[#FCD535]/60 hover:text-[#FCD535]"
+          >
+            Retry
+          </button>
+        </div>
+      ) : isLoading ? (
+        <p className="py-6 text-center text-xs text-gray-500">Loading your assets…</p>
+      ) : !balances || balances.length === 0 ? (
+        <p className="py-6 text-center text-xs text-gray-500">No assets yet. Deposit to start trading.</p>
       ) : (
         <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
           {/* 左：总资产 + 饼图 */}
@@ -177,22 +191,24 @@ export function AssetOverview({ onWithdraw }: { onWithdraw?: (asset: string) => 
       {depRow && (
         <DepositModal
           row={depRow}
+          t={t}
           onClose={() => setDepRow(null)}
           onDone={async () => {
             setDepRow(null);
             await qc.invalidateQueries({ queryKey: ["wallet-balance"] });
-            toast.success("Deposit credited");
+            toast.success(t("wallet.depositCredited"));
           }}
         />
       )}
       {trRow && (
         <TransferModal
           row={trRow}
+          t={t}
           onClose={() => setTrRow(null)}
           onDone={async () => {
             setTrRow(null);
             await qc.invalidateQueries({ queryKey: ["wallet-balance"] });
-            toast.success("Transfer completed");
+            toast.success(t("wallet.transferCompleted"));
           }}
         />
       )}
@@ -201,7 +217,7 @@ export function AssetOverview({ onWithdraw }: { onWithdraw?: (asset: string) => 
 }
 
 /** 充值弹窗：按资产+网络生成确定性充值地址；"模拟到账"走服务端入账。 */
-function DepositModal({ row, onClose, onDone }: { row: WalletRow; onClose: () => void; onDone: () => void | Promise<void> }) {
+function DepositModal({ row, onClose, onDone, t }: { row: WalletRow; onClose: () => void; onDone: () => void | Promise<void>; t: (k: string) => string }) {
   const toast = useToast();
   const networks = ["ERC20", "TRC20", "BEP20"];
   const [network, setNetwork] = useState("ERC20");
@@ -232,7 +248,7 @@ function DepositModal({ row, onClose, onDone }: { row: WalletRow; onClose: () =>
       await api.futuresDeposit({ asset: row.asset, amount: amt, network });
       await onDone();
     } catch (e) {
-      toast.error((e as Error).message || "Deposit failed");
+      toast.error(e instanceof ApiError ? e : (e as Error).message || t("wallet.depositFailed"));
     } finally {
       setBusy(false);
     }
@@ -284,7 +300,7 @@ function DepositModal({ row, onClose, onDone }: { row: WalletRow; onClose: () =>
 }
 
 /** 划转弹窗：资金账户(可用) ⇄ 合约保证金(冻结)。 */
-function TransferModal({ row, onClose, onDone }: { row: WalletRow; onClose: () => void; onDone: () => void | Promise<void> }) {
+function TransferModal({ row, onClose, onDone, t }: { row: WalletRow; onClose: () => void; onDone: () => void | Promise<void>; t: (k: string) => string }) {
   const toast = useToast();
   const [direction, setDirection] = useState<"to_futures" | "to_funding">("to_futures");
   const [amount, setAmount] = useState("");
@@ -294,11 +310,11 @@ function TransferModal({ row, onClose, onDone }: { row: WalletRow; onClose: () =
     const amt = Number(amount);
     if (!(amt > 0)) return;
     if (direction === "to_futures" && amt > row.available) {
-      toast.error("Insufficient available balance");
+      toast.error(t("wallet.insufficientBalance"));
       return;
     }
     if (direction === "to_funding" && amt > row.frozen) {
-      toast.error("Insufficient futures margin");
+      toast.error(t("wallet.insufficientMargin"));
       return;
     }
     setBusy(true);
@@ -306,7 +322,7 @@ function TransferModal({ row, onClose, onDone }: { row: WalletRow; onClose: () =
       await api.futuresTransfer({ asset: row.asset, amount: amt, direction });
       await onDone();
     } catch (e) {
-      toast.error((e as Error).message || "Transfer failed");
+      toast.error(e instanceof ApiError ? e : (e as Error).message || t("wallet.transferFailed"));
     } finally {
       setBusy(false);
     }

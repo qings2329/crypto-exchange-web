@@ -78,7 +78,7 @@ export function KycPage() {
       });
       await refresh();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : t("kyc.submitFailed"));
+      toast.error(e instanceof ApiError ? e : t("kyc.submitFailed"));
     } finally {
       setSubmitting(false);
     }

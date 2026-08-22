@@ -22,6 +22,7 @@ import { fmtPrice } from "../../lib/format";
 import { cn } from "../../lib/utils";
 import { Skeleton } from "../ui/skeleton";
 import { StreamDot } from "./StreamDot";
+import { InlineError } from "../InlineError";
 import type { Kline } from "../../types";
 
 export const INTERVALS = ["1m", "15m", "1h", "1d"] as const;
@@ -56,7 +57,7 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
   const [themeVer, setThemeVer] = useState(0);
 
   // REST 种子数据
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["binanceKlines", symbol, interval, limit],
     queryFn: () => fetchKlines(symbol, interval, limit),
     staleTime: 60_000,
@@ -211,7 +212,7 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
         )}
         {isError && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-xs text-sell">
-            Failed to load klines (network/region restricted)
+            <InlineError err={error} failKey="trade.klineErr" />
           </div>
         )}
       </div>

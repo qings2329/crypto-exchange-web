@@ -8,6 +8,7 @@ import type { PayMethod } from "./MethodIcon";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { cn } from "../../lib/utils";
 import { MethodIcon } from "./MethodIcon";
+import { InlineError } from "../InlineError";
 
 interface Props {
   onTrade: (ad: OtcAdView) => void;
@@ -73,9 +74,9 @@ export function MerchantList({ onTrade }: Props) {
     }
     if (error) {
       return (
-        <p className="py-12 text-center text-sm text-sell" data-testid="ads-error">
-          {t("otc.loadFailed")} · {error}
-        </p>
+        <div className="py-12 text-center" data-testid="ads-error">
+          <InlineError err={error} />
+        </div>
       );
     }
     if (ads.length === 0) {

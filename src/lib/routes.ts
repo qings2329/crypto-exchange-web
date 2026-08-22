@@ -1,7 +1,7 @@
 // 路由元数据：公开页面白名单（无需登录即可浏览）。
 // App 路由器与 api/client（401 处理）共用，避免双向依赖。
 
-export const PUBLIC_PAGES = new Set(["/", "/home", "/markets", "/futures", "/otc", "/announcements", "/lending", "/wealth", "/earn", "/launchpad"]);
+export const PUBLIC_PAGES = new Set(["/", "/home", "/markets", "/futures", "/otc", "/announcements", "/lending", "/launchpad"]);
 
 /** 当前 hash 路由路径（如 /home、/trade/BTCUSDT）。 */
 export function currentPath(): string {

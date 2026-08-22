@@ -125,7 +125,7 @@ export function OtcTradeModal({ ad, initialTradeId, onClose }: Props) {
       prevStatus.current = created.status;
       setOrder(created);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : t("otc.loadFailed"));
+      toast.error(e instanceof ApiError ? e : t("otc.loadFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -152,7 +152,7 @@ export function OtcTradeModal({ ad, initialTradeId, onClose }: Props) {
       const fresh = d.find((x) => x.id === order.id);
       if (fresh) setOrder(fresh);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : t("otc.loadFailed"));
+      toast.error(e instanceof ApiError ? e : t("otc.loadFailed"));
     }
   };
 
@@ -166,7 +166,7 @@ export function OtcTradeModal({ ad, initialTradeId, onClose }: Props) {
       const fresh = d.find((x) => x.id === order.id);
       if (fresh) setOrder(fresh);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : t("otc.loadFailed"));
+      toast.error(e instanceof ApiError ? e : t("otc.loadFailed"));
     }
   };
 

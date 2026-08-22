@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, tokenStore, type OrderView, type TradeView } from "../api/client";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
+import { InlineError } from "../components/InlineError";
 
 // 订单状态 -> 文案 key（对齐 history.status.*）。
 const ORDER_STATUS_KEY: Record<string, string> = {
@@ -215,7 +216,7 @@ export function History() {
       </div>
 
       {err ? (
-        <div className="error">{t("common.loadError", { err })}</div>
+        <InlineError err={err} />
       ) : !ready ? (
         <div className="muted">{t("common.loading")}</div>
       ) : isOrders ? (

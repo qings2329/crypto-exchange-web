@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/Confirm";
+import { InlineError } from "../components/InlineError";
 import { api, ApiError, type LaunchPool, type LaunchPosition, type LaunchProject, type LaunchStatus } from "../api/client";
 import { useAuth } from "../lib/auth";
 import { fmtAPY, fmtDuration, msUntil } from "../lib/earn-utils";
@@ -58,9 +59,9 @@ export function LaunchpadPage() {
         </div>
       )}
       {!loading && error && (
-        <p className="py-12 text-center text-sm text-sell" data-testid="launch-error">
-          {t("earn.loadFailed")} · {error}
-        </p>
+        <div className="py-12 text-center" data-testid="launch-error">
+          <InlineError err={error} />
+        </div>
       )}
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3" data-testid="project-grid">
@@ -212,7 +213,7 @@ function StakeModal({
       toast.success(okMsg);
       loadPosition(poolId);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : t("earn.actionFailed"));
+      toast.error(e instanceof ApiError ? e : t("earn.actionFailed"));
     } finally {
       setBusy(false);
     }

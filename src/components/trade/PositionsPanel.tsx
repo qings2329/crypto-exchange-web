@@ -2,7 +2,7 @@
 // 提供 Market Close（确认弹窗）与 TP/SL 设置弹窗；标记价格用实时行情现算。
 import { useEffect, useState } from "react";
 import { useFuturesStore, type Position } from "../../store/futures-store";
-import { api } from "../../api/client";
+import { api, ApiError } from "../../api/client";
 import { useTickerLive } from "../../hooks/use-ticker-live";
 import { calcMarginRatio, calcPnl } from "../../lib/futures-math";
 import { fmtPrice, fmtQty } from "../../lib/format";
@@ -138,7 +138,7 @@ function PositionRow({ pos }: { pos: Position }) {
       const realized = typeof r.realized_pnl === "number" ? r.realized_pnl : pnl;
       toast.success(`Position closed · realized ${realized >= 0 ? "+" : ""}${realized.toFixed(2)} USDT`);
     } catch (e) {
-      toast.error((e as Error).message || "Close failed");
+      toast.error(e instanceof ApiError ? e : (e as Error).message || "Close failed");
     }
   };
 
@@ -231,7 +231,7 @@ function PositionRow({ pos }: { pos: Position }) {
               setTpslOpen(false);
               toast.success("TP/SL updated");
             } catch (e) {
-              toast.error((e as Error).message || "TP/SL update failed");
+              toast.error(e instanceof ApiError ? e : (e as Error).message || "TP/SL update failed");
             }
           }}
         />

@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`LaunchpadPage 错误态快照 > 项目列表加载失败 → 渲染 InlineError（默认 common.loadError） 1`] = `
+<DocumentFragment>
+  <div
+    class="mx-auto max-w-[1100px] px-4 py-6"
+  >
+    <div
+      class="mb-5"
+    >
+      <h1
+        class="text-xl font-bold"
+      >
+        新币挖矿
+      </h1>
+      <p
+        class="mt-1 text-sm text-muted"
+      >
+        质押 BNB / FDUSD，零成本挖取新币
+      </p>
+    </div>
+    <div
+      class="py-12 text-center"
+      data-testid="launch-error"
+    >
+      <div
+        class="error"
+      >
+        加载失败：network down
+      </div>
+    </div>
+    <div
+      class="grid gap-3 md:grid-cols-2 lg:grid-cols-3"
+      data-testid="project-grid"
+    />
+  </div>
+</DocumentFragment>
+`;

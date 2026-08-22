@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Announcement } from "../api/client";
 import { useI18n } from "../i18n";
+import { InlineError } from "../components/InlineError";
 
 const LEVEL_KEY: Record<string, string> = {
   info: "ann.level.info",
@@ -32,7 +33,7 @@ export default function Announcements() {
       <div className="page-head">
         <h2>{t("page.announcements")}</h2>
       </div>
-      {err && <div className="error">{t("common.loadError", { err })}</div>}
+      <InlineError err={err} />
       {!err && list === undefined && <div className="muted">{t("common.loading")}</div>}
       {!err && list !== undefined && list.length === 0 && (
         <div className="muted">{t("ann.empty")}</div>

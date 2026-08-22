@@ -4,6 +4,7 @@ import type { IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from
 import { api, connectKlineWS, type Kline } from "../api/client";
 import { reportWsDrop } from "../lib/monitor";
 import { useI18n } from "../i18n";
+import { InlineError } from "./InlineError";
 
 interface Props {
   symbol: string;
@@ -47,7 +48,7 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
 
   const [data, setData] = useState<Kline[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [live, setLive] = useState(false);
   const [themeVer, setThemeVer] = useState(0);
 
@@ -65,7 +66,7 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
       })
       .catch((e: unknown) => {
         if (!alive) return;
-        setError(e instanceof Error ? e.message : t("trade.klineErr"));
+        setError(e);
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -203,7 +204,11 @@ export function KLineChart({ symbol, interval = "1m", limit = 500 }: Props) {
       </div>
       <div className="kchart-canvas-wrap" ref={wrapRef}>
         {loading && <div className="kchart-tip">{t("common.loading")}</div>}
-        {!loading && error && <div className="kchart-tip err">{error}</div>}
+        {!loading && error != null && (
+          <div className="kchart-tip err">
+            <InlineError err={error} failKey="trade.klineErr" />
+          </div>
+        )}
         {!loading && !error && data.length === 0 && (
           <div className="kchart-tip">{t("trade.noKline")}</div>
         )}

@@ -14,7 +14,6 @@ const LINKS: { path: string; key: string; role?: "operator" | "admin"; auth?: bo
   { path: "/markets", key: "nav.markets" },
   { path: "/wallet", key: "nav.wallet" },
   { path: "/lending", key: "nav.lending" },
-  { path: "/wealth", key: "nav.wealth" },
   { path: "/launchpad", key: "nav.launchpad" },
   { path: "/bot", key: "nav.bot" },
   { path: "/referral", key: "nav.referral" },
@@ -126,22 +125,22 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
 
   return (
     <div className="relative hidden sm:block" ref={ref} data-testid="lang-menu">
-      <Button variant="outline" size="sm" aria-label={t("lang.label")} onClick={() => setOpen((o) => !o)} data-testid="lang-trigger" className="gap-1.5 hover:border-accent/60 hover:text-accent">
+      <Button variant="outline" size="sm" aria-label={t("lang.label")} aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="lang-trigger" className="gap-1.5 hover:border-accent/60 hover:text-accent">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
           <circle cx="12" cy="12" r="9" />
           <path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" />
         </svg>
         {current?.label}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cn("size-3 transition-transform", open && "rotate-180")}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={cn("size-3 transition-transform duration-200", open && "rotate-180")}>
           <path d="m6 9 6 6 6-6" />
         </svg>
       </Button>
       {open && (
         <div
           data-testid="lang-dropdown"
-          className="lang-dropdown absolute right-0 top-full z-50 mt-1.5 w-44 origin-top-right overflow-hidden rounded-xl border border-border bg-card shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+          className="lang-dropdown absolute right-0 top-full z-50 mt-2 w-48 origin-top-right overflow-hidden rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
         >
-          <div className="border-b border-border px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
             {t("lang.label")}
           </div>
           {LOCALES.map((lc) => {
@@ -154,8 +153,8 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left transition-colors",
-                  active ? "bg-panel-2/60" : "hover:bg-panel-2/60"
+                  "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                  active ? "bg-[#FCD535]/10" : "hover:bg-[#2B3139]/50"
                 )}
               >
                 <span className={cn("text-sm", active ? "font-semibold text-accent" : "text-foreground")}>{lc.label}</span>

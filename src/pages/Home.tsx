@@ -65,7 +65,6 @@ const SHORTCUTS = [
   { path: "/wallet", icon: "💰", key: "wallet" },
   { path: "/futures", icon: "📈", key: "futures" },
   { path: "/lending", icon: "🏦", key: "lending" },
-  { path: "/wealth", icon: "💎", key: "wealth" },
   { path: "/bot", icon: "🤖", key: "bot" },
   { path: "/referral", icon: "🎁", key: "referral" },
   { path: "/settings", icon: "⚙️", key: "settings" },

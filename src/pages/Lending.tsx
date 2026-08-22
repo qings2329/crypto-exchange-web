@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type LendingPool, type LendOrder, type BorrowOrder } from "../api/client";
 import { useI18n } from "../i18n";
+import { InlineError } from "../components/InlineError";
 
 const LEND_STATUS: Record<string, string> = {
   active: "lending.status.active",
@@ -148,7 +149,7 @@ export function Lending() {
         </button>
       </div>
 
-      {err && <div className="error">{t("lending.fail", { err })}</div>}
+      <InlineError err={err} failKey="lending.fail" />
       {msg && <div className="ok">{msg}</div>}
 
       {/* Pool list */}

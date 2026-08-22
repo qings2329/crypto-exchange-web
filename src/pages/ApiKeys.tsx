@@ -3,6 +3,7 @@ import { api, type ApiKey, type ApiKeyPermission } from "../api/client";
 import { useI18n } from "../i18n";
 import { useSecureAction } from "../components/security/SecureActionProvider";
 import { formatDateTime } from "../lib/timezone";
+import { InlineError } from "../components/InlineError";
 
 const PERMS: ApiKeyPermission[] = ["read", "trade", "withdraw"];
 // 权限 -> 文案 key（对齐 apikeys.perm.*）。
@@ -275,7 +276,7 @@ export function ApiKeys() {
         </section>
       )}
 
-      {err && <div className="error">{t("apikeys.fail", { err })}</div>}
+      <InlineError err={err} failKey="apikeys.fail" />
       {msg && <div className="ok">{msg}</div>}
 
       {/* 创建表单 */}

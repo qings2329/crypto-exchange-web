@@ -41,13 +41,20 @@ export const tokenStore = {
   },
 };
 
+// 错误语义分类：用于 Toast 层区分「未登录/会话过期(401)」与「已登录但权限不足(403)」，
+// 避免把 403 误提示为「请先登录」。由 HTTP 状态码派生，无需调用方显式传递。
+export type ApiErrorKind = "unauthorized" | "forbidden" | "other";
+
 export class ApiError extends Error {
   code: number;
   status: number;
+  kind: ApiErrorKind;
   constructor(message: string, code: number, status: number) {
     super(message);
     this.code = code;
     this.status = status;
+    this.kind =
+      status === 401 ? "unauthorized" : status === 403 ? "forbidden" : "other";
   }
 }
 
@@ -112,7 +119,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     /* 非 JSON 响应 */
   }
   if (!res.ok) {
-    const msg = body?.message || res.statusText || "请求失败";
+    // 403：已登录但角色/权限不足。构造 forbidden 错误，文案由 Toast 层按状态码统一收口
+    // 为「权限不足」提示，避免把「权限不足」误提示为「请先登录」。
+    const msg =
+      res.status === 403
+        ? body?.message || "权限不足"
+        : body?.message || res.statusText || "请求失败";
     const err = new ApiError(msg, body?.code ?? -1, res.status);
     // 集中上报接口异常（动态导入避免与 monitor 模块形成静态循环依赖）。
     import("../lib/monitor")
@@ -481,22 +493,6 @@ export const api = {
       body: JSON.stringify({ position_id }),
     }),
 
-
-  // ---- 理财 ----
-  wealthProducts: () => request("/api/v1/wealth/products"),
-  wealthHoldings: () => request("/api/v1/wealth/holdings"),
-  // POST /api/v1/wealth/subscribe 认购（需登录）。返回新建持仓。
-  wealthSubscribe: (productId: number, amount: number) =>
-    request<WealthHolding>("/api/v1/wealth/subscribe", {
-      method: "POST",
-      body: JSON.stringify({ product_id: productId, amount }),
-    }),
-  // POST /api/v1/wealth/redeem 赎回（需登录）。返回赎回后的持仓（终态）。
-  wealthRedeem: (holdingId: number) =>
-    request<WealthHolding>("/api/v1/wealth/redeem", {
-      method: "POST",
-      body: JSON.stringify({ holding_id: holdingId }),
-    }),
 
   // ---- 借贷 ----
   lendingPools: async () => {
@@ -1074,44 +1070,6 @@ export interface RiskEvent {
   detail: string;
   status: RiskEventStatus;
   created_at?: string;
-}
-
-// ---------- 理财 ----------
-// 理财产品类型。
-export type WealthProductType = "current" | "fixed";
-// 理财产品状态。
-export type WealthProductStatus = "open" | "closed";
-// 持仓状态。
-export type WealthHoldingStatus = "active" | "funding" | "redeemed";
-
-// 理财产品（GET /api/v1/wealth/products 返回）。
-export interface WealthProduct {
-  id: number;
-  name: string;
-  asset: string; // 底层资产，如 USDT
-  type: WealthProductType;
-  annual_rate: number; // 年化收益率，0.05 表示 5%
-  duration_days: number; // 锁定期限（天）；活期为 0
-  min_amount: number; // 起购金额
-  status: WealthProductStatus;
-  created_at?: string;
-  updated_at?: string;
-}
-
-// 用户理财持仓（GET /api/v1/wealth/holdings 返回）。
-// principal / accrued_yield 由后端按人类可读十进制数字序列化（JSON 数字）。
-export interface WealthHolding {
-  id: number;
-  user_id: number;
-  product_id: number;
-  asset: string;
-  principal: number; // 本金（人类单位）
-  accrued_yield: number; // 已计收益（人类单位）
-  status: WealthHoldingStatus;
-  created_at?: string;
-  last_accrual_at?: string;
-  redeemed_at?: string;
-  updated_at?: string;
 }
 
 // ---------- 订单 / 成交（现货 + 合约共享 matching.OrderView / TradeView）----------

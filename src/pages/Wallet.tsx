@@ -7,6 +7,7 @@ import { AssetOverview } from "../components/wallet/AssetOverview";
 import { useSecureAction } from "../components/security/SecureActionProvider";
 import { useGuardedAction } from "../hooks/use-guarded-action";
 import { SecureText } from "../components/security/SecureText";
+import { InlineError } from "../components/InlineError";
 
 const BALANCE_EP = "/api/v1/futures/wallet/balance";
 const WITHDRAWS_EP = "/api/v1/futures/wallet/withdraws";
@@ -345,7 +346,7 @@ export function Wallet() {
       <section className="card">
         <h3>{t("wallet.balance")}</h3>
         {balanceErr ? (
-          <div className="error">{t("common.loadError", { err: balanceErr })}</div>
+          <InlineError err={balanceErr} />
         ) : balance === undefined ? (
           <div className="muted">{t("common.loading")}</div>
         ) : (
@@ -463,7 +464,7 @@ export function Wallet() {
         )}
 
         {withdrawsErr ? (
-          <div className="error">{t("common.loadError", { err: withdrawsErr })}</div>
+          <InlineError err={withdrawsErr} />
         ) : withdraws === undefined ? (
           <div className="muted">{t("common.loading")}</div>
         ) : Array.isArray(withdraws) && (withdraws as unknown[]).length === 0 ? (
@@ -484,7 +485,7 @@ export function Wallet() {
           />
         </div>
         {ledgerErr ? (
-          <div className="error">{t("common.loadError", { err: ledgerErr })}</div>
+          <InlineError err={ledgerErr} />
         ) : ledger === undefined ? (
           <div className="muted">{t("common.loading")}</div>
         ) : filteredLedger.length === 0 ? (

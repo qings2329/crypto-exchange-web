@@ -14,6 +14,7 @@ import { applyTheme, THEMES, type ThemeId } from "../lib/theme";
 import { setTimeZone, COMMON_TZ } from "../lib/timezone";
 import { validatePassword } from "../lib/validate";
 import { useSecureAction } from "../components/security/SecureActionProvider";
+import { InlineError } from "../components/InlineError";
 
 const DEFAULT_PREFS: UserPreferences = {
   user_id: 0,
@@ -284,7 +285,7 @@ export function Settings() {
       </div>
 
       {loading && <div className="mono">{t("common.loading")}</div>}
-      {err && <div className="error">{t("common.loadError", { err })}</div>}
+      <InlineError err={err} />
 
       {/* 账户信息 */}
       {profile && (
