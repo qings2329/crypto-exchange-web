@@ -95,10 +95,7 @@ authRouter.post("/api/v1/user/login", (req, res) => {
   if (!user || user.password !== password) {
     return res.status(401).json({ code: 401, message: "账号或密码错误", data: null });
   }
-  // 用户前端只允许普通用户登录；管理员/运营账户请走管理后台（ce-admin-web，经 Go :8095 认证）。
-  if (user.role !== "user") {
-    return res.status(403).json({ code: 403, message: "管理员/运营账户请使用管理后台登录", data: null });
-  }
+  // 用户前端不存在管理员/运营角色差异，任意账户均可登录（演示网关仅做凭证校验）。
   const tokens = issueTokens(user);
   res.json({ code: 0, message: "ok", data: tokens });
 });
@@ -113,8 +110,8 @@ authRouter.post("/api/v1/user/refresh", (req, res) => {
   }
   const user = users.find((u) => u.id === rec.userId);
   refreshStore.delete(rt); // 轮转：旧 refresh 失效
-  if (!user || user.role !== "user") {
-    return res.status(403).json({ code: 403, message: "管理员/运营账户请使用管理后台登录", data: null });
+  if (!user) {
+    return res.status(403).json({ code: 403, message: "刷新令牌无效", data: null });
   }
   const tokens = issueTokens(user);
   res.json({ code: 0, message: "ok", data: tokens });

@@ -25,7 +25,7 @@ describe("InlineError 渲染快照", () => {
     expect(asFragment()).toMatchSnapshot();
   });
 
-  it("403 forbidden：权限不足提示（无登录入口）", () => {
+  it("403：用户前端无管理员角色概念，归为会话失效（请先登录 + 登录入口）", () => {
     const { asFragment } = renderErr({ err: { status: 403, message: "Forbidden" } });
     expect(asFragment()).toMatchSnapshot();
   });

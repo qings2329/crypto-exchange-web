@@ -24,12 +24,12 @@ interface ToastItem {
 // 允许传入错误对象以便按 HTTP 状态码区分 401 与 403，而非依赖文案正则。
 export type ToastInput = string | Error | { status?: number; message?: string };
 
-// 把错误归一成最终展示文案：优先按状态码区分 401 / 403（复用统一的 classifyError），
+// 把错误归一成最终展示文案：优先按状态码区分 401 / 403（复用统一的 classifyError）。
+// 用户前端无管理员/运营角色概念，403 与 401 同样视为「会话失效」引导重新登录；
 // 其余情况展示原始报错文本。
 function resolveErrorMessage(input: ToastInput): string {
   const kind = classifyError(input);
-  if (kind === "forbidden") return i18next.t("common.forbiddenAction");
-  if (kind === "unauthorized") return i18next.t("common.authRequired");
+  if (kind === "unauthorized" || kind === "forbidden") return i18next.t("common.authRequired");
   return errorToText(input);
 }
 

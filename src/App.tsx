@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { AuthProvider } from "./lib/auth";
-import { RequireRole } from "./lib/rbac";
+import { RequireLogin } from "./lib/rbac";
 import { ConfirmProvider } from "./components/Confirm";
 import { SecureActionProvider } from "./components/security/SecureActionProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -110,7 +110,7 @@ function Router() {
 
   return (
     <Layout>
-      <div className="content">{isPublic ? content : <RequireRole role="user">{content}</RequireRole>}</div>
+      <div className="content">{isPublic ? content : <RequireLogin>{content}</RequireLogin>}</div>
     </Layout>
   );
 }

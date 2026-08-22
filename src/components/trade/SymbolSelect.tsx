@@ -65,7 +65,7 @@ export function SymbolSelect({
       {open && (
         <ul
           role="listbox"
-          className="absolute left-0 z-30 mt-1 max-h-72 w-40 overflow-auto rounded-md border border-border bg-card py-1 shadow-lg"
+          className="absolute left-0 z-30 mt-1 max-h-72 w-44 overflow-auto rounded-md border border-[#2B3139] bg-[#1E2329] py-1 shadow-lg"
         >
           {TRADE_SYMBOLS.map((s) => (
             <li key={s} role="option" aria-selected={s === value}>
@@ -76,8 +76,8 @@ export function SymbolSelect({
                   setOpen(false);
                 }}
                 className={cn(
-                  "block w-full px-3 py-1.5 text-left font-mono text-xs transition-colors hover:bg-[#2B3139]/40",
-                  s === value ? "font-semibold text-accent" : "text-foreground"
+                  "block w-full px-3 py-1.5 text-left font-mono text-xs text-[#EAECEF] transition-colors hover:bg-[#2B3139]/60",
+                  s === value && "font-semibold text-[#FCD535]"
                 )}
               >
                 {s}

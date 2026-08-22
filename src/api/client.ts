@@ -110,7 +110,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   // 无刷新令牌却收到 401（未登录态访问受保护资源）：跳转登录页重新鉴权。
   // 登录接口自身的 401（凭证错误）除外，避免打断登录错误提示；
-  // 公开页（首页/合约等）保持匿名可浏览，仅由页面自身的 RequireRole 决定是否跳转。
+  // 公开页（首页/合约等）保持匿名可浏览，仅由页面自身的登录态守卫决定是否跳转。
   if (res.status === 401 && !tokenStore.refresh && !path.includes("/user/login") && !isPublicRoute()) {
     if (typeof location !== "undefined") location.hash = "/login";
   }
@@ -122,8 +122,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     /* 非 JSON 响应 */
   }
   if (!res.ok) {
-    // 403：已登录但角色/权限不足。构造 forbidden 错误，文案由 Toast 层按状态码统一收口
-    // 为「权限不足」提示，避免把「权限不足」误提示为「请先登录」。
+  // 403：用户前端无管理员/运营角色概念，此处按状态码构造错误，由 Toast / InlineError
+  // 统一归为「会话失效」引导重新登录（而非「权限不足」）。
     const msg =
       res.status === 403
         ? body?.message || "权限不足"

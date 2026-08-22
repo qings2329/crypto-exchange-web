@@ -16,17 +16,18 @@ exports[`InlineError 渲染快照 > 401 unauthorized：请先登录 + 登录入�
 </DocumentFragment>
 `;
 
-exports[`InlineError 渲染快照 > 403 forbidden：权限不足提示（无登录入口） 1`] = `
+exports[`InlineError 渲染快照 > 403：用户前端无管理员角色概念，归为会话失效（请先登录 + 登录入口） 1`] = `
 <DocumentFragment>
   <div
     class="error"
   >
-    权限不足，无法执行该操作
-    <span
-      class="ml-1 muted"
+    请先登录以查看
+    <a
+      class="ml-1 underline hover:text-accent"
+      href="#/login"
     >
-      如需开通请联系管理员。
-    </span>
+      登录
+    </a>
   </div>
 </DocumentFragment>
 `;

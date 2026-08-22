@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
-import { usePermission } from "../../lib/rbac";
 import { useI18n, LOCALES, type Locale } from "../../i18n";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 
-// 导航项与所需最低角色（与业务路由保持一致，管理入口仅对运营/管理员可见）。
-const LINKS: { path: string; key: string; role?: "operator" | "admin"; auth?: boolean }[] = [
+// 导航项：用户前端无角色权限差异，所有已登录用户可见同一套导航。
+const LINKS: { path: string; key: string; auth?: boolean }[] = [
   { path: "/home", key: "nav.home" },
   { path: "/trade", key: "nav.trade" },
   { path: "/futures", key: "nav.futures" },
@@ -27,7 +26,6 @@ const LINKS: { path: string; key: string; role?: "operator" | "admin"; auth?: bo
  */
 export function Header() {
   const { uid, logout } = useAuth();
-  const { role, hasRole } = usePermission();
   const { locale, setLocale } = useI18n();
   const { t } = useTranslation();
   const current = (location.hash.replace(/^#/, "") || "/home").split("?")[0];
@@ -43,7 +41,7 @@ export function Header() {
 
         {/* 主导航：下划线 Tab */}
         <nav className="hidden h-full flex-1 items-center gap-1 lg:flex">
-          {LINKS.filter((l) => (!l.role || hasRole(l.role)) && (!l.auth || uid)).map((l) => {
+          {LINKS.filter((l) => !l.auth || uid).map((l) => {
             // 前缀匹配：/trade 重定向到 /trade/BTCUSDT 后仍保持高亮
             const active = current === l.path || current.startsWith(`${l.path}/`);
             return (
@@ -68,14 +66,7 @@ export function Header() {
 
           {uid ? (
             <>
-              <span className="flex items-center gap-1.5 text-xs text-muted">
-                #{uid}
-                {role && (
-                  <span className="rounded-md bg-tag-bg px-1.5 py-0.5 text-[11px] font-medium text-accent">
-                    {t(`nav.role.${role}`)}
-                  </span>
-                )}
-              </span>
+              <span className="flex items-center gap-1.5 text-xs text-muted">#{uid}</span>
               <Button variant="ghost" size="sm" onClick={logout}>
                 {t("header.logout")}
               </Button>
@@ -138,9 +129,9 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
       {open && (
         <div
           data-testid="lang-dropdown"
-          className="lang-dropdown absolute right-0 top-full z-50 mt-2 w-48 origin-top-right overflow-hidden rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+          className="lang-dropdown absolute right-0 top-full z-50 mt-2 w-48 origin-top-right overflow-hidden rounded-xl border border-[#2B3139] bg-[#1E2329] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
         >
-          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
+          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#848E9C]">
             {t("lang.label")}
           </div>
           {LOCALES.map((lc) => {
@@ -154,16 +145,16 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
                 }}
                 className={cn(
                   "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
-                  active ? "bg-[#FCD535]/10" : "hover:bg-[#2B3139]/50"
+                  active ? "bg-[#FCD535]/10" : "hover:bg-[#2B3139]/60"
                 )}
               >
-                <span className={cn("text-sm", active ? "font-semibold text-accent" : "text-foreground")}>{lc.label}</span>
+                <span className={cn("text-sm text-[#EAECEF]", active && "font-semibold text-[#FCD535]")}>{lc.label}</span>
                 <span className="ml-auto flex items-center gap-1.5">
                   {NATIVE_LABELS[lc.value] !== lc.label && (
-                    <span className="text-[11px] text-muted">{NATIVE_LABELS[lc.value]}</span>
+                    <span className="text-[11px] text-[#848E9C]">{NATIVE_LABELS[lc.value]}</span>
                   )}
                   {active && (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-3.5 text-accent">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-3.5 text-[#FCD535]">
                       <path d="M20 6 9 17l-5-5" />
                     </svg>
                   )}

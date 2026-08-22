@@ -2,8 +2,9 @@ import { useTranslation } from "react-i18next";
 import { classifyError, errorToText } from "../lib/utils";
 
 // 页面内联错误：统一判定 401 / 403 并渲染对应提示，替换各页面重复的 inline 报错 JSX。
-// - forbidden(403)：已登录但权限不足 → 「权限不足」提示（不引导登录）
-// - unauthorized(401)：未登录/会话过期 → 「请先登录」+ 登录入口
+// 用户前端无管理员/运营角色与权限等级，因此 403 不再解读为「权限不足」，
+// 而视为「会话失效」（令牌无效/过期），与 401 同样引导重新登录。
+// - unauthorized(401) / forbidden(403)：未登录或会话失效 → 「请先登录」+ 登录入口
 // - 其他：加载失败 + 原始报错（failKey 可指定页面特有文案，默认 common.loadError）
 export function InlineError({
   err,
@@ -16,16 +17,7 @@ export function InlineError({
   const kind = classifyError(err);
   if (!err) return null;
 
-  if (kind === "forbidden") {
-    return (
-      <div className="error">
-        {t("common.forbiddenAction")}
-        <span className="ml-1 muted">{t("forbidden.contact")}</span>
-      </div>
-    );
-  }
-
-  if (kind === "unauthorized") {
+  if (kind === "unauthorized" || kind === "forbidden") {
     return (
       <div className="error">
         {t("common.authRequired")}
