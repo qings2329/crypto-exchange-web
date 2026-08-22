@@ -4,6 +4,9 @@ import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
 import { isValidCryptoAddress, validateAmount } from "../lib/validate";
 import { AssetOverview } from "../components/wallet/AssetOverview";
+import { useSecureAction } from "../components/security/SecureActionProvider";
+import { useGuardedAction } from "../hooks/use-guarded-action";
+import { SecureText } from "../components/security/SecureText";
 
 const BALANCE_EP = "/api/v1/futures/wallet/balance";
 const WITHDRAWS_EP = "/api/v1/futures/wallet/withdraws";
@@ -116,6 +119,7 @@ function AdaptiveTable({ data }: { data: unknown }) {
 // 钱包：以合约钱包余额接口为统一资产视图（现货余额经撮合引擎内存态，无独立 HTTP 接口）。
 export function Wallet() {
   const { t } = useI18n();
+  const secureAction = useSecureAction();
   const [balance, setBalance] = useState<unknown>(undefined);
   const [balanceErr, setBalanceErr] = useState("");
   const [withdraws, setWithdraws] = useState<unknown>(undefined);
@@ -210,7 +214,13 @@ export function Wallet() {
     return Object.keys(d as Record<string, unknown>);
   }, [balance]);
 
-  const submitWithdraw = async () => {
+  const guardedSubmit = useGuardedAction(() => void doSubmitWithdraw(), {
+    key: "withdraw-submit",
+    cooldownMs: 3000,
+    debounceMs: 500,
+  });
+
+  const doSubmitWithdraw = async () => {
     setFormMsg("");
     setAddrErr("");
     setAmtErr("");
@@ -281,7 +291,20 @@ export function Wallet() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
-          <button className="btn" onClick={() => setShowForm((v) => !v)}>
+          <button
+            className="btn"
+            data-testid="wallet-withdraw-toggle"
+            onClick={() => {
+              if (showForm) {
+                setShowForm(false);
+                return;
+              }
+              // 高危操作拦截：提现需通过滑块 + 2FA/邮箱验证码二次验证
+              void secureAction.verify({ action: "withdraw" }).then((ok) => {
+                if (ok) setShowForm(true);
+              });
+            }}
+          >
             {showForm ? t("otc.collapse") : t("wallet.applyWithdraw")}
           </button>
         </div>
@@ -305,6 +328,12 @@ export function Wallet() {
             <label>
               {t("wallet.address")}
               <input value={address} onChange={(e) => onAddressChange(e.target.value)} placeholder={t("wallet.phAddress")} />
+              {address.length >= 8 && (
+                <div className="mono" data-testid="withdraw-address-masked">
+                  {t("wallet.addressConfirm")}{" "}
+                  <SecureText value={address} mask maskOpts={{ leading: 6, trailing: 6 }} />
+                </div>
+              )}
               {addrErr && <div className="error">{addrErr}</div>}
             </label>
             <label>
@@ -321,8 +350,10 @@ export function Wallet() {
               {t("wallet.network")}
               <input value={network} onChange={(e) => setNetwork(e.target.value)} placeholder={t("wallet.phNetwork")} />
             </label>
-            <button className="btn primary" onClick={submitWithdraw} disabled={submitting}>
-              {submitting ? t("common.loading") : t("wallet.submitWithdraw")}
+            <button className="btn primary" onClick={() => guardedSubmit.run()} disabled={submitting || guardedSubmit.cooling}>
+              {submitting || guardedSubmit.cooling
+                ? t("common.loading")
+                : t("wallet.submitWithdraw")}
             </button>
             {formMsg && (
               <div className={formMsg.startsWith(t("wallet.fail", { err: "" })) ? "error" : "ok"}>

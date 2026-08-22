@@ -15,6 +15,7 @@ import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { leverageOf, marginModeOf, useFuturesStore } from "../../store/futures-store";
 import { LeverageMarginBar } from "./LeverageMarginBar";
 import { useToast } from "../Toast";
+import { useGuardedAction } from "../../hooks/use-guarded-action";
 
 export type OrderSide = TradeOrder["side"];
 export type OrderType = TradeOrder["type"];
@@ -149,6 +150,13 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
       setSubmitting(false);
     }
   };
+
+  // 防重复下单：300ms 防抖合并连点 + 1s 接口冷却（冷却表跨重挂载共享）
+  const guarded = useGuardedAction(() => void submit(), {
+    key: "order-submit",
+    cooldownMs: 1000,
+    debounceMs: 300,
+  });
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
@@ -292,8 +300,8 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
         {/* 提交按钮：买入实心绿底黑字 / 卖出实心红底白字（AGENTS.md 规范）；未登录跳转登录页 */}
         {authed ? (
           <button
-            onClick={submit}
-            disabled={!valid || submitting}
+            onClick={guarded.run}
+            disabled={!valid || submitting || guarded.cooling}
             className={cn(
               "mt-auto h-10 cursor-pointer rounded-lg text-sm font-semibold transition-all",
               submitting || errors.length > 0

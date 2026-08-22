@@ -12,6 +12,7 @@ import { AntiPhishingModal } from "../components/security/AntiPhishingModal";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { useConfirm } from "../components/Confirm";
+import { useSecureAction } from "../components/security/SecureActionProvider";
 import { useToast } from "../components/Toast";
 
 type ModalKind = "twofa" | "phone" | "email" | "antiphishing" | null;
@@ -20,6 +21,7 @@ export function SecurityCenter() {
   const { t } = useTranslation();
   const { uid } = useAuth();
   const confirm = useConfirm();
+  const secureAction = useSecureAction();
   const toast = useToast();
   const sec = useSecurityStore();
   const [modal, setModal] = useState<ModalKind>(null);
@@ -86,11 +88,13 @@ export function SecurityCenter() {
                 onChange={(v) => {
                   if (v) setModal("twofa");
                   else
-                    void confirm({ message: t("security.confirmDisableTwofa"), danger: true }).then((ok) => {
-                      if (ok) {
-                        sec.disableTwofa();
-                        toast.info(t("security.twofaDisabledToast"));
-                      }
+                    void confirm({ message: t("security.confirmDisableTwofa"), danger: true }).then(async (ok) => {
+                      if (!ok) return;
+                      // 高危操作拦截：解绑 2FA 需滑块 + 二次验证码
+                      const verified = await secureAction.verify({ action: "unbind2fa" });
+                      if (!verified) return;
+                      sec.disableTwofa();
+                      toast.info(t("security.twofaDisabledToast"));
                     });
                 }}
               />

@@ -13,6 +13,7 @@ import { useI18n, LOCALES } from "../i18n";
 import { applyTheme, THEMES, type ThemeId } from "../lib/theme";
 import { setTimeZone, COMMON_TZ } from "../lib/timezone";
 import { validatePassword } from "../lib/validate";
+import { useSecureAction } from "../components/security/SecureActionProvider";
 
 const DEFAULT_PREFS: UserPreferences = {
   user_id: 0,
@@ -133,6 +134,8 @@ export function Settings() {
     }
   };
 
+  const secureAction = useSecureAction();
+
   const savePassword = async () => {
     setPwdMsg("");
     if (!oldPwd || !newPwd) {
@@ -141,6 +144,12 @@ export function Settings() {
     }
     if (!validatePassword(newPwd)) {
       setPwdMsg(t("settings.pwdWeak"));
+      return;
+    }
+    // 高危操作拦截：修改密码需通过滑块 + 2FA/邮箱验证码二次验证
+    const verified = await secureAction.verify({ action: "password" });
+    if (!verified) {
+      setPwdMsg(t("settings.pwdVerifyCancelled"));
       return;
     }
     try {

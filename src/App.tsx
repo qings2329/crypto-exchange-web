@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from "react";
 import { AuthProvider } from "./lib/auth";
 import { RequireRole, type Role } from "./lib/rbac";
 import { ConfirmProvider } from "./components/Confirm";
+import { SecureActionProvider } from "./components/security/SecureActionProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider, MonitorToasts } from "./components/Toast";
 import { I18nProvider } from "./i18n";
@@ -160,7 +161,9 @@ export default function App() {
             <AuthProvider>
               <ConfirmProvider>
                 <ToastProvider>
-                  <Router />
+                  <SecureActionProvider>
+                    <Router />
+                  </SecureActionProvider>
                   <MonitorToasts />
                 </ToastProvider>
               </ConfirmProvider>

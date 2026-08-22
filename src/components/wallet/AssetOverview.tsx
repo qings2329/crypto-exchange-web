@@ -8,12 +8,14 @@ import { useMockBalances } from "../../hooks/use-mock-balances";
 import { valueAssets } from "../../lib/wallet-utils";
 import { fmtPrice, fmtQty, fmtCompact } from "../../lib/format";
 import { useToast } from "../Toast";
+import { SecureText } from "../security/SecureText";
 
 const HIDE_KEY = "cx_hide_balance";
 const PIE_COLORS = ["#FCD535", "#0ECB81", "#4B9EFF"];
 
 function Masked({ value, hidden }: { value: string; hidden: boolean }) {
-  return <span className="font-mono tabular-nums">{hidden ? "******" : value}</span>;
+  if (hidden) return <span className="font-mono tabular-nums">******</span>;
+  return <SecureText value={value} />;
 }
 
 export function AssetOverview() {
