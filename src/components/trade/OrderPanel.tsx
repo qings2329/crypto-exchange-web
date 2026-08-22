@@ -6,6 +6,7 @@
 //   行情穿越限价时自动撮合。接真实链时把 submit() 替换为合约 writeContract / 后端 API 即可。
 
 import { useMemo, useState } from "react";
+import { api } from "../../api/client";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/utils";
@@ -108,9 +109,22 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
     if (!valid || submitting) return;
     setSubmitting(true);
     try {
-      await new Promise((r) => setTimeout(r, 600)); // 模拟网络/上链延迟
       if (perp) {
-        // 永续合约：提交即按参考价开仓（模拟即时成交）
+        // 永续合约：先落服务端（POST /futures/order，契约对齐 Go futuresapi），成功后本地镜像保持 UI 即时
+        try {
+          await api.futuresPlaceOrder({
+            symbol,
+            action: "open",
+            pos_side: isBuy ? "long" : "short",
+            margin_mode: marginMode,
+            leverage,
+            price: effectivePrice,
+            qty,
+          });
+        } catch (e) {
+          toast.error((e as Error).message || t("common.requestFailed"));
+          return;
+        }
         openPosition({
           symbol,
           side: isBuy ? "long" : "short",

@@ -294,6 +294,41 @@ export const api = {
   addressBookRemove: (id: number) =>
     request<{ ok: boolean }>(`/api/v1/futures/wallet/address-book/${id}`, { method: "DELETE" }),
 
+  // POST /api/v1/futures/order 合约下单（契约对齐 Go futuresapi.handleOrder：open/close + pos_side）。
+  futuresPlaceOrder: (p: {
+    symbol: string;
+    action: "open" | "close";
+    pos_side: "long" | "short";
+    margin_mode?: "isolated" | "cross";
+    leverage?: number;
+    price?: number;
+    qty: number;
+    margin?: number;
+  }) =>
+    request<{ order_id: string; status: string; realized_pnl?: number }>("/api/v1/futures/order", {
+      method: "POST",
+      body: JSON.stringify(p),
+    }),
+  // GET /api/v1/futures/positions 本人持仓（服务端结构 {mark_price, positions, cross_balances}，字段为 Go 导出名）。
+  futuresPositions: async (symbol?: string) => {
+    const d = await request<{
+      mark_price: number | null;
+      positions: Array<{
+        UserID: number;
+        Symbol: string;
+        Side: "long" | "short";
+        Size: number;
+        EntryPrice: number;
+        Margin: number;
+        Leverage: number;
+        Mode: string;
+        OpenTime: number;
+        LiqPriceVal: number;
+      }>;
+      cross_balances: Record<string, number>;
+    }>(withQuery("/api/v1/futures/positions", symbol ? { symbol } : undefined));
+    return d;
+  },
   // GET /api/v1/futures/orders 本人合约订单（后端返回 {orders:[]}）。
   futuresOrders: async (params?: { symbol?: string; status?: string; limit?: number }) => {
     const d = await request<{ orders: OrderView[] }>(

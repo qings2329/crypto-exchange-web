@@ -558,6 +558,90 @@ app.get("/api/v1/futures/wallet/ledger", (req, res) => {
 });
 
 // ---------- 合约：订单 / 成交 ----------
+// ---------- 合约下单/持仓（契约对齐 crypto-exchange Go internal/futuresapi/handler.go）----------
+// 开发期简化：市价即时成交（无订单簿撮合），保证金冻结走内存账本；切换真实 Go 服务后前端零改动。
+const futuresPosStore = new Map(); // uid -> positions[]
+const futuresFrozen = new Map(); // uid -> 冻结保证金累计
+let futOrderId = 4700;
+
+function futuresMarkPrice(symbol) {
+  const m = getMarket(symbol);
+  return m ? r2(m.price) : null;
+}
+
+app.post("/api/v1/futures/order", (req, res) => {
+  const uid = req.user.sub;
+  const { symbol, action, pos_side, margin_mode, leverage, price, qty } = req.body || {};
+  if (!symbol || !["open", "close"].includes(action) || !["long", "short"].includes(pos_side)) {
+    return fail(res, 400, "bad request");
+  }
+  const q = Number(qty);
+  if (!(q > 0)) return fail(res, 400, "invalid qty");
+  const mark = futuresMarkPrice(symbol);
+  if (mark == null) return fail(res, 400, "unknown symbol or matching unavailable");
+
+  const positions = futuresPosStore.get(uid) ?? [];
+  if (action === "open") {
+    const lev = Math.min(125, Math.max(1, Number(leverage) || 10));
+    const px = Number(price) > 0 ? Number(price) : mark;
+    let marginAmt = Number(req.body.margin);
+    if (!(marginAmt > 0)) marginAmt = r2((px * q) / lev);
+    // 余额校验：可用 = 派生余额 - 已冻结合计
+    const seed = seedFrom(`session-${uid}`);
+    const usdtTotal = r2(5000 + (seed % 45000));
+    const frozen = futuresFrozen.get(uid) ?? 0;
+    if (marginAmt > r2(usdtTotal - frozen)) return fail(res, 400, "insufficient margin");
+    futuresFrozen.set(uid, r2(frozen + marginAmt));
+    const liq = pos_side === "long" ? r2(px * (1 - 1 / lev)) : r2(px * (1 + 1 / lev));
+    const pos = {
+      UserID: uid,
+      Symbol: symbol,
+      Side: pos_side,
+      Size: q,
+      EntryPrice: px,
+      Margin: marginAmt,
+      Leverage: lev,
+      Mode: margin_mode === "cross" ? "cross" : "isolated",
+      OpenTime: Date.now(),
+      LiqPriceVal: liq,
+    };
+    positions.push(pos);
+    futuresPosStore.set(uid, positions);
+    const oid = ++futOrderId;
+    futuresOrders.unshift({
+      id: oid, user_id: uid, symbol, side: pos_side === "long" ? "buy" : "sell",
+      price: px, qty: q, status: "filled", market: "futures", ts: Date.now(),
+    });
+    return ok(res, { order_id: String(oid), status: "accepted" });
+  }
+  // action === close：按标记价平掉本人同向仓位，释放保证金并结算盈亏
+  const idx = positions.findIndex((p) => p.Symbol === symbol && p.Side === pos_side);
+  if (idx < 0) return fail(res, 400, "position not found");
+  const p = positions[idx];
+  const pnl = p.Side === "long" ? (mark - p.EntryPrice) * p.Size : (p.EntryPrice - mark) * p.Size;
+  positions.splice(idx, 1);
+  futuresPosStore.set(uid, positions);
+  futuresFrozen.set(uid, r2(Math.max(0, (futuresFrozen.get(uid) ?? 0) - p.Margin)));
+  const oid = ++futOrderId;
+  futuresOrders.unshift({
+    id: oid, user_id: uid, symbol, side: pos_side === "long" ? "sell" : "buy",
+    price: mark, qty: p.Size, status: "filled", market: "futures", ts: Date.now(),
+  });
+  return ok(res, { order_id: String(oid), status: "accepted", realized_pnl: r2(pnl) });
+});
+
+app.get("/api/v1/futures/positions", (req, res) => {
+  const uid = req.user.sub;
+  const symbol = req.query.symbol;
+  let list = futuresPosStore.get(uid) ?? [];
+  if (symbol) list = list.filter((p) => p.Symbol === symbol.toString());
+  ok(res, {
+    mark_price: symbol ? futuresMarkPrice(symbol.toString()) : null,
+    positions: list,
+    cross_balances: {},
+  });
+});
+
 app.get("/api/v1/futures/orders", (req, res) => {
   const { symbol, status } = req.query;
   let list = futuresOrders.filter((o) => o.user_id === req.user.sub);

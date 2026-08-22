@@ -323,5 +323,6 @@
   "ann.empty": "暫無公告",
   "ann.level.info": "公告",
   "ann.level.warning": "提醒",
-  "ann.level.maintenance": "維護"
+  "ann.level.maintenance": "維護",
+  "common.requestFailed": "請求失敗"
 }

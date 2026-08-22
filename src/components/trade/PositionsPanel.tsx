@@ -1,7 +1,8 @@
 // 未结平仓头寸面板：合约对/杠杆/开仓均价/标记价格/未实现盈亏（着色）/保证金率。
 // 提供 Market Close（确认弹窗）与 TP/SL 设置弹窗；标记价格用实时行情现算。
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFuturesStore, type Position } from "../../store/futures-store";
+import { api } from "../../api/client";
 import { useTickerLive } from "../../hooks/use-ticker-live";
 import { calcMarginRatio, calcPnl } from "../../lib/futures-math";
 import { fmtPrice, fmtQty } from "../../lib/format";
@@ -10,10 +11,58 @@ import { Modal } from "../Modal";
 import { useConfirm } from "../Confirm";
 import { useToast } from "../Toast";
 
+/** 服务端持仓（Go 导出字段）→ 本地镜像结构；id 用 symbol+side+openTime 稳定映射 */
+function toLocal(p: {
+  Symbol: string;
+  Side: "long" | "short";
+  Size: number;
+  EntryPrice: number;
+  Margin: number;
+  Leverage: number;
+  Mode: string;
+  OpenTime: number;
+}): Position {
+  return {
+    id: `${p.Symbol}-${p.Side}-${p.OpenTime}`,
+    symbol: p.Symbol,
+    side: p.Side,
+    leverage: p.Leverage,
+    marginMode: p.Mode === "cross" ? "cross" : "isolated",
+    entryPrice: p.EntryPrice,
+    qty: p.Size,
+    margin: p.Margin,
+    ts: p.OpenTime,
+  };
+}
+
 export function PositionsPanel({ symbol }: { symbol: string }) {
   const positions = useFuturesStore((s) => s.positions);
+  const hydrate = useFuturesStore((s) => s.hydrate);
   const mine = positions.filter((p) => p.symbol === symbol);
   const others = positions.filter((p) => p.symbol !== symbol);
+
+  // 服务端为真相源：挂载即拉取，之后每 5s 轮询对账（本地乐观更新仅作即时反馈）
+  useEffect(() => {
+    let alive = true;
+    const pull = async () => {
+      try {
+        const d = await api.futuresPositions(symbol);
+        if (!alive) return;
+        hydrate(
+          symbol,
+          (d.positions ?? []).map(toLocal)
+        );
+      } catch {
+        /* 未登录/网络失败时保留本地镜像 */
+      }
+    };
+    void pull();
+    const t = setInterval(pull, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [symbol, hydrate]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card" data-testid="positions-panel">
@@ -76,9 +125,20 @@ function PositionRow({ pos }: { pos: Position }) {
       danger: true,
       confirmText: "Confirm Close",
     });
-    if (ok) {
+    if (!ok) return;
+    try {
+      // 平仓走服务端（action=close），以服务端结算的已实现盈亏为准
+      const r = await api.futuresPlaceOrder({
+        symbol: pos.symbol,
+        action: "close",
+        pos_side: pos.side,
+        qty: pos.qty,
+      });
       close(pos.id);
-      toast.success(`Position closed · realized ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT`);
+      const realized = typeof r.realized_pnl === "number" ? r.realized_pnl : pnl;
+      toast.success(`Position closed · realized ${realized >= 0 ? "+" : ""}${realized.toFixed(2)} USDT`);
+    } catch (e) {
+      toast.error((e as Error).message || "Close failed");
     }
   };
 

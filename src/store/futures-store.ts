@@ -26,6 +26,8 @@ interface FuturesState {
   marginModeBySymbol: Record<string, MarginMode>;
   open: (pos: Omit<Position, "id" | "ts">) => void;
   close: (id: string) => void;
+  /** 服务端水合：用后端持仓替换某交易对的本地镜像（id 稳定映射，避免行重挂载闪烁） */
+  hydrate: (symbol: string, positions: Position[]) => void;
   setLeverage: (symbol: string, leverage: number) => void;
   setMarginMode: (symbol: string, mode: MarginMode) => void;
   setTpSl: (id: string, tp: number | undefined, sl: number | undefined) => void;
@@ -44,6 +46,11 @@ export const useFuturesStore = create<FuturesState>((set) => ({
     })),
 
   close: (id) => set((s) => ({ positions: s.positions.filter((p) => p.id !== id) })),
+
+  hydrate: (symbol, positions) =>
+    set((s) => ({
+      positions: [...positions, ...s.positions.filter((p) => p.symbol !== symbol)],
+    })),
 
   setLeverage: (symbol, leverage) =>
     set((s) => ({

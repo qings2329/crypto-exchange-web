@@ -323,5 +323,6 @@
   "ann.empty": "No announcements",
   "ann.level.info": "Notice",
   "ann.level.warning": "Alert",
-  "ann.level.maintenance": "Maintenance"
+  "ann.level.maintenance": "Maintenance",
+  "common.requestFailed": "Request failed"
 }
