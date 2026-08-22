@@ -37,8 +37,8 @@ export function Dashboard() {
       </div>
       {err && <div className="error">{t("dash.overviewError", { err })}</div>}
       <div className="stat-row">
-        {cards.map((c) => (
-          <div className="card stat" key={c.label}>
+        {cards.map((c, i) => (
+          <div className="card stat" key={`${c.label}-${i}`}>
             <div className="stat-value" style={c.tone ? { color: c.tone } : undefined}>
               {c.value}
             </div>

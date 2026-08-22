@@ -89,7 +89,9 @@ export function ApiTable({
   const total = Array.isArray(view) ? view.length : 0;
   const pageCount = pageSize ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const safePage = Math.min(page, pageCount - 1);
-  const pageRows = pageSize ? view.slice(safePage * pageSize, safePage * pageSize + pageSize) : view;
+  // 数据未返回（undefined）或非数组时不切片，避免首帧崩溃
+  const rowsForPage = Array.isArray(view) ? view : [];
+  const pageRows = pageSize ? rowsForPage.slice(safePage * pageSize, safePage * pageSize + pageSize) : rowsForPage;
 
   // 批量选择：以 rowId 作为行键，跨分页保留选中状态。
   const allIds = useMemo(

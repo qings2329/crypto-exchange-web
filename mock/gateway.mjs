@@ -18,7 +18,7 @@ import express from "express";
 import http from "node:http";
 import { WebSocketServer } from "ws";
 import crypto from "node:crypto";
-import { authRouter, gateway, authorize, getUserById } from "./gateway-auth.mjs";
+import { authRouter, gateway, authorize, getUserById, roleAtLeast, users } from "./gateway-auth.mjs";
 import { buildAdminApp, notFound } from "./admin-api.mjs";
 import { pushEvents, summary, recentEvents } from "./monitor-store.mjs";
 import { getSim, intervalToMs } from "./kline-server.mjs";
@@ -112,6 +112,34 @@ const spotTrades = [];
 const futuresOrders = [];
 const futuresTrades = [];
 const futuresWithdrawRecords = [];
+
+// ---------- 风控事件 / 审计日志（演示数据 + 处置联动） ----------
+const riskEvents = [
+  { id: nextId(), rule_id: 1, type: "login.anomaly", level: "high", target: "user@ce.dev (ID:3)", detail: "异地 IP 登录：45.32.x.x（美国）与常用地区不符", status: "pending", created_at: new Date(Date.now() - 3600e3).toISOString() },
+  { id: nextId(), rule_id: 2, type: "trade.velocity", level: "medium", target: "op@ce.dev (ID:2)", detail: "10 分钟内下单 47 次，超过频次阈值 40", status: "pending", created_at: new Date(Date.now() - 7200e3).toISOString() },
+  { id: nextId(), rule_id: 3, type: "withdraw.rapid", level: "high", target: "user@ce.dev (ID:3)", detail: "注册 24h 内发起提现 1200 USDT", status: "resolved", created_at: new Date(Date.now() - 86400e3).toISOString() },
+];
+const auditLogs = [
+  { id: nextId(), admin_id: 1, admin_name: "admin", action: "kyc.review.approve", target: "KYC #1", detail: "高级认证通过（演示种子）", ip: "10.0.0.2", created_at: new Date(Date.now() - 172800e3).toISOString() },
+  { id: nextId(), admin_id: 2, admin_name: "op", action: "otc.ad.offline", target: "AD #7", detail: "商家广告下架（余额不足）", ip: "10.0.0.3", created_at: new Date(Date.now() - 86400e3).toISOString() },
+];
+// 预置两条待审提现，便于管理端看板/审核页有初始数据
+futuresWithdrawRecords.push(
+  { id: nextId(), user_id: 3, asset: "USDT", address: "0x8Ba1f109551bD432803012645Ac136ddd64DBA72", amount: 500, network: "ERC20", status: "pending", created_at: ns() },
+  { id: nextId(), user_id: 2, asset: "USDT", address: "TXk8L2nPQ7sYvVrH4mZcJdFgWq9bAu1E3yRiS5tD", amount: 1200, network: "TRC20", status: "approved", created_at: ns() }
+);
+function appendAudit(user, action, target, detail) {
+  auditLogs.push({
+    id: nextId(),
+    admin_id: user?.sub ?? 0,
+    admin_name: user?.username ?? "system",
+    action,
+    target,
+    detail,
+    ip: "10.0.0.1",
+    created_at: new Date().toISOString(),
+  });
+}
 {
   const fo1 = {
     id: nextId(), user_id: 3, symbol: "BTC_USDT", market: "futures", is_margin: true,
@@ -512,6 +540,74 @@ app.post("/api/v1/futures/wallet/withdraw", (req, res) => {
   futuresWithdrawRecords.push(rec);
   ok(res, { order_id: id, status: "pending" }, 201);
 });
+// 提现记录列表：admin/operator 见全部，普通用户仅本人
+app.get("/api/v1/futures/wallet/withdraws", (req, res) => {
+  const role = req.user.role ?? "user";
+  const list = roleAtLeast(role, "operator")
+    ? [...futuresWithdrawRecords].sort((a, b) => b.id - a.id)
+    : futuresWithdrawRecords.filter((w) => w.user_id === req.user.sub).sort((a, b) => b.id - a.id);
+  ok(res, list);
+});
+// 提现审核（admin）：approve / reject，落审计日志
+app.post("/api/v1/futures/wallet/withdraws/:id/review", authorize("admin"), (req, res) => {
+  const w = futuresWithdrawRecords.find((x) => x.id === Number(req.params.id));
+  if (!w) return fail(res, 404, "提现记录不存在");
+  if (w.status !== "pending") return fail(res, 409, "该提现已处理");
+  const action = req.body?.action;
+  if (!["approve", "reject"].includes(action)) return fail(res, 400, "action 必须为 approve/reject");
+  w.status = action === "approve" ? "approved" : "rejected";
+  w.reviewed_by = req.user.username;
+  appendAudit(req.user, "withdraw.review", `WD #${w.id}`, `${action} · ${w.amount} ${w.asset}`);
+  ok(res, { ok: true });
+});
+// 批量审核（admin）
+app.post("/api/v1/futures/wallet/withdraws/batch/review", authorize("admin"), (req, res) => {
+  const { ids = [], action } = req.body || {};
+  if (!["approve", "reject"].includes(action)) return fail(res, 400, "action 必须为 approve/reject");
+  let count = 0;
+  for (const id of ids) {
+    const w = futuresWithdrawRecords.find((x) => x.id === Number(id));
+    if (w && w.status === "pending") {
+      w.status = action === "approve" ? "approved" : "rejected";
+      w.reviewed_by = req.user.username;
+      count += 1;
+    }
+  }
+  if (count > 0) appendAudit(req.user, "withdraw.batchReview", `${count} 条`, action);
+  ok(res, { ok: true, count });
+});
+
+// ---------- 风控事件 ----------
+app.get("/api/v1/risk/events", (req, res) => {
+  const { status, level } = req.query;
+  let list = [...riskEvents].sort((a, b) => b.id - a.id);
+  if (status) list = list.filter((e) => e.status === status.toString());
+  if (level) list = list.filter((e) => e.level === level.toString());
+  ok(res, list);
+});
+app.post("/api/v1/risk/events/batch/resolve", authorize("admin"), (req, res) => {
+  const { ids = [], status } = req.body || {};
+  if (!["resolved", "ignored"].includes(status)) return fail(res, 400, "status 必须为 resolved/ignored");
+  let count = 0;
+  for (const id of ids) {
+    const ev = riskEvents.find((x) => x.id === Number(id));
+    if (ev && ev.status === "pending") {
+      ev.status = status;
+      count += 1;
+    }
+  }
+  if (count > 0) appendAudit(req.user, "risk.batchResolve", `${count} 条`, status);
+  ok(res, { ok: true, count });
+});
+app.post("/api/v1/risk/events/:id/resolve", authorize("admin"), (req, res) => {
+  const ev = riskEvents.find((x) => x.id === Number(req.params.id));
+  if (!ev) return fail(res, 404, "风控事件不存在");
+  const { status } = req.body || {};
+  if (!["resolved", "ignored"].includes(status)) return fail(res, 400, "status 必须为 resolved/ignored");
+  ev.status = status;
+  appendAudit(req.user, "risk.resolve", `EVENT #${ev.id}`, `${ev.type} → ${status}`);
+  ok(res, { ok: true });
+});
 
 // ---------- 理财 ----------
 app.get("/api/v1/wealth/products", (req, res) => ok(res, wealthProducts));
@@ -549,6 +645,27 @@ app.post("/api/v1/wealth/redeem", (req, res) => {
 app.get("/api/v1/announcement/list", (req, res) =>
   ok(res, { announcements: announcements.filter((a) => a.active) })
 );
+// ---------- 后台总览 / 审计 ----------
+app.get("/api/v1/admin/overview", authorize("admin"), (req, res) => {
+  const today = new Date().toDateString();
+  ok(res, {
+    users_total: users.length,
+    users_today: users.filter((u) => new Date((u.created_at ?? Date.now())).toDateString() === today).length,
+    trade_volume_24h: spotTrades.reduce((s2, tr) => s2 + (tr.price || 0) * (tr.quantity || 0), 0) + futuresTrades.reduce((s2, tr) => s2 + (tr.price || 0) * (tr.quantity || 0), 0),
+    orders_24h: spotOrders.length + futuresOrders.length,
+    pending_withdraws: futuresWithdrawRecords.filter((w) => w.status === "pending").length,
+    pending_risk_events: riskEvents.filter((e) => e.status === "pending").length,
+    open_disputes: otcOrders.filter((o) => o.status === "disputed").length,
+    online_users: Math.max(1, Math.round(users.length / 2)),
+  });
+});
+app.get("/api/v1/admin/audit", authorize("admin"), (req, res) => {
+  const { action } = req.query;
+  let list = [...auditLogs].sort((a, b) => b.id - a.id);
+  if (action) list = list.filter((l) => l.action.includes(action.toString()));
+  ok(res, list);
+});
+
 app.use("/api/v1/announcement/admin", authorize("admin"));
 app.get("/api/v1/announcement/admin", (req, res) => ok(res, { announcements }));
 app.post("/api/v1/announcement/admin", (req, res) => {
