@@ -21,7 +21,10 @@ const r3 = (x) => Math.round(x * 1000) / 1000;
 // 每个 symbol 一份模拟行情
 const sims = new Map();
 function getSim(symbol, intervalMs) {
-  let sim = sims.get(symbol);
+  // 缓存键必须同时包含 symbol 与 intervalMs：不同周期应生成各自独立的行情序列，
+  // 否则首次（如 1m）建立的行情会被后续任意周期命中，导致切换周期时返回同一份数据（切换"无效"）。
+  const key = `${symbol}:${intervalMs}`;
+  let sim = sims.get(key);
   if (sim) return sim;
   const limit = 500;
   const now = Math.floor(Date.now() / intervalMs) * intervalMs;
@@ -39,7 +42,7 @@ function getSim(symbol, intervalMs) {
     price = c;
   }
   sim = { history, current: history[history.length - 1], tick: 0 };
-  sims.set(symbol, sim);
+  sims.set(key, sim);
   return sim;
 }
 
