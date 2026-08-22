@@ -642,6 +642,152 @@ app.get("/api/v1/futures/positions", (req, res) => {
   });
 });
 
+// ---------- 借贷（契约对齐 Go internal/lending/handler.go：金额为字符串数字）----------
+const lendingPools = [
+  { id: 1, asset: "USDT", total_supply: "1200000", total_borrow: "540000", available: "660000", interest_rate: 0.032, collateral_req: 1.5 },
+  { id: 2, asset: "ETH", total_supply: "8600", total_borrow: "3100", available: "5500", interest_rate: 0.021, collateral_req: 1.6 },
+  { id: 3, asset: "BTC", total_supply: "420", total_borrow: "150", available: "270", interest_rate: 0.018, collateral_req: 1.6 },
+];
+const lendingLends = new Map(); // uid -> lend orders[]
+const lendingBorrows = new Map(); // uid -> borrow orders[]
+let lendingSeq = 900;
+
+function lendingPoolView(p) {
+  return { id: p.id, asset: p.asset, total_supply: p.total_supply, total_borrow: p.total_borrow,
+    available: p.available, interest_rate: p.interest_rate, collateral_req: p.collateral_req };
+}
+
+app.get("/api/v1/lending/pools", (_req, res) => {
+  ok(res, { pools: lendingPools.map(lendingPoolView) });
+});
+
+app.get("/api/v1/lending/pools/:id", (req, res) => {
+  const p = lendingPools.find((x) => x.id === Number(req.params.id));
+  if (!p) return fail(res, 404, "pool not found");
+  const util = Number(p.total_supply) > 0 ? Number(p.total_borrow) / Number(p.total_supply) : 0;
+  ok(res, { ...lendingPoolView(p), utilization: util, status: "active", created_at: 1750000000 });
+});
+
+app.post("/api/v1/lending/lend", (req, res) => {
+  const uid = req.user.sub;
+  const { pool_id: poolId } = req.body || {};
+  const amt = Number(req.body?.amount);
+  const p = lendingPools.find((x) => x.id === Number(poolId));
+  if (!p || !(amt > 0)) return fail(res, 400, "invalid pool or amount");
+  const order = { id: ++lendingSeq, user_id: uid, pool_id: p.id, amount: String(amt),
+    rate: p.interest_rate, status: "active", created_at: Math.floor(Date.now() / 1000) };
+  const list = lendingLends.get(uid) ?? [];
+  list.unshift(order);
+  lendingLends.set(uid, list);
+  // 池子总供应同步增加（字符串数字）
+  p.total_supply = String(r2(Number(p.total_supply) + amt));
+  p.available = String(r2(Number(p.available) + amt));
+  ok(res, order);
+});
+
+app.post("/api/v1/lending/borrow", (req, res) => {
+  const uid = req.user.sub;
+  const { pool_id: poolId } = req.body || {};
+  const borrowAmt = Number(req.body?.borrow_amount);
+  const collateral = Number(req.body?.collateral);
+  const p = lendingPools.find((x) => x.id === Number(poolId));
+  if (!p || !(borrowAmt > 0) || !(collateral >= 0)) return fail(res, 400, "invalid body");
+  if (borrowAmt > Number(p.available)) return fail(res, 400, "insufficient pool liquidity");
+  // 抵押率校验（Go service.Borrow 同规则）：collateral >= borrow * collateral_req
+  if (collateral < borrowAmt * p.collateral_req) return fail(res, 400, "insufficient collateral");
+  const order = { id: ++lendingSeq, user_id: uid, pool_id: p.id, amount: String(borrowAmt),
+    collateral: String(collateral), rate: p.interest_rate, interest_acc: "0",
+    status: "active", created_at: Math.floor(Date.now() / 1000), repaid_at: 0 };
+  const list = lendingBorrows.get(uid) ?? [];
+  list.unshift(order);
+  lendingBorrows.set(uid, list);
+  p.total_borrow = String(r2(Number(p.total_borrow) + borrowAmt));
+  p.available = String(r2(Number(p.available) - borrowAmt));
+  ok(res, order);
+});
+
+app.post("/api/v1/lending/repay/:id", (req, res) => {
+  const uid = req.user.sub;
+  const list = lendingBorrows.get(uid) ?? [];
+  const o = list.find((x) => x.id === Number(req.params.id));
+  if (!o) return fail(res, 404, "order not found");
+  if (o.status !== "active") return fail(res, 400, "order not active");
+  o.status = "repaid";
+  o.repaid_at = Math.floor(Date.now() / 1000);
+  const p = lendingPools.find((x) => x.id === o.pool_id);
+  if (p) {
+    p.total_borrow = String(r2(Math.max(0, Number(p.total_borrow) - Number(o.amount))));
+    p.available = String(r2(Number(p.available) + Number(o.amount)));
+  }
+  ok(res, o);
+});
+
+app.post("/api/v1/lending/withdraw/:id", (req, res) => {
+  const uid = req.user.sub;
+  const list = lendingLends.get(uid) ?? [];
+  const o = list.find((x) => x.id === Number(req.params.id));
+  if (!o) return fail(res, 404, "order not found");
+  if (o.status !== "active") return fail(res, 400, "order not active");
+  o.status = "withdrawn";
+  const p = lendingPools.find((x) => x.id === o.pool_id);
+  if (p) {
+    p.total_supply = String(r2(Math.max(0, Number(p.total_supply) - Number(o.amount))));
+    p.available = String(r2(Math.max(0, Number(p.available) - Number(o.amount))));
+  }
+  ok(res, o);
+});
+
+app.get("/api/v1/lending/my/lends", (req, res) => {
+  ok(res, { lends: lendingLends.get(req.user.sub) ?? [] });
+});
+
+app.get("/api/v1/lending/my/borrows", (req, res) => {
+  ok(res, { borrows: lendingBorrows.get(req.user.sub) ?? [] });
+});
+
+// ---------- 邀请返佣（契约对齐 Go internal/referral + services/user getReferralCode/getReferrals）----------
+// 佣金金额为最小单位整数（USDT 精度 6），前端展示时 /1e6。
+function referralCodeOf(uid) {
+  return `CE${String(uid).padStart(3, "0")}${(seedFrom(`ref-${uid}`) % 900000 + 100000)}`;
+}
+
+app.get("/api/v1/user/referral-code", (req, res) => {
+  ok(res, { referral_code: referralCodeOf(req.user.sub) });
+});
+
+app.get("/api/v1/user/referrals", (req, res) => {
+  const uid = Number(req.user.sub);
+  // 种子：user1 邀请了 op；其余用户暂无下线
+  const invited = uid === 3 ? [users[1]] : [];
+  const referrals = invited.map((u) => ({
+    user_id: u.id, nickname: u.nickname || u.username, email: u.email,
+    created_at: new Date(1753200000000).toISOString(),
+  }));
+  ok(res, { referrals, total: referrals.length });
+});
+
+app.get("/api/v1/referral/stats", (req, res) => {
+  const uid = Number(req.user.sub);
+  // user1 有已结算返佣；最小单位累计
+  const totals = uid === 3 ? { USDT: 125500000 } : {};
+  ok(res, { totals });
+});
+
+app.get("/api/v1/referral/commissions", (req, res) => {
+  const uid = Number(req.user.sub);
+  const all = uid === 3
+    ? [
+        { id: 71, referrer_id: 3, taker_id: 2, asset: "USDT", amount: 85500000, rate: 0.2, status: 1,
+          biz_ref: "futures_trade:4702", created_at: new Date(1756800000000).toISOString(), updated_at: new Date(1756800001000).toISOString() },
+        { id: 70, referrer_id: 3, taker_id: 2, asset: "USDT", amount: 40000000, rate: 0.2, status: 1,
+          biz_ref: "spot_trade:8841", created_at: new Date(1755000000000).toISOString(), updated_at: new Date(1755000001000).toISOString() },
+      ]
+    : [];
+  const limit = Math.max(1, Number(req.query.limit) || 20);
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  ok(res, { commissions: all.slice(offset, offset + limit), total: all.length });
+});
+
 app.get("/api/v1/futures/orders", (req, res) => {
   const { symbol, status } = req.query;
   let list = futuresOrders.filter((o) => o.user_id === req.user.sub);

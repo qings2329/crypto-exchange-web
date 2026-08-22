@@ -467,9 +467,6 @@ export const api = {
 
   // ---- 杠杆 ----
   marginLiqPrice: () => request("/api/v1/margin/liq-price"),
-  // POST /api/v1/margin/accounts/:id/adjust 调整账户余额（需 admin 角色）。
-  // POST /api/v1/margin/accounts/:id/liquidate 强制平仓（需 admin 角色）。
-  // POST /api/v1/margin/accounts/batch/liquidate 批量强制平仓（需 admin 角色）。
 
   // ---- 理财 ----
   wealthProducts: () => request("/api/v1/wealth/products"),
@@ -486,46 +483,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ holding_id: holdingId }),
     }),
-
-  // ---- 风控 ----
-  riskRules: () => request<RiskRule[]>("/api/v1/risk/rules"),
-  riskCreateRule: (payload: RiskRuleInput) =>
-    request<RiskRule>("/api/v1/risk/rules", { method: "POST", body: JSON.stringify(payload) }),
-  riskUpdateRule: (id: number, payload: RiskRuleInput) =>
-    request<RiskRule>(`/api/v1/risk/rules/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
-  riskDeleteRule: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/risk/rules/${id}`, { method: "DELETE" }),
-  // DELETE /api/v1/risk/rules/batch 批量删除规则（需 admin 角色）。
-  riskBatchDeleteRules: (ids: number[]) =>
-    request<{ ok: boolean; count: number }>("/api/v1/risk/rules/batch", {
-      method: "DELETE",
-      body: JSON.stringify({ ids }),
-    }),
-  riskBlacklist: () => request<BlacklistItem[]>("/api/v1/risk/blacklist"),
-  riskCreateBlacklist: (payload: BlacklistInput) =>
-    request<BlacklistItem>("/api/v1/risk/blacklist", { method: "POST", body: JSON.stringify(payload) }),
-  riskDeleteBlacklist: (id: number) =>
-    request<{ ok: boolean }>(`/api/v1/risk/blacklist/${id}`, { method: "DELETE" }),
-  // DELETE /api/v1/risk/blacklist/batch 批量移除黑名单（需 admin 角色）。
-  riskBatchDeleteBlacklist: (ids: number[]) =>
-    request<{ ok: boolean; count: number }>("/api/v1/risk/blacklist/batch", {
-      method: "DELETE",
-      body: JSON.stringify({ ids }),
-    }),
-  // POST /api/v1/risk/events/:id/resolve 处置事件（resolve=已处理 / ignore=忽略）。
-  // POST /api/v1/risk/events/batch/resolve 批量处置事件（需 admin 角色）。
-  riskBatchResolveEvents: (ids: number[], status: "resolved" | "ignored") =>
-    request<{ ok: boolean; count: number }>("/api/v1/risk/events/batch/resolve", {
-      method: "POST",
-      body: JSON.stringify({ ids, status }),
-    }),
-
-  // ---- 通知 ----
-  notifications: () => request<NotificationItem[]>("/api/v1/notification/admin/list"),
-  // POST /api/v1/notification/admin 发布通知（需 admin 角色）。
-  // POST /api/v1/notification/admin/:id/recall 撤回已发通知（需 admin 角色）。
-  // DELETE /api/v1/notification/admin/:id 删除通知记录（需 admin 角色）。
-  // DELETE /api/v1/notification/admin/batch 批量删除通知（需 admin 角色）。
 
   // ---- 借贷 ----
   lendingPools: async () => {
@@ -1025,16 +982,6 @@ export type NotificationLevel = "info" | "warning" | "critical";
 export type NotificationTarget = "all" | "vip" | "user";
 
 // 通知（GET /api/v1/notification/admin/list 返回）。
-export interface NotificationItem {
-  id: number;
-  title: string;
-  content: string;
-  level: NotificationLevel;
-  target: NotificationTarget;
-  target_user?: string; // target=user 时指定的接收用户
-  status: "sent" | "recalled";
-  created_at?: string;
-}
 
 // 发布通知的载荷。
 export interface NotificationInput {
@@ -1088,48 +1035,15 @@ export type RiskRuleType = "trade" | "withdraw" | "login" | "api";
 export type RiskAction = "block" | "review" | "limit";
 
 // 风控规则（GET /api/v1/risk/rules 返回）。
-export interface RiskRule {
-  id: number;
-  name: string;
-  type: RiskRuleType;
-  condition: string; // 触发条件描述，如 "单笔 > 100000"
-  action: RiskAction;
-  priority: number; // 越大越优先
-  enabled: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
 
 // 创建/更新规则的载荷。
-export interface RiskRuleInput {
-  name: string;
-  type: RiskRuleType;
-  condition: string;
-  action: RiskAction;
-  priority?: number;
-  enabled?: boolean;
-}
 
 // 黑名单目标类型。
 export type BlacklistTargetType = "user" | "ip" | "address";
 
 // 黑名单条目（GET /api/v1/risk/blacklist 返回）。
-export interface BlacklistItem {
-  id: number;
-  target_type: BlacklistTargetType;
-  target: string; // 用户ID / IP / 链上地址
-  reason: string;
-  expire_at?: string; // 为空表示永久
-  created_at?: string;
-}
 
 // 添加黑名单的载荷。
-export interface BlacklistInput {
-  target_type: BlacklistTargetType;
-  target: string;
-  reason: string;
-  expire_at?: string;
-}
 
 // 风控事件等级。
 export type RiskEventLevel = "info" | "warning" | "critical";
