@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api } from "../api/client";
+import { fetchPremiumIndex } from "../services/binance";
 import { TradingViewChart, type ChartInterval } from "../components/trade/TradingViewChart";
 import { OrderBook } from "../components/trade/OrderBook";
 import { RecentTrades } from "../components/trade/RecentTrades";
@@ -48,10 +48,19 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   const [mode, setMode] = useState<MarketMode>(initialMode);
   const [bottomTab, setBottomTab] = useState<BottomTab>("orders");
   const { ticker, status } = useTickerLive(symbol);
-  // 永续专属：指数价/标记价/资金费率（契约对齐 Go futuresapi.handleFunding）
+  // 永续专属：指数价/标记价/资金费率，统一走真实 Binance（premiumIndex），
+  // 与订单簿/顶栏的现货行情同源，避免指数价与盘口价格不一致。
   const { data: funding } = useQuery({
     queryKey: ["futures-funding", symbol],
-    queryFn: () => api.futuresFunding(symbol),
+    queryFn: async () => {
+      const p = await fetchPremiumIndex(symbol);
+      return {
+        index_price: Number(p.indexPrice),
+        mark_price: Number(p.markPrice),
+        funding_rate: Number(p.lastFundingRate),
+        nextFundingTime: p.nextFundingTime,
+      };
+    },
     enabled: mode === "perp",
     refetchInterval: 30_000,
   });
@@ -202,7 +211,7 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
                 label="Funding / Countdown"
                 value={
                   funding
-                    ? `${(funding.funding_rate * 100).toFixed(4)}% · ${String(Math.floor((funding.funding_interval % 3600) / 60)).padStart(2, "0")}:${String(funding.funding_interval % 60).padStart(2, "0")}`
+                    ? `${(funding.funding_rate * 100).toFixed(4)}% · ${fundingCountdown(funding.nextFundingTime)}`
                     : "--"
                 }
                 tone={(funding?.funding_rate ?? 0) >= 0 ? "buy" : "sell"}
@@ -252,6 +261,16 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
       )}
     </div>
   );
+}
+
+// 资金费率倒计时：nextFundingTime 为 Binance 下个结算时刻（epoch ms）。
+function fundingCountdown(nextFundingTime: number): string {
+  const ms = Math.max(0, nextFundingTime - Date.now());
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function Stat({

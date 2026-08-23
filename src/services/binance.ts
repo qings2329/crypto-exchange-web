@@ -65,6 +65,21 @@ export async function fetchAllFuturesTickers(): Promise<Ticker[]> {
   return raw.map(mapTicker);
 }
 
+export interface PremiumIndex {
+  symbol: string;
+  markPrice: string;
+  indexPrice: string;
+  lastFundingRate: string;
+  interestRate: string;
+  nextFundingTime: number;
+  time: number;
+}
+
+/** 拉取 U 本位合约标记价/指数价/资金费率（premiumIndex），与订单簿/顶栏同源，保证价格一致。 */
+export async function fetchPremiumIndex(symbol: string): Promise<PremiumIndex> {
+  return get<PremiumIndex>("/fapi/v1/premiumIndex", { symbol }, FAPI_BASE);
+}
+
 interface RawExchangeInfo {
   symbols: { symbol: string; status: string; onboardDate?: number }[];
 }
