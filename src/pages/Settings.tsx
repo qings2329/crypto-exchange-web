@@ -10,6 +10,7 @@ import {
   type UserSession,
 } from "../api/client";
 import { useI18n, LOCALES } from "../i18n";
+import i18n from "../i18n/i18next";
 import { applyTheme, THEMES, type ThemeId } from "../lib/theme";
 import { setTimeZone, COMMON_TZ } from "../lib/timezone";
 import { validatePassword } from "../lib/validate";
@@ -31,6 +32,8 @@ const KYC_KEY = ["home.kyc.unverified", "home.kyc.reviewing", "home.kyc.verified
 
 function applyLang(lang: string) {
   document.documentElement.lang = lang;
+  // 同时切换 i18next 当前语言，否则仅修改 <html lang> 属性而界面文案不变。
+  if (lang) void i18n.changeLanguage(lang);
 }
 
 // 失败文案模板前缀（用于判断消息是否为错误）。
