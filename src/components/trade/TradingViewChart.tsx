@@ -169,11 +169,16 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     });
     candleRef.current = candle;
 
+    // 成交量副图：独立 overlay 刻度置于图表底部（约 22% 高度），
+    // 每根按涨跌着色（绿/红），与币安成交量面板一致。
     const vol = chart.addSeries(HistogramSeries, {
       priceFormat: { type: "volume" },
       priceScaleId: "vol",
+      base: 0,
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
-    vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
     volRef.current = vol;
 
     // 均线叠加层（固定在主价格刻度，不占额外空间）
@@ -318,9 +323,10 @@ function toCandle(k: Kline): CandlestickData<Time> {
 }
 
 function toVolume(k: Kline): HistogramData<Time> {
+  // 收盘 ≥ 开盘为阳线（绿），否则阴线（红）；提高不透明度使成交量柱更醒目。
   return {
     time: (k.t / 1000) as Time,
     value: k.v,
-    color: k.c >= k.o ? "rgba(14,203,129,0.45)" : "rgba(246,70,93,0.45)",
+    color: k.c >= k.o ? "rgba(14,203,129,0.6)" : "rgba(246,70,93,0.6)",
   };
 }
