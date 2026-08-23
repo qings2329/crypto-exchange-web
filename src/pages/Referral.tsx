@@ -10,27 +10,35 @@ export function Referral() {
   const [commissions, setCommissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let alive = true;
     (async () => {
-      try {
-        const [codeRes, refRes, statsRes, commRes] = await Promise.all([
-          api.referralCode(),
-          api.referrals(),
-          api.referralStats(),
-          api.referralCommissions({ limit: 50, offset: 0 }),
-        ]);
-        setCode(codeRes.referral_code);
-        setReferrals(refRes.referrals ?? []);
-        setTotals(statsRes.totals ?? {});
-        setCommissions(commRes.commissions ?? []);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      setErr(null);
+      const [codeRes, refRes, statsRes, commRes] = await Promise.allSettled([
+        api.referralCode(),
+        api.referrals(),
+        api.referralStats(),
+        api.referralCommissions({ limit: 50, offset: 0 }),
+      ]);
+      if (!alive) return;
+      if (codeRes.status === "fulfilled") setCode(codeRes.value.referral_code);
+      if (refRes.status === "fulfilled") setReferrals(refRes.value.referrals ?? []);
+      if (statsRes.status === "fulfilled") setTotals(statsRes.value.totals ?? {});
+      if (commRes.status === "fulfilled") setCommissions(commRes.value.commissions ?? []);
+      const failed = [codeRes, refRes, statsRes, commRes].some((r) => r.status === "rejected");
+      if (failed) setErr(t("common.requestFailed"));
+      setLoading(false);
     })();
-  }, []);
+    return () => {
+      alive = false;
+    };
+  }, [reloadKey]);
+
+  const retry = () => setReloadKey((k) => k + 1);
 
   const copyLink = () => {
     const link = `${location.origin}/#/register?ref=${code}`;
@@ -41,6 +49,20 @@ export function Referral() {
   };
 
   if (loading) return <div className="page muted">{t("common.loading")}</div>;
+
+  if (err) {
+    return (
+      <div className="page">
+        <div className="page-head">
+          <h2>{t("referral.title")}</h2>
+        </div>
+        <div className="card">
+          <div className="muted" style={{ marginBottom: 12 }}>{err}</div>
+          <button className="copy-btn" onClick={retry}>{t("common.retry")}</button>
+        </div>
+      </div>
+    );
+  }
 
   const inviteLink = `${location.origin}/#/register?ref=${code}`;
 

@@ -324,5 +324,6 @@
   "ann.level.info": "お知らせ",
   "ann.level.warning": "注意",
   "ann.level.maintenance": "メンテナンス",
-  "common.requestFailed": "リクエスト失敗"
+  "common.requestFailed": "リクエスト失敗",
+  "common.retry": "再試行"
 }

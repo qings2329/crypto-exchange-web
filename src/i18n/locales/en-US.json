@@ -324,5 +324,6 @@
   "ann.level.info": "Notice",
   "ann.level.warning": "Alert",
   "ann.level.maintenance": "Maintenance",
-  "common.requestFailed": "Request failed"
+  "common.requestFailed": "Request failed",
+  "common.retry": "Retry"
 }
