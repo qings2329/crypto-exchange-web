@@ -93,13 +93,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     return fetch(path, { ...init, headers });
   };
 
+  // 鉴权流接口（登录/注册/发码）的 401 代表「账号或密码错误 / 验证码错误」等业务失败，
+  // 不应触发 refresh 续期重试，也不应被统一失效处理覆盖成「登录已过期」。
+  const isAuthFlow = /\/user\/(login|register|send-code)$/.test(path);
+
   let res = await doFetch(tokenStore.access ?? undefined);
 
-  // 统一 401 处理：优先用 refresh_token 换发新 access 并重试一次；
+  // 统一 401 处理：仅对受保护接口尝试 refresh 续期；
   // 无论「无刷新令牌 / 刷新失败 / 刷新成功但重试仍 401」，只要最终仍是 401，
   // 就判定会话失效——强制清登录态并跳登录页，杜绝「Header 仍显示已登录、
   // 钱包余额/提现记录却提示请先登录」的半死状态（修复偶发显示请先登录）。
-  if (res.status === 401 && tokenStore.refresh) {
+  if (res.status === 401 && tokenStore.refresh && !isAuthFlow) {
     try {
       const next = await refreshAccessToken();
       res = await doFetch(next);
@@ -108,25 +112,25 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
   }
 
-  if (res.status === 401) {
-    if (!isPublicRoute()) {
-      tokenStore.clear();
-      // 同步 React 登录态：仅清 localStorage 不足以让 Header 等消费 useAuth 的组件
-      // 及时更新，否则会出现「顶栏仍显示已登录、接口却 401」的割裂。
-      if (typeof window !== "undefined") window.dispatchEvent(new Event("auth:expired"));
-      // 登录接口自身的 401（凭证错误）除外，避免打断登录错误提示。
-      if (typeof location !== "undefined" && !path.includes("/user/login")) {
-        location.hash = "/login";
-      }
-    }
-    throw new ApiError("登录已过期，请重新登录", 401, 401);
-  }
-
   let body: any = null;
   try {
     body = await res.json();
   } catch {
     /* 非 JSON 响应 */
+  }
+
+  if (res.status === 401) {
+    if (!isPublicRoute() && !isAuthFlow) {
+      tokenStore.clear();
+      // 同步 React 登录态：仅清 localStorage 不足以让 Header 等消费 useAuth 的组件
+      // 及时更新，否则会出现「顶栏仍显示已登录、接口却 401」的割裂。
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("auth:expired"));
+      if (typeof location !== "undefined") location.hash = "/login";
+    }
+    // 鉴权流接口保留后端原始报错（如「账号或密码错误」）；
+    // 受保护接口会话确已失效，统一提示重新登录。
+    const msg = isAuthFlow ? (body?.message || "登录失败") : "登录已过期，请重新登录";
+    throw new ApiError(msg, res.status, res.status);
   }
   if (!res.ok) {
   // 403：用户前端无管理员/运营角色概念，此处按状态码构造错误，由 Toast / InlineError
