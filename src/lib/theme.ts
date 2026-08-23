@@ -29,16 +29,28 @@ function resolve(theme: ThemeId): Concrete {
 }
 
 // 应用主题：写入 <html data-theme>，并对 system 注册/清理系统配色监听。
+// 同时把 color-scheme 同步给浏览器，使原生控件（<select>、input autofill、
+// 滚动条）与主题一致，避免暗色界面下原生下拉呈「白底白字、宽度自适应变大」。
 export function applyTheme(theme: ThemeId) {
   if (sysListener && mq) {
     mq.removeEventListener("change", sysListener);
     sysListener = null;
   }
-  document.documentElement.setAttribute("data-theme", resolve(theme));
+  const concrete = resolve(theme);
+  document.documentElement.setAttribute("data-theme", concrete);
+  document.documentElement.style.colorScheme = concrete === "light" || concrete === "solar" ? "light" : "dark";
   if (theme === "system" && mq) {
     sysListener = () => {
-      document.documentElement.setAttribute("data-theme", resolve("system"));
+      const c = resolve("system");
+      document.documentElement.setAttribute("data-theme", c);
+      document.documentElement.style.colorScheme = c === "light" || c === "solar" ? "light" : "dark";
     };
     mq.addEventListener("change", sysListener);
   }
+}
+
+// 启动即应用主题：默认暗色（符合品牌默认 Midnight Black），避免首屏 data-theme
+// 为 null 时整页依赖 :root 兜底、且在 light/system 偏好下整页变白的割裂。
+export function initTheme(defaultTheme: ThemeId = "dark") {
+  applyTheme(defaultTheme);
 }

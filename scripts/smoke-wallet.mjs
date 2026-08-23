@@ -12,7 +12,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await page.goto(`${BASE}/#/login`);
 await page.fill("input[placeholder='user1']", "user1");
-await page.fill("input[type='password']", "User@123");
+await page.fill("input[type='password']", "qwert@123x");
 await page.click("form button:last-of-type");
 await page.waitForFunction(() => location.hash !== "#/login", null, { timeout: 8000 });
 

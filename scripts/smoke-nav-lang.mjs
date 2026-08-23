@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 const b = await chromium.launch(); const p = await b.newPage();
 await p.goto("http://localhost:5173/#/login");
 await p.fill("input[placeholder='user1']", "user1");
-await p.fill("input[type='password']", "User@123");
+await p.fill("input[type='password']", "qwert@123x");
 await p.click("form button:last-of-type");
 await p.waitForFunction(() => location.hash !== "#/login");
 await new Promise(r => setTimeout(r, 1200));

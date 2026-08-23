@@ -14,7 +14,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await page.goto(`${BASE}/#/login`);
 await page.fill("input[placeholder='user1']", "user1");
-await page.fill("input[type='password']", "User@123");
+await page.fill("input[type='password']", "qwert@123x");
 await page.click("form button:last-of-type");
 await page.waitForFunction(() => location.hash !== "#/login", null, { timeout: 8000 });
 
@@ -23,7 +23,7 @@ await page.waitForFunction(() => location.hash !== "#/login", null, { timeout: 8
 {
   const login = await fetch("http://localhost:8787/api/v1/user/login", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ target: "user1", password: "User@123" }),
+    body: JSON.stringify({ target: "user1", password: "qwert@123x" }),
   }).then((r) => r.json());
   const tk = login.data.access_token;
   const lends = await fetch("http://localhost:8787/api/v1/lending/my/lends", { headers: { Authorization: `Bearer ${tk}` } }).then((r) => r.json());
