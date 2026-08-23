@@ -19,8 +19,9 @@ import {
 } from "lightweight-charts";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api, connectKlineWS, type Kline } from "../../api/client";
-import type { BinanceWsStatus } from "../../services/binance-ws";
+import { type Kline } from "../../api/client";
+import { fetchKlines } from "../../services/binance";
+import { useKlineLive } from "../../hooks/use-kline-live";
 import { fmtPrice } from "../../lib/format";
 import { cn } from "../../lib/utils";
 import { Skeleton } from "../ui/skeleton";
@@ -79,11 +80,11 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
   const [themeVer, setThemeVer] = useState(0);
   const [showMA, setShowMA] = useState(true);
 
-  // REST 种子数据：走自建后端 /api/v1/market/kline（经 Vite 代理），
-  // 而非直连 api.binance.com，规避受限网络下的地域封锁。
+  // REST 种子数据：直接走真实 Binance /api/v3/klines（与订单簿/顶栏同一行情源，保证价格一致）。
+  // 注意：依赖可访问 api.binance.com 的网络环境。
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["klines", symbol, interval, limit],
-    queryFn: () => api.getKline(symbol, interval, limit),
+    queryFn: () => fetchKlines(symbol, interval, limit),
     staleTime: 60_000,
   });
 
@@ -102,47 +103,36 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     const candle = candleRef.current;
     const vol = volRef.current;
     if (!candle || !vol || !data || data.length === 0) return;
-    candlesRef.current = data;
-    candle.setData(data.map(toCandle));
-    vol.setData(data.map(toVolume));
+    const rows = data.map(norm);
+    candlesRef.current = rows;
+    candle.setData(rows.map(toCandle));
+    vol.setData(rows.map(toVolume));
     seededRef.current = true;
     paintMA();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, showMA]);
 
-  // WS 实时增量：走自建后端 /api/v1/market/kline/ws（与 KLineChart 一致），
+  // WS 实时增量：统一走真实 Binance K 线流（与订单簿/顶栏同一行情源），
   // 合并最后一根/追加新根，仅 update 当前 bar；连接状态驱动顶栏指示灯。
-  const [wsStatus, setWsStatus] = useState<BinanceWsStatus>("idle");
-  useEffect(() => {
-    setWsStatus("connecting");
-    const stop = connectKlineWS(
-      symbol,
-      interval,
-      (k) => {
-        const list = candlesRef.current;
-        if (list.length === 0) return; // 种子未到，REST 会带回最新一根
-        const last = list[list.length - 1];
-        if (k.t < last.t) return;
-        const next = k.t === last.t ? [...list.slice(0, -1), k] : [...list, k];
-        candlesRef.current = next;
-        if (!seededRef.current) return;
-        candleRef.current?.update(toCandle(k));
-        volRef.current?.update(toVolume(k));
-        if (showMA) {
-          MA_CONFIG.forEach((cfg, idx) => {
-            const pt = maPoints(next, cfg.period).at(-1);
-            if (pt) maRefs.current[idx]?.update(pt);
-          });
-        }
-      },
-      () => setWsStatus("closed"),
-    );
-    setWsStatus("open");
-    return () => {
-      stop();
-      setWsStatus("closed");
-    };
-  }, [symbol, interval, showMA]);
+  const onKlineRef = useRef<(k: Kline) => void>(() => {});
+  onKlineRef.current = (k) => {
+    const list = candlesRef.current;
+    if (list.length === 0) return; // 种子未到，REST 会带回最新一根
+    const last = list[list.length - 1];
+    if (k.t < last.t) return;
+    const next = k.t === last.t ? [...list.slice(0, -1), k] : [...list, k];
+    candlesRef.current = next;
+    if (!seededRef.current) return;
+    candleRef.current?.update(toCandle(k));
+    volRef.current?.update(toVolume(k));
+    if (showMA) {
+      MA_CONFIG.forEach((cfg, idx) => {
+        const pt = maPoints(next, cfg.period).at(-1);
+        if (pt) maRefs.current[idx]?.update(pt);
+      });
+    }
+  };
+  const wsStatus = useKlineLive(symbol, interval, (k) => onKlineRef.current(norm(k)));
 
   // 建图（一次）与销毁
   useEffect(() => {
@@ -320,6 +310,12 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
 
 function toCandle(k: Kline): CandlestickData<Time> {
   return { time: (k.t / 1000) as Time, open: k.o, high: k.h, low: k.l, close: k.c };
+}
+
+// Binance K 线事件/REST 返回 {time,open,high,low,close,volume}，统一归一为图表内部 Kline {t,o,h,l,c,v}。
+type BinanceKline = { time: number; open: number; high: number; low: number; close: number; volume: number };
+function norm(k: BinanceKline): Kline {
+  return { t: k.time, o: k.open, h: k.high, l: k.low, c: k.close, v: k.volume };
 }
 
 function toVolume(k: Kline): HistogramData<Time> {
