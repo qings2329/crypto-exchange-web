@@ -29,6 +29,7 @@ function isValidCryptoAddress(s) {
 import { buildAdminApp, notFound } from "./admin-api.mjs";
 import { pushEvents, summary, recentEvents } from "./monitor-store.mjs";
 import { getSim, intervalToMs } from "./kline-server.mjs";
+import { livePrice, tickLive } from "./market-state.mjs";
 
 // 演示用种子监控事件：让聚合看板首次打开即有数据（真实环境由前端上报累积）。
 pushEvents([
@@ -55,25 +56,19 @@ const r2 = (x) => Math.round(x * 100) / 100;
 const r4 = (x) => Math.round(x * 10000) / 10000;
 const ns = () => Number(BigInt(Date.now()) * 1000000n); // Unix 纳秒（与前端 OrderView/TradeView/LedgerEntry 对齐）
 
-// ---------- 行情模拟 ----------
-function basePrice(symbol) {
-  if (symbol.startsWith("BTC")) return 68000;
-  if (symbol.startsWith("ETH")) return 3500;
-  if (symbol.startsWith("SOL")) return 150;
-  return 7.2;
-}
+// ---------- 行情模拟（单一数据源：与 kline-server 共用 market-state 的实时价）----------
 const marketSims = new Map();
 function getMarket(symbol) {
   let s = marketSims.get(symbol);
   if (!s) {
-    s = { symbol, price: basePrice(symbol), lastTradeId: 1 };
+    s = { symbol, price: livePrice(symbol), lastTradeId: 1 };
     marketSims.set(symbol, s);
   }
+  s.price = livePrice(symbol); // 实时价来自单一数据源，深度/Ticker/K线 始终一致
   return s;
 }
 function stepPrice(s) {
-  const drift = (Math.random() - 0.5) * s.price * 0.0016;
-  s.price = Math.max(0.01, s.price + drift);
+  s.price = tickLive(s.symbol, 0.0016);
   return s.price;
 }
 function makeDepth(symbol, price) {
@@ -1971,7 +1966,7 @@ marketWss.on("connection", (ws, req) => {
   ws.on("close", () => clearInterval(timer));
 });
 
-// K 线实时推送（与 REST 共用 kline-server 的内存行情）
+// K 线实时推送（与 REST 共用 kline-server 的内存行情，价格来自单一数据源）
 klineWss.on("connection", (ws, req) => {
   const { symbol, interval } = parseWsUrl(req.url);
   const ivMs = intervalToMs(interval);
@@ -1980,20 +1975,19 @@ klineWss.on("connection", (ws, req) => {
   ws.send(JSON.stringify(sim.current));
   const timer = setInterval(() => {
     if (ws.readyState !== ws.OPEN) return;
+    const p = tickLive(symbol, 0.003); // 演化单一实时价，深度/Ticker 同步
     sim.tick++;
     const cur = sim.current;
     if (sim.tick % ROLL_EVERY === 0) {
       const t = cur.t + ivMs;
-      const o = cur.c;
+      const o = p;
       sim.current = { t, o, h: o, l: o, c: o, v: Math.round((Math.random() * 2 + 0.2) * 1000) / 1000 };
       sim.history.push(sim.current);
       if (sim.history.length > 500) sim.history.shift();
     } else {
-      const drift = (Math.random() - 0.5) * cur.c * 0.003;
-      const c = Math.max(1e-8, cur.c + drift);
-      cur.c = r2(c);
-      cur.h = r2(Math.max(cur.h, c));
-      cur.l = r2(Math.min(cur.l, c));
+      cur.c = r2(p);
+      cur.h = r2(Math.max(cur.h, p));
+      cur.l = r2(Math.min(cur.l, p));
       cur.v = Math.round((cur.v + Math.random() * 1.5) * 1000) / 1000;
       sim.current = cur;
       sim.history[sim.history.length - 1] = cur;

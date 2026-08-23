@@ -4,6 +4,7 @@
 // 历史与实时共享同一份内存行情，保证 WS 起始蜡烛与 REST 末根对齐。
 import http from "node:http";
 import { WebSocketServer } from "ws";
+import { livePrice } from "./market-state.mjs";
 
 const PORT = Number(process.env.KLINE_PORT || 8802);
 const TICK_MS = 400; // 实时推送频率
@@ -18,29 +19,10 @@ function intervalToMs(iv) {
 const r2 = (x) => Math.round(x * 100) / 100;
 const r3 = (x) => Math.round(x * 1000) / 1000;
 
-// 按 symbol 生成真实感的基准价（与 gateway.mjs 的 basePrice 保持一致）。
+// 按 symbol 生成真实感的基准价（与 gateway.mjs 共用 market-state 的 basePrice）。
 // 兼容 BTCUSDT / BTC_USDT 两种拼写。
-function basePrice(symbol) {
-  const s = (symbol || "").toUpperCase();
-  if (s.startsWith("BTC")) return 68000;
-  if (s.startsWith("ETH")) return 3500;
-  if (s.startsWith("BNB")) return 600;
-  if (s.startsWith("SOL")) return 150;
-  if (s.startsWith("XRP")) return 2.5;
-  if (s.startsWith("DOGE")) return 0.12;
-  if (s.startsWith("ADA")) return 0.45;
-  if (s.startsWith("DOT")) return 6.5;
-  if (s.startsWith("AVAX")) return 35;
-  if (s.startsWith("LINK")) return 15;
-  if (s.startsWith("LTC")) return 85;
-  if (s.startsWith("TRX")) return 0.16;
-  if (s.startsWith("TON")) return 5.5;
-  if (s.startsWith("NEAR")) return 5;
-  if (s.startsWith("APT")) return 9;
-  return 7.2;
-}
 
-// 每个 symbol 一份模拟行情
+// 每个 symbol 一份模拟行情；末根收盘价 = 单一实时价（livePrice），与深度/Ticker 最新价对齐。
 const sims = new Map();
 function getSim(symbol, intervalMs) {
   // 缓存键必须同时包含 symbol 与 intervalMs：不同周期应生成各自独立的行情序列，
@@ -51,17 +33,17 @@ function getSim(symbol, intervalMs) {
   const limit = 500;
   const now = Math.floor(Date.now() / intervalMs) * intervalMs;
   const startT = now - (limit - 1) * intervalMs;
-  let price = basePrice(symbol);
+  const cur = livePrice(symbol); // 当前实时价（= 深度/Ticker 最新价）
+  let price = cur;
   const history = [];
-  for (let i = 0; i < limit; i++) {
+  for (let i = limit - 1; i >= 0; i--) {
     const t = startT + i * intervalMs;
-    const o = price;
-    const c = Math.max(1e-8, o + (Math.random() - 0.5) * o * 0.004);
+    const c = price;
+    const o = c - (Math.random() - 0.5) * c * 0.004;
     const h = Math.max(o, c) * (1 + Math.random() * 0.002);
     const l = Math.min(o, c) * (1 - Math.random() * 0.002);
-    const v = r3(Math.random() * 10 + 1);
-    history.push({ t, o: r2(o), h: r2(h), l: r2(l), c: r2(c), v });
-    price = c;
+    history[i] = { t, o: r2(o), h: r2(h), l: r2(l), c: r2(c), v: r3(Math.random() * 10 + 1) };
+    price = o; // 向前回溯生成历史，末根对齐到实时价
   }
   sim = { history, current: history[history.length - 1], tick: 0 };
   sims.set(key, sim);
