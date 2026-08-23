@@ -31,7 +31,12 @@ function toLocalOrder(o: {
   status: string;
   created_at?: number;
 }): TradeOrder {
-  const status = o.status === "open" || o.status === "filled" ? o.status : "canceled";
+  const status: TradeOrder["status"] =
+    o.status === "filled"
+      ? "filled"
+      : o.status === "canceled" || o.status === "cancelled" || o.status === "rejected"
+        ? "canceled"
+        : "open"; // open / partial / new / 未知均视为活动委托
   return {
     id: `SRV-${o.id}`,
     symbol: o.symbol,
