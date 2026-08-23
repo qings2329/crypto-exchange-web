@@ -131,20 +131,20 @@ export function Notifications() {
           {list.map((n) => (
             <div
               key={n.id}
-              className={`flex items-start gap-3 rounded-lg border border-[#2B3139] bg-[#1E2329] p-3 ${
+              className={`flex items-start gap-3 rounded-lg border border-border bg-card p-3 ${
                 n.read ? "opacity-70" : ""
               }`}
             >
-              <span className={`mt-1.5 size-2 shrink-0 rounded-full ${LEVEL_DOT[n.level] ?? "bg-[#848E9C]"}`} />
+              <span className={`mt-1.5 size-2 shrink-0 rounded-full ${LEVEL_DOT[n.level] ?? "bg-muted"}`} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-foreground">{n.title}</span>
-                  <span className={`text-[10px] uppercase tracking-wide ${LEVEL_TEXT[n.level] ?? "text-[#848E9C]"}`}>
+                  <span className={`text-[10px] uppercase tracking-wide ${LEVEL_TEXT[n.level] ?? "text-muted"}`}>
                     {t(LEVEL_KEY[n.level] ?? "notify.levelInfo")}
                   </span>
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-muted">{n.content}</p>
-                <div className="mt-1 text-[11px] text-[#848E9C]">{new Date(n.created_at).toLocaleString()}</div>
+                <div className="mt-1 text-[11px] text-muted">{new Date(n.created_at).toLocaleString()}</div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 {!n.read && (

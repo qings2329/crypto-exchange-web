@@ -121,7 +121,7 @@ export function AssetOverview() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ background: "#1E2329", border: "1px solid #2B3139", borderRadius: 8, fontSize: 12 }}
+                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", borderRadius: 8, fontSize: 12 }}
                   formatter={(v) => `$${fmtCompact(Number(v))}`}
                 />
               </PieChart>
@@ -129,11 +129,11 @@ export function AssetOverview() {
           </div>
 
           {/* 右：图例 */}
-          <div className="flex flex-col gap-1.5 text-xs text-gray-400">
+          <div className="flex flex-col gap-1.5 text-xs text-muted">
             {pieData.map((d, i) => (
               <span key={d.name} className="flex items-center gap-1.5">
                 <span className="inline-block h-2 w-2 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                <span className="text-slate-300">{d.name}</span>
+                <span className="text-foreground">{d.name}</span>
                 <span className="font-mono tabular-nums">${fmtCompact(d.value)}</span>
               </span>
             ))}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type AddressBookEntry, type LedgerEntry } from "../api/client";
+import { useAuth } from "../lib/auth";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
 import { isValidCryptoAddress, validateAmount } from "../lib/validate";
@@ -122,6 +123,7 @@ function AdaptiveTable({ data }: { data: unknown }) {
 
 // 钱包：以合约钱包余额接口为统一资产视图（现货余额经撮合引擎内存态，无独立 HTTP 接口）。
 export function Wallet() {
+  const { uid } = useAuth();
   const { t } = useI18n();
   const secureAction = useSecureAction();
   const toast = useToast();
@@ -165,9 +167,11 @@ export function Wallet() {
     setLoading(false);
   }, []);
 
+  // 登录态（uid）变化时重新拉取：覆盖「会话过期后重新登录 / auth:expired 同步登出」
+  // 等场景，避免 Wallet 挂载时遗留的 401 错误（「请先登录以查看」）一直残留不刷新。
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, uid]);
 
   // 提现记录客户端筛选（按任意字段文本匹配）
   const filteredWithdraws = useMemo(() => {
