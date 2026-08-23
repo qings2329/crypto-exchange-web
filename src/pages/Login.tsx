@@ -48,7 +48,7 @@ export function Login() {
         <div className="demo-accounts">
           <div className="demo-title">{t("login.demoAccounts")}</div>
           <ul>
-            <li><code>user1</code> / <code>User@123</code></li>
+            <li><code>user1</code> / <code>qwert@123x</code></li>
           </ul>
         </div>
         <div className="switch">

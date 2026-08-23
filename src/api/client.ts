@@ -103,6 +103,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       // 刷新失败：会话已失效，清除并跳转登录（对接网关后的标准过期处理）。
       // 公开页（首页/合约等）不强制跳转，避免浏览体验被打断。
       tokenStore.clear();
+      // 同步 React 登录态：仅清 localStorage 不足以让 Header 等消费 useAuth 的组件
+      // 及时更新，否则会出现「顶栏仍显示已登录、接口却 401」的割裂。
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("auth:expired"));
       if (typeof location !== "undefined" && !isPublicRoute()) location.hash = "/login";
       throw new ApiError("登录已过期，请重新登录", 401, 401);
     }

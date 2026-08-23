@@ -1990,7 +1990,7 @@ klineWss.on("connection", (ws, req) => {
       if (sim.history.length > 500) sim.history.shift();
     } else {
       const drift = (Math.random() - 0.5) * cur.c * 0.003;
-      const c = Math.max(1, cur.c + drift);
+      const c = Math.max(1e-8, cur.c + drift);
       cur.c = r2(c);
       cur.h = r2(Math.max(cur.h, c));
       cur.l = r2(Math.min(cur.l, c));

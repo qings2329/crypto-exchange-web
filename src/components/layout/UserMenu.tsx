@@ -83,18 +83,18 @@ export function UserMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right overflow-hidden rounded-xl border border-[#2B3139] bg-[#1E2329] p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
+        <div className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
           <div className="flex items-center gap-2.5 px-2.5 py-2">
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#FCD535] to-[#F0B90B] text-sm font-bold text-black">
               {initials(profile, uid)}
             </span>
             <div className="min-w-0">
               <div className="truncate text-[13px] font-semibold text-foreground">{name}</div>
-              {uid && <div className="truncate text-[11px] text-[#848E9C]">UID #{uid}</div>}
+              {uid && <div className="truncate text-[11px] text-muted">UID #{uid}</div>}
             </div>
           </div>
 
-          <div className="my-1 h-px bg-[#2B3139]" />
+          <div className="my-1 h-px bg-border" />
 
           <ul role="menu">
             {ITEMS.map((it) => (
@@ -103,7 +103,7 @@ export function UserMenu() {
                   role="menuitem"
                   href={it.href}
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-foreground transition-colors hover:bg-[#2B3139]/60"
+                  className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-foreground transition-colors hover:bg-panel-2/60"
                 >
                   {t(it.labelKey)}
                 </a>
@@ -111,7 +111,7 @@ export function UserMenu() {
             ))}
           </ul>
 
-          <div className="my-1 h-px bg-[#2B3139]" />
+          <div className="my-1 h-px bg-border" />
 
           <button
             type="button"
@@ -119,7 +119,7 @@ export function UserMenu() {
             onClick={handleLogout}
             className={cn(
               "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors",
-              "text-[#F6465D] hover:bg-[#F6465D]/10"
+              "text-sell hover:bg-sell/10"
             )}
           >
             {t("header.logout")}

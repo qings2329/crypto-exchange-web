@@ -79,7 +79,7 @@ export function Help() {
       {/* 搜索框（币安风格） */}
       <div className="relative mb-4">
         <svg
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#848E9C]"
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -92,7 +92,7 @@ export function Help() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("help.searchPlaceholder")}
-          className="w-full rounded-lg border border-[#2B3139] bg-[#181A20] py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-[#848E9C] outline-none focus:border-accent"
+          className="w-full rounded-lg border border-border bg-card py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted outline-none focus:border-accent"
         />
       </div>
 
@@ -120,19 +120,19 @@ export function Help() {
           {results.map((c) => (
             <section key={c.id}>
               <h3 className="mb-2 text-[13px] font-semibold text-foreground">{t(c.titleKey)}</h3>
-              <div className="overflow-hidden rounded-lg border border-[#2B3139] bg-[#1E2329]">
+              <div className="overflow-hidden rounded-lg border border-border bg-card">
                 {c.items.map((it, idx) => {
                   const key = `${c.id}:${it.q}`;
                   const isOpen = open === key;
                   return (
-                    <div key={key} className={idx > 0 ? "border-t border-[#2B3139]" : ""}>
+                    <div key={key} className={idx > 0 ? "border-t border-border" : ""}>
                       <button
                         onClick={() => setOpen(isOpen ? null : key)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-[#2B3139]/30"
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-panel-2/30"
                       >
                         <span>{t(it.q)}</span>
                         <svg
-                          className={`size-4 shrink-0 text-[#848E9C] transition-transform ${isOpen ? "rotate-180" : ""}`}
+                          className={`size-4 shrink-0 text-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
@@ -154,7 +154,7 @@ export function Help() {
       )}
 
       {/* 底部联系支持 */}
-      <div className="mt-6 flex flex-col items-start gap-3 rounded-lg border border-[#2B3139] bg-[#181A20] p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-6 flex flex-col items-start gap-3 rounded-lg border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-foreground">{t("help.contactTitle")}</div>
           <p className="mt-1 text-xs text-muted">{t("help.contactDesc")}</p>

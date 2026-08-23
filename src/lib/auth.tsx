@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, tokenStore } from "../api/client";
 
 // 用户前端仅存在「已登录 / 未登录」两种状态，不区分角色（无管理员/运营概念）。
@@ -21,6 +21,17 @@ const AuthCtx = createContext<AuthCtxValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [uid, setUid] = useState<string | null>(tokenStore.uid);
   const [role, setRole] = useState<UserRole>(tokenStore.role ?? null);
+
+  // 会话失效（令牌过期且刷新失败）时，由 request() 派发 auth:expired，
+  // 这里同步清空 React 登录态，保证顶栏/守卫与 localStorage 一致。
+  useEffect(() => {
+    const onExpired = () => {
+      setUid(null);
+      setRole(null);
+    };
+    window.addEventListener("auth:expired", onExpired);
+    return () => window.removeEventListener("auth:expired", onExpired);
+  }, []);
 
   const login = async (target: string, password: string) => {
     const res = await api.login(target, password);

@@ -89,14 +89,14 @@ export function Header() {
               <a
                 href="#/notifications"
                 aria-label={t("nav.notifications")}
-                className="relative grid size-8 place-items-center rounded-md text-muted transition-colors hover:bg-[#2B3139]/60 hover:text-foreground"
+                className="relative grid size-8 place-items-center rounded-md text-muted transition-colors hover:bg-panel-2/60 hover:text-foreground"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4.5">
                   <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
                 {unread > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid min-w-[16px] place-items-center rounded-full bg-[#F6465D] px-1 text-[10px] font-bold leading-4 text-white">
+                  <span className="absolute -right-0.5 -top-0.5 grid min-w-[16px] place-items-center rounded-full bg-sell px-1 text-[10px] font-bold leading-4 text-white">
                     {unread > 99 ? "99+" : unread}
                   </span>
                 )}
@@ -161,9 +161,9 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
       {open && (
         <div
           data-testid="lang-dropdown"
-          className="lang-dropdown absolute right-0 top-full z-50 mt-2 w-48 origin-top-right overflow-hidden rounded-xl border border-[#2B3139] bg-[#1E2329] p-1 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+          className="lang-dropdown absolute right-0 top-full z-50 mt-2 w-44 origin-top-right overflow-hidden rounded-xl border border-border bg-card p-1 shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
         >
-          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#848E9C]">
+          <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
             {t("lang.label")}
           </div>
           {LOCALES.map((lc) => {
@@ -177,16 +177,16 @@ function LanguageMenu({ locale, onChange }: { locale: Locale; onChange: (l: Loca
                 }}
                 className={cn(
                   "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
-                  active ? "bg-[#FCD535]/10" : "hover:bg-[#2B3139]/60"
+                  active ? "bg-accent/10" : "hover:bg-panel-2/60"
                 )}
               >
-                <span className={cn("text-sm text-[#EAECEF]", active && "font-semibold text-[#FCD535]")}>{lc.label}</span>
+                <span className={cn("text-sm text-foreground", active && "font-semibold text-accent")}>{lc.label}</span>
                 <span className="ml-auto flex items-center gap-1.5">
                   {NATIVE_LABELS[lc.value] !== lc.label && (
-                    <span className="text-[11px] text-[#848E9C]">{NATIVE_LABELS[lc.value]}</span>
+                    <span className="text-[11px] text-muted">{NATIVE_LABELS[lc.value]}</span>
                   )}
                   {active && (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-3.5 text-[#FCD535]">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-3.5 text-accent">
                       <path d="M20 6 9 17l-5-5" />
                     </svg>
                   )}
