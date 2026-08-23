@@ -183,7 +183,8 @@ function StakeModal({
   const [position, setPosition] = useState<LaunchPosition | null>(null);
   const [amountStr, setAmountStr] = useState("");
   const [busy, setBusy] = useState(false);
-  const pool = project.pools.find((x) => x.id === poolId)!;
+  const pool = project.pools.find((x) => x.id === poolId) ?? project.pools[0];
+  if (!pool) return null;
 
   const loadPosition = useCallback(
     (pid: string) => {
