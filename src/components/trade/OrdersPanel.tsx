@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api } from "../../api/client";
+import { api, ApiError } from "../../api/client";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { useToast } from "../Toast";
 import { fmtPrice, fmtQty, fmtTime } from "../../lib/format";
@@ -97,9 +97,18 @@ export function OrdersPanel({ symbol, initialTab = "open", market = "spot" }: Pr
   );
   const rows = tab === "open" ? openOrders : history;
 
-  const onCancel = (o: TradeOrder) => {
-    cancel(o.id);
-    toast.info(`${t("ordersPanel.cancel")} · ${o.id}`);
+  const onCancel = async (o: TradeOrder) => {
+    const srvId = Number(o.id.startsWith("SRV-") ? o.id.slice(4) : o.id);
+    cancel(o.id); // 本地乐观标记 + 记入已撤集合，避免轮询重现
+    toast.info(`${t("ordersPanel.cancel")} · ${o.symbol}`);
+    if (market === "spot") {
+      try {
+        await api.spotCancelOrder({ symbol, orderId: srvId });
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : t("common.requestFailed"));
+      }
+    }
+    // 合约无用户级撤单端点：本地屏蔽已撤单即可（服务端不再返回则自然消失）。
   };
 
   return (

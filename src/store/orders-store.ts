@@ -24,6 +24,8 @@ export interface TradeOrder {
 
 interface OrdersState {
   orders: TradeOrder[];
+  /** 已本地撤单的真实服务端订单号（轮询对账时过滤，避免已撤单重现） */
+  cancelledIds: number[];
   /** 服务端水合：用后端订单替换某交易对的本地镜像（服务端为真相源） */
   hydrate: (symbol: string, orders: TradeOrder[]) => void;
   place: (order: TradeOrder) => void;
@@ -49,20 +51,32 @@ export function findFillable(open: TradeOrder[], symbol: string, lastPrice: numb
 
 export const useOrdersStore = create<OrdersState>((set) => ({
   orders: [],
+  cancelledIds: [],
 
   hydrate: (symbol, orders) =>
-    set((s) => ({
-      orders: [...orders, ...s.orders.filter((o) => o.symbol !== symbol)],
-    })),
+    set((s) => {
+      // 过滤掉已本地撤单的服务端订单：撤单后服务端可能仍短暂返回 open（尤其合约无用户级撤单端点），
+      // 若不过滤会在 5s 轮询后“复活”为当前委托。
+      const cancelled = new Set(s.cancelledIds);
+      const incoming = orders.filter((o) => {
+        const srv = Number(o.id.startsWith("SRV-") ? o.id.slice(4) : o.id);
+        return !cancelled.has(srv);
+      });
+      return { orders: [...incoming, ...s.orders.filter((o) => o.symbol !== symbol)] };
+    }),
 
   place: (order) => set((s) => ({ orders: [order, ...s.orders] })),
 
   cancel: (id) =>
-    set((s) => ({
-      orders: s.orders.map((o) =>
-        o.id === id && o.status === "open" ? { ...o, status: "canceled", settledTs: Date.now() } : o
-      ),
-    })),
+    set((s) => {
+      const srv = Number(id.startsWith("SRV-") ? id.slice(4) : id);
+      return {
+        orders: s.orders.map((o) =>
+          o.id === id && o.status === "open" ? { ...o, status: "canceled", settledTs: Date.now() } : o
+        ),
+        cancelledIds: s.cancelledIds.includes(srv) ? s.cancelledIds : [...s.cancelledIds, srv],
+      };
+    }),
 
   fill: (id) =>
     set((s) => ({

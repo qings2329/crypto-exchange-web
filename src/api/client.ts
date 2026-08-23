@@ -286,6 +286,12 @@ export const api = {
     );
     return d.orders ?? [];
   },
+  // POST /api/v1/spot/cancel 撤销本人现货委托（服务端校验归属，释放预冻结）。
+  spotCancelOrder: (body: { symbol: string; orderId: number }) =>
+    request<{ symbol: string; order_id: number; canceled: boolean }>("/api/v1/spot/cancel", {
+      method: "POST",
+      body: JSON.stringify({ symbol: body.symbol, order_id: body.orderId }),
+    }),
   // GET /api/v1/spot/trades 本人现货成交流水（后端返回 {trades:[]}）。
   spotTrades: async (params?: { symbol?: string; limit?: number }) => {
     const d = await request<{ trades: TradeView[] }>(
