@@ -8,8 +8,8 @@ import "../../i18n/index";
 const h = vi.hoisted(() => {
   // 第一个 addSeries 返回 candle 系列，其 setData 用于断言重新落图
   const series: Array<{ setData: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; applyOptions: ReturnType<typeof vi.fn>; priceScale: () => { applyOptions: () => void } }> = [];
-  const getKline = vi.fn();
-  return { series, getKline };
+  const fetchKlines = vi.fn();
+  return { series, fetchKlines };
 });
 
 vi.mock("lightweight-charts", () => ({
@@ -32,24 +32,32 @@ vi.mock("lightweight-charts", () => ({
   LineSeries: class {},
 }));
 
-vi.mock("../../api/client", () => ({
-  api: { getKline: h.getKline },
-  connectKlineWS: vi.fn(() => () => {}),
+// REST 种子走真实 Binance（../../services/binance），返回币安形态的 K 线。
+vi.mock("../../services/binance", () => ({
+  fetchKlines: h.fetchKlines,
+  klineStream: vi.fn(() => ""),
+  parseKlineEvent: vi.fn(),
+}));
+
+// 实时流：测试中无需建立真实 Binance WS 连接。
+vi.mock("../../hooks/use-kline-live", () => ({
+  useKlineLive: vi.fn(() => "open"),
 }));
 
 import { TradingViewChart } from "./TradingViewChart";
 
+// 币安 REST K 线形态：{ time, open, high, low, close, volume }
 function klineFor(close: number) {
   const t = Math.floor(Date.now() / 60000) * 60000;
   return [
-    { t, o: close - 1, h: close + 1, l: close - 2, c: close, v: 1 },
-    { t: t + 60000, o: close, h: close + 1, l: close - 1, c: close, v: 1 },
+    { time: t, open: close - 1, high: close + 1, low: close - 2, close, volume: 1 },
+    { time: t + 60000, open: close, high: close + 1, low: close - 1, close, volume: 1 },
   ];
 }
 
 describe("TradingViewChart 切换交易对", () => {
   it("切换 symbol 后以新交易对数据重新落图", async () => {
-    h.getKline.mockImplementation((symbol: string) =>
+    h.fetchKlines.mockImplementation((symbol: string) =>
       Promise.resolve(symbol === "BTCUSDT" ? klineFor(100) : klineFor(5000)),
     );
 
@@ -69,7 +77,7 @@ describe("TradingViewChart 切换交易对", () => {
 
     rerender(tree("ETHUSDT"));
 
-    await waitFor(() => expect(h.getKline).toHaveBeenCalledWith("ETHUSDT", "1m", 300));
+    await waitFor(() => expect(h.fetchKlines).toHaveBeenCalledWith("ETHUSDT", "1m", 300));
     await waitFor(() => {
       const calls = h.series[0].setData.mock.calls;
       const last = calls[calls.length - 1][0] as Array<{ close: number }>;

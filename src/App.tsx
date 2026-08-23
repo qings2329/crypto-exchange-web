@@ -14,7 +14,6 @@ import { Register } from "./pages/Register";
 
 // 路由级代码分割：各业务页面按需懒加载，首屏仅加载登录/注册等必要模块，
 // 其余页面进入对应路由时才加载对应 chunk（见 README 性能优化）。
-const Trade = lazy(() => import("./pages/Trade").then((m) => ({ default: m.Trade })));
 const TradeHall = lazy(() => import("./pages/TradeHall").then((m) => ({ default: m.TradeHall })));
 const SecurityCenter = lazy(() => import("./pages/SecurityCenter").then((m) => ({ default: m.SecurityCenter })));
 const KycPage = lazy(() => import("./pages/KycPage").then((m) => ({ default: m.KycPage })));
@@ -52,7 +51,6 @@ const PAGES: Record<string, React.ComponentType> = {
   "/orders": Orders,
   "/announcements": Announcements,
   "/history": History,
-  "/trade": Trade,
   "/wallet": Wallet,
   "/otc": OtcPage,
   "/launchpad": LaunchpadPage,

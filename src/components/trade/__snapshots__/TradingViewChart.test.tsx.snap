@@ -65,12 +65,12 @@ exports[`TradingViewChart 错误态快照 > K 线加载失败 → 覆盖层渲�
         </button>
         <span
           class="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted"
-          title="LIVE"
+          title="CONNECTING"
         >
           <span
-            class="size-1.5 rounded-full bg-buy"
+            class="size-1.5 rounded-full bg-accent animate-pulse"
           />
-          LIVE
+          CONNECTING
         </span>
       </div>
     </div>
