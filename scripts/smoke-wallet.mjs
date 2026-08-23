@@ -21,7 +21,7 @@ await page.goto(`${BASE}/#/login`);
 await page.reload();
 await sleep(800);
 await page.fill("input[placeholder='user1']", "admin@ce.dev");
-await page.fill("input[type='password']", "Admin@123");
+await page.fill("input[type='password']", "qwert@123x");
 await page.click("form button:last-of-type");
 await sleep(1200);
 let errTxt = await page.locator(".error, [class*='error']").first().innerText().catch(() => "");

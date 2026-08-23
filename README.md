@@ -113,7 +113,7 @@ npm run dev
 说明：
 
 - 数据为**内存 mock**，无持久化，仅用于联调；重启即重置。
-- 登录演示账号（见 `mock/gateway-auth.mjs` 顶部种子）：`admin@ce.dev` / `op@ce.dev` / `user@ce.dev`（密码分别为 `Admin@123` / `Op@123` / `User@123`）。角色分别为 `admin` / `operator` / `user`，对应前端 RBAC。
+- 登录演示账号（见 `mock/gateway-auth.mjs` 顶部种子）：`admin@ce.dev` / `op@ce.dev` / `user@ce.dev`（用户名亦可分别用 `admin` / `op` / `user1` 登录）。三个账号密码统一为 `qwert@123x`。角色分别为 `admin` / `operator` / `user`，对应前端 RBAC。
 - 之前分散的骨架服务（`kline-server.mjs` / `monitor-server.mjs` / `apikey-express.mjs` / `admin-api.mjs`）仍可作为独立 mock 运行（`npm --prefix mock run start:*`），但**统一网关已覆盖其全部能力**，日常开发只需运行 `dev:mock` 一个进程。
 - 监控上报端点 `POST /api/v1/monitor/report`，聚合查询 `GET /api/v1/monitor/summary` 与 `GET /api/v1/monitor/events?limit=`（前端监控看板页读取）。
 

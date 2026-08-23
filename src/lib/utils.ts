@@ -11,7 +11,11 @@ export function cn(...inputs: ClassValue[]) {
  * CEX 资产/账户类视图需先登录，不应把原始网关报错直接暴露给用户。
  */
 export function isAuthError(err: string): boolean {
-  return /权限|未登录|未携带|令牌|token|login|expired/i.test(err);
+  // 仅匹配明确指向「未登录 / 会话失效」的文案，避免把含 token/login/auth/expired 等词的
+  // 普通业务报错（如「令牌地址非法」「登录成功」）误判为「请先登录」。
+  return /权限|未登录|未鉴权|未携带|令牌|请先登录|登录已过期|unauthorized|not authenticated|session expired/i.test(
+    err
+  );
 }
 
 // 错误语义分类：单页内联报错与 Toast 统一复用此判定，避免各自实现导致不一致。

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, type AddressBookEntry, type LedgerEntry } from "../api/client";
+import { api, tokenStore, type AddressBookEntry, type LedgerEntry } from "../api/client";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../i18n";
+import { isPublicRoute } from "../lib/routes";
 import { formatDateTime } from "../lib/timezone";
 import { isValidCryptoAddress, validateAmount } from "../lib/validate";
 import { AssetOverview, TransferModal, type WalletRow } from "../components/wallet/AssetOverview";
@@ -165,6 +166,20 @@ export function Wallet() {
       setLedgerErr(l.reason);
     }
     setLoading(false);
+    // 防御：余额 / 提现记录任一请求因会话失效而 401/403 时，立即清登录态并跳登录页，
+    // 杜绝「顶栏仍显示已登录、钱包却提示请先登录以查看」的半死状态（组件级兜底，
+    // 与 api/client 的 request() 统一失效处理互为冗余，确保任何路径都不会卡在钱包页）。
+    const authFailed = [b, w].some(
+      (r) =>
+        r.status === "rejected" &&
+        r.reason &&
+        (r.reason.status === 401 || r.reason.status === 403)
+    );
+    if (authFailed) {
+      tokenStore.clear();
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("auth:expired"));
+      if (typeof location !== "undefined" && !isPublicRoute()) location.hash = "/login";
+    }
   }, []);
 
   // 登录态（uid）变化时重新拉取：覆盖「会话过期后重新登录 / auth:expired 同步登出」
