@@ -72,7 +72,7 @@ export function BotGrid() {
   async function createStrategy() {
     setErr("");
     setMsg("");
-    if (!name.trim() || !symbol.trim() || !token.trim() || !lower || !upper || !gridNum || !orderAmt) {
+    if (!name.trim() || !symbol.trim() || !token.trim() || !lower || !upper || !gridNum || !(Number(orderAmt) > 0)) {
       setErr(t("bot.form.err"));
       return;
     }
@@ -83,7 +83,7 @@ export function BotGrid() {
       setErr(t("bot.form.errRange"));
       return;
     }
-    if (gn <= 0) {
+    if (!(gn >= 2)) {
       setErr(t("bot.form.errGridNum"));
       return;
     }
@@ -301,7 +301,7 @@ export function BotGrid() {
               ["bot.gridUpper", viewOrders.params.grid_upper],
               ["bot.gridNum", viewOrders.params.grid_num],
               ["bot.gridStep", viewOrders.params.grid_lower != null && viewOrders.params.grid_upper != null && viewOrders.params.grid_num
-                ? ((viewOrders.params.grid_upper - viewOrders.params.grid_lower) / viewOrders.params.grid_num).toFixed(4)
+                ? ((viewOrders.params.grid_upper - viewOrders.params.grid_lower) / Math.max(1, viewOrders.params.grid_num - 1)).toFixed(4)
                 : "—"],
               ["bot.gridPosition", viewOrders.grid_state.position],
               ["bot.gridPendingBuys", viewOrders.grid_state.levels?.filter((l) => l.placed && !l.filled && l.side === "buy").length ?? 0],
