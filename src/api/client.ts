@@ -95,27 +95,31 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let res = await doFetch(tokenStore.access ?? undefined);
 
+  // 统一 401 处理：优先用 refresh_token 换发新 access 并重试一次；
+  // 无论「无刷新令牌 / 刷新失败 / 刷新成功但重试仍 401」，只要最终仍是 401，
+  // 就判定会话失效——强制清登录态并跳登录页，杜绝「Header 仍显示已登录、
+  // 钱包余额/提现记录却提示请先登录」的半死状态（修复偶发显示请先登录）。
   if (res.status === 401 && tokenStore.refresh) {
     try {
       const next = await refreshAccessToken();
       res = await doFetch(next);
     } catch {
-      // 刷新失败：会话已失效，清除并跳转登录（对接网关后的标准过期处理）。
-      // 公开页（首页/合约等）不强制跳转，避免浏览体验被打断。
+      // 刷新失败：落入下方统一失效处理
+    }
+  }
+
+  if (res.status === 401) {
+    if (!isPublicRoute()) {
       tokenStore.clear();
       // 同步 React 登录态：仅清 localStorage 不足以让 Header 等消费 useAuth 的组件
       // 及时更新，否则会出现「顶栏仍显示已登录、接口却 401」的割裂。
       if (typeof window !== "undefined") window.dispatchEvent(new Event("auth:expired"));
-      if (typeof location !== "undefined" && !isPublicRoute()) location.hash = "/login";
-      throw new ApiError("登录已过期，请重新登录", 401, 401);
+      // 登录接口自身的 401（凭证错误）除外，避免打断登录错误提示。
+      if (typeof location !== "undefined" && !path.includes("/user/login")) {
+        location.hash = "/login";
+      }
     }
-  }
-
-  // 无刷新令牌却收到 401（未登录态访问受保护资源）：跳转登录页重新鉴权。
-  // 登录接口自身的 401（凭证错误）除外，避免打断登录错误提示；
-  // 公开页（首页/合约等）保持匿名可浏览，仅由页面自身的登录态守卫决定是否跳转。
-  if (res.status === 401 && !tokenStore.refresh && !path.includes("/user/login") && !isPublicRoute()) {
-    if (typeof location !== "undefined") location.hash = "/login";
+    throw new ApiError("登录已过期，请重新登录", 401, 401);
   }
 
   let body: any = null;

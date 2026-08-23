@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, tokenStore } from "../api/client";
+import { isPublicRoute } from "./routes";
 
 // 用户前端仅存在「已登录 / 未登录」两种状态，不区分角色（无管理员/运营概念）。
 type UserRole = string | null;
@@ -31,6 +32,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener("auth:expired", onExpired);
     return () => window.removeEventListener("auth:expired", onExpired);
+  }, []);
+
+  // 启动时用 /user/me 校验本地令牌是否仍有效：localStorage 可能残留已失效的令牌
+  // （如 mock 网关重启导致 refresh_token 失效）。若不校验，RequireLogin 会凭「令牌存在」
+  // 放行钱包页，而余额/提现记录接口却返回 401，表现为「已登录却提示请先登录」。
+  // 校验失败（含刷新也失败）即清登录态并跳登录，避免半死状态。
+  useEffect(() => {
+    if (!tokenStore.access) return;
+    let alive = true;
+    api
+      .userMe()
+      .catch(() => {
+        if (!alive) return;
+        tokenStore.clear();
+        setUid(null);
+        setRole(null);
+        if (typeof location !== "undefined" && !isPublicRoute()) location.hash = "/login";
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const login = async (target: string, password: string) => {
