@@ -48,9 +48,16 @@ export const useFuturesStore = create<FuturesState>((set) => ({
   close: (id) => set((s) => ({ positions: s.positions.filter((p) => p.id !== id) })),
 
   hydrate: (symbol, positions) =>
-    set((s) => ({
-      positions: [...positions, ...s.positions.filter((p) => p.symbol !== symbol)],
-    })),
+    set((s) => {
+      // 合并服务端持仓与本地镜像：服务端不回传 tp/sl，需保留本地已设置的止盈/止损，
+      // 否则每 5s 轮询会把用户刚配置的 TP/SL 覆盖清空。
+      const others = s.positions.filter((p) => p.symbol !== symbol);
+      const merged = positions.map((sp) => {
+        const local = s.positions.find((p) => p.id === sp.id);
+        return local ? { ...sp, tp: local.tp, sl: local.sl } : sp;
+      });
+      return { positions: [...merged, ...others] };
+    }),
 
   setLeverage: (symbol, leverage) =>
     set((s) => ({
