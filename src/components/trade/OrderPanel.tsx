@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/utils";
 import { fmtPrice, fmtQty } from "../../lib/format";
-import { useMockBalances } from "../../hooks/use-mock-balances";
+import { useMockBalances, type MockBalances } from "../../hooks/use-mock-balances";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { leverageOf, marginModeOf, useFuturesStore } from "../../store/futures-store";
 import { useTradeDraft } from "../../store/trade-draft-store";
@@ -35,6 +35,20 @@ const PCT_PRESETS = [25, 50, 75, 100] as const;
 
 function roundQty(q: number): number {
   return Math.floor(q / QTY_STEP) * QTY_STEP;
+}
+
+/** 取某资产的模拟可用余额（演示用：仅覆盖 USDT/BTC/ETH） */
+function balanceOf(balances: MockBalances, asset: string): number {
+  switch (asset) {
+    case "USDT":
+      return balances.usdt;
+    case "BTC":
+      return balances.btc;
+    case "ETH":
+      return balances.eth;
+    default:
+      return 0;
+  }
 }
 
 export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
@@ -69,8 +83,9 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
 
   const base = symbol.replace(/USDT$/, "");
   const isBuy = side === "buy";
-  // 合约双边均以 USDT 计保证金；现货卖出消耗币余额
-  const available = balances ? (perp || isBuy ? balances.usdt : balances.btc) : 0;
+  // 合约保证金与现货买入均用 USDT；现货卖出消耗 base 币种余额（修复 ETHUSDT 等卖单误用 BTC 余额）
+  const asset = perp || isBuy ? "USDT" : base;
+  const available = balances ? balanceOf(balances, asset) : 0;
 
   // 成交参考价：限价=输入价；市价=最新行情价
   const limitPrice = parseFloat(priceStr) || 0;
