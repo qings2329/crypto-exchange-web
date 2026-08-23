@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api, type AddressBookEntry, type LedgerEntry } from "../api/client";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
 import { isValidCryptoAddress, validateAmount } from "../lib/validate";
-import { AssetOverview } from "../components/wallet/AssetOverview";
+import { AssetOverview, TransferModal, type WalletRow } from "../components/wallet/AssetOverview";
+import { AssetCards, type AssetCardRow } from "../components/wallet/AssetCards";
 import { useSecureAction } from "../components/security/SecureActionProvider";
 import { useGuardedAction } from "../hooks/use-guarded-action";
 import { SecureText } from "../components/security/SecureText";
 import { InlineError } from "../components/InlineError";
+import { useToast } from "../components/Toast";
 
 const BALANCE_EP = "/api/v1/futures/wallet/balance";
 const WITHDRAWS_EP = "/api/v1/futures/wallet/withdraws";
@@ -121,6 +124,8 @@ function AdaptiveTable({ data }: { data: unknown }) {
 export function Wallet() {
   const { t } = useI18n();
   const secureAction = useSecureAction();
+  const toast = useToast();
+  const qc = useQueryClient();
   const [balance, setBalance] = useState<unknown>(undefined);
   const [balanceErr, setBalanceErr] = useState<unknown>(undefined);
   const [withdraws, setWithdraws] = useState<unknown>(undefined);
@@ -276,6 +281,75 @@ export function Wallet() {
     debounceMs: 500,
   });
 
+  // ---- 充值表单（与提现对称：模拟链上充值即时入账）----
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [dAsset, setDAsset] = useState("");
+  const [dAmount, setDAmount] = useState("");
+  const [dNetwork, setDNetwork] = useState("");
+  const [dSubmitting, setDSubmitting] = useState(false);
+  const [dFormMsg, setDFormMsg] = useState("");
+  const [dAmtErr, setDAmtErr] = useState("");
+
+  const openDepositForm = (asset?: string) => {
+    if (asset) setDAsset(asset);
+    else if (!dAsset) setDAsset(assetOptions[0] || "USDT");
+    setShowDeposit(true);
+  };
+  // 划转：从卡片化列表取该资产的可用/冻结余额，打开划转弹窗
+  const [trRow, setTrRow] = useState<WalletRow | null>(null);
+  const openTransferForm = (asset: string) => {
+    const row = Array.isArray(balance)
+      ? (balance as AssetCardRow[]).find((r) => r.asset === asset)
+      : undefined;
+    if (row) setTrRow({ asset: row.asset, available: row.available, frozen: row.frozen });
+  };
+  // 提现高危操作：经滑块 + 2FA/邮箱验证码二次验证后展开表单并预填资产
+  const openWithdrawForm = (asset: string) => {
+    void secureAction.verify({ action: "withdraw" }).then((ok) => {
+      if (!ok) return;
+      setAsset(asset);
+      setShowForm(true);
+      setTimeout(
+        () => document.getElementById("wallet-withdraw-section")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        60
+      );
+    });
+  };
+  const onDAmountChange = (v: string) => {
+    setDAmount(v);
+    if (dAmtErr) setDAmtErr("");
+  };
+  const doDeposit = async () => {
+    setDFormMsg("");
+    setDAmtErr("");
+    if (!dAsset) {
+      setDFormMsg(t("wallet.errForm"));
+      return;
+    }
+    const amtRes = validateAmount(dAmount);
+    if (!amtRes.ok) {
+      setDAmtErr(t("wallet.errAmount"));
+      return;
+    }
+    setDSubmitting(true);
+    try {
+      const r = await api.futuresDeposit({
+        asset: dAsset,
+        amount: amtRes.value as number,
+        network: dNetwork || undefined,
+      });
+      setDFormMsg(t("wallet.deposited", { asset: r.asset }));
+      setShowDeposit(false);
+      setDAmount("");
+      setDNetwork("");
+      load();
+    } catch (e) {
+      setDFormMsg(t("wallet.fail", { err: (e as Error).message }));
+    } finally {
+      setDSubmitting(false);
+    }
+  };
+
   const doSubmitWithdraw = async () => {
     setFormMsg("");
     setAddrErr("");
@@ -327,23 +401,25 @@ export function Wallet() {
     <div className="page">
       <div className="page-head">
         <h2>{t("wallet.title")}</h2>
-        <button className="refresh" onClick={load} disabled={loading}>
-          {loading ? t("common.loading") : t("common.refresh")}
+        <div className="panel-tools">
+          <button className="refresh" onClick={load} disabled={loading}>
+            {loading ? t("common.loading") : t("common.refresh")}
+          </button>
+        </div>
+      </div>
+
+      {/* 顶部操作栏：充值 / 提现 快捷入口（划转位于资产卡片） */}
+      <div className="wallet-actions" style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <button className="btn buy" style={{ padding: "10px 22px" }} data-testid="wallet-deposit-top" onClick={() => openDepositForm()}>
+          {t("wallet.applyDeposit")}
+        </button>
+        <button className="btn sell" style={{ padding: "10px 22px" }} data-testid="wallet-withdraw-top" onClick={() => openWithdrawForm("")}>
+          {t("wallet.applyWithdraw")}
         </button>
       </div>
 
-      {/* 资产总览：总资产折算 + 分布饼图 + 资产列表快捷操作 */}
-      <AssetOverview
-        onWithdraw={(a) => {
-          // 与"申请提现"同链路：高危操作需二次验证通过才展开表单
-          void secureAction.verify({ action: "withdraw" }).then((ok) => {
-            if (!ok) return;
-            setAsset(a);
-            setShowForm(true);
-            setTimeout(() => document.getElementById("wallet-withdraw-section")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
-          });
-        }}
-      />
+      {/* 资产总览：总资产折算 + 分布饼图（纯汇总卡片） */}
+      <AssetOverview />
 
       <section className="card">
         <h3>{t("wallet.balance")}</h3>
@@ -351,8 +427,72 @@ export function Wallet() {
           <InlineError err={balanceErr} />
         ) : balance === undefined ? (
           <div className="muted">{t("common.loading")}</div>
+        ) : Array.isArray(balance) ? (
+          <AssetCards rows={balance as AssetCardRow[]} onDeposit={openDepositForm} onWithdraw={openWithdrawForm} onTransfer={openTransferForm} />
         ) : (
           <AdaptiveTable data={balance} />
+        )}
+      </section>
+
+      {/* 充值：模拟链上充值，即时入账（与提现对称） */}
+      <section className="card">
+        <div className="card-head">
+          <h3>{t("wallet.applyDeposit")}</h3>
+          <button
+            className="btn"
+            data-testid="wallet-deposit-toggle"
+            onClick={() => {
+              if (showDeposit) {
+                setShowDeposit(false);
+                return;
+              }
+              openDepositForm();
+            }}
+          >
+            {showDeposit ? t("otc.collapse") : t("wallet.applyDeposit")}
+          </button>
+        </div>
+
+        {showDeposit && (
+          <div className="card">
+            <div className="form-hint">{t("wallet.depositHint")}</div>
+            <label>
+              {t("wallet.asset")}
+              <input
+                list="deposit-asset-options"
+                value={dAsset}
+                onChange={(e) => setDAsset(e.target.value)}
+                placeholder={t("wallet.phAsset")}
+              />
+            </label>
+            <datalist id="deposit-asset-options">
+              {assetOptions.map((a) => (
+                <option key={a} value={a} />
+              ))}
+            </datalist>
+            <label>
+              {t("wallet.amount")}
+              <input
+                value={dAmount}
+                onChange={(e) => onDAmountChange(e.target.value)}
+                placeholder="0.00"
+                inputMode="decimal"
+              />
+              {dAmtErr && <div className="error">{dAmtErr}</div>}
+            </label>
+            <label>
+              {t("wallet.network")}
+              <input value={dNetwork} onChange={(e) => setDNetwork(e.target.value)} placeholder={t("wallet.phNetwork")} />
+            </label>
+            <button className="btn primary" onClick={() => void doDeposit()} disabled={dSubmitting}>
+              {dSubmitting ? t("common.loading") : t("wallet.submitDeposit")}
+            </button>
+            {dFormMsg && (
+              <div className={dFormMsg.startsWith(t("wallet.fail", { err: "" })) ? "error" : "ok"}>
+                {dFormMsg}
+              </div>
+            )}
+          </div>
         )}
       </section>
 
@@ -524,6 +664,21 @@ export function Wallet() {
           </div>
         )}
       </section>
+
+      {/* 划转弹窗：资金账户 ⇄ 合约保证金 */}
+      {trRow && (
+        <TransferModal
+          row={trRow}
+          t={t}
+          onClose={() => setTrRow(null)}
+          onDone={async () => {
+            setTrRow(null);
+            await qc.invalidateQueries({ queryKey: ["wallet-balance"] });
+            toast.success(t("wallet.transferCompleted"));
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }

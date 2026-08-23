@@ -29,6 +29,7 @@ import { Badge } from "../components/ui/badge";
 import { useTickerLive } from "../hooks/use-ticker-live";
 import { useMediaQuery } from "../hooks/use-media-query";
 import { useOrdersStore } from "../store/orders-store";
+import { useTradeDraft } from "../store/trade-draft-store";
 import { fmtPercent, fmtPrice, fmtQty } from "../lib/format";
 import { cn } from "../lib/utils";
 
@@ -122,7 +123,12 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   const bookNode = (
     <aside className="flex h-full min-h-0 flex-col gap-2">
       <div className="min-h-0 flex-1">
-        <OrderBook symbol={symbol} />
+        <OrderBook
+          symbol={symbol}
+          lastPrice={last}
+          rising={rising}
+          onPriceClick={(p) => useTradeDraft.getState().setPrice(symbol, p)}
+        />
       </div>
       <div className="h-[216px] shrink-0">
         <RecentTrades symbol={symbol} />

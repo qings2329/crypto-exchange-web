@@ -6,6 +6,7 @@
 import { memo, useMemo } from "react";
 import { useDepthLive } from "../../hooks/use-depth-live";
 import { fmtPrice, fmtQty } from "../../lib/format";
+import { cn } from "../../lib/utils";
 import { Skeleton } from "../ui/skeleton";
 import { StreamDot } from "./StreamDot";
 import type { OrderBookLevel } from "../../types";
@@ -13,6 +14,12 @@ import type { OrderBookLevel } from "../../types";
 interface Props {
   symbol: string;
   rows?: number;
+  /** 点击某价位：回填到下单面板（币安交互） */
+  onPriceClick?: (price: number) => void;
+  /** 最新成交价（来自 ticker），用于中间行展示涨跌着色 */
+  lastPrice?: number;
+  /** 最新价相对 24h 前涨跌方向 */
+  rising?: boolean;
 }
 
 /** 计算单侧累计量序列 */
@@ -21,7 +28,7 @@ function cumulative(levels: OrderBookLevel[]): number[] {
   return levels.map(([, qty]) => (sum += qty));
 }
 
-export function OrderBook({ symbol, rows = 10 }: Props) {
+export function OrderBook({ symbol, rows = 10, onPriceClick, lastPrice, rising }: Props) {
   const { book, status } = useDepthLive(symbol);
 
   const view = useMemo(() => {
@@ -69,14 +76,27 @@ export function OrderBook({ symbol, rows = 10 }: Props) {
                 total={total}
                 maxTotal={view.maxTotal}
                 side="ask"
+                onPriceClick={onPriceClick}
               />
             ))}
           </div>
 
-          {/* 价差行 */}
-          <div className="my-0.5 flex items-center justify-between border-y border-border bg-panel-2/30 px-3 py-1.5">
-            <span className="font-semibold text-foreground">{fmtPrice(view.spread ?? NaN)}</span>
-            <span className="text-[11px] text-muted">Spread</span>
+          {/* 中间行：最新价（涨跌着色）+ 价差 */}
+          <div className="my-0.5 flex items-center justify-between gap-2 border-y border-border bg-panel-2/40 px-3 py-1.5">
+            <span
+              className={cn(
+                "font-mono text-sm font-semibold tabular-nums",
+                rising ? "text-buy" : "text-sell",
+              )}
+            >
+              {fmtPrice(lastPrice ?? view.spread ?? NaN)}
+            </span>
+            <div className="flex flex-col items-end leading-tight">
+              <span className="text-[10px] text-muted">Spread</span>
+              <span className="font-mono text-[11px] font-medium tabular-nums text-foreground">
+                {fmtPrice(view.spread ?? NaN)}
+              </span>
+            </div>
           </div>
 
           {/* 买盘 */}
@@ -89,6 +109,7 @@ export function OrderBook({ symbol, rows = 10 }: Props) {
                 total={total}
                 maxTotal={view.maxTotal}
                 side="bid"
+                onPriceClick={onPriceClick}
               />
             ))}
           </div>
@@ -105,16 +126,31 @@ const Row = memo(function Row({
   total,
   maxTotal,
   side,
+  onPriceClick,
 }: {
   price: number;
   qty: number;
   total: number;
   maxTotal: number;
   side: "ask" | "bid";
+  onPriceClick?: (price: number) => void;
 }) {
   const width = `${Math.min((total / maxTotal) * 100, 100)}%`;
   return (
-    <div className="relative flex cursor-pointer items-center px-3 py-[3px] hover:bg-panel-2/40" data-testid={`ob-row-${side}`}>
+    <div
+      role="button"
+      tabIndex={0}
+      title="Click to use this price"
+      onClick={() => onPriceClick?.(price)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPriceClick?.(price);
+        }
+      }}
+      className="relative flex cursor-pointer items-center px-3 py-[3px] hover:bg-panel-2/40"
+      data-testid={`ob-row-${side}`}
+    >
       {/* 深度渐变进度条：右对齐背景填充 */}
       <div
         aria-hidden

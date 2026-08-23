@@ -212,6 +212,7 @@ function hashSecret(secret) {
 const loginHistory = [];
 const sessions = new Map(); // userId -> UserSession[]
 const antiPhishing = new Map(); // userId -> code string
+const notifications = new Map(); // userId -> UserNotification[]（用户站内信）
 function ensureSessions(userId) {
   let arr = sessions.get(userId);
   if (!arr) {
@@ -449,6 +450,54 @@ app.post("/api/v1/user/anti-phishing", (req, res) => {
     antiPhishing.delete(req.user.sub);
     ok(res, { ok: true, message: "防钓鱼码已清除" });
   }
+});
+
+// ---------- 用户通知（站内信） ----------
+function ensureNotifications(uid) {
+  if (!notifications.has(uid)) {
+    const now = Date.now();
+    notifications.set(uid, [
+      { id: 1, level: "info", title: "欢迎使用 CryptoExchange", content: "您已成功注册，开启您的数字资产交易之旅。", read: false, created_at: new Date(now - 3600_000).toISOString() },
+      { id: 2, level: "warning", title: "安全提醒", content: "建议开启两步验证（2FA）以提升账户安全等级。", read: false, created_at: new Date(now - 1800_000).toISOString() },
+      { id: 3, level: "info", title: "系统通知", content: "您的 BTC_USDT 现货买单已部分成交。", read: true, created_at: new Date(now - 600_000).toISOString() },
+    ]);
+  }
+  return notifications.get(uid);
+}
+
+app.get("/api/v1/user/notifications", (req, res) => {
+  const list = ensureNotifications(req.user.sub);
+  const unreadOnly = req.query.unread_only === "1" || req.query.unread_only === "true";
+  const filtered = unreadOnly ? list.filter((n) => !n.read) : list;
+  const limit = Math.min(parseInt(req.query.limit || "50", 10) || 50, 500);
+  ok(res, { notifications: filtered.slice(0, limit), unread: list.filter((n) => !n.read).length });
+});
+
+app.get("/api/v1/user/notifications/unread-count", (req, res) => {
+  const list = ensureNotifications(req.user.sub);
+  ok(res, { count: list.filter((n) => !n.read).length });
+});
+
+app.post("/api/v1/user/notifications/:id/read", (req, res) => {
+  const list = ensureNotifications(req.user.sub);
+  const n = list.find((x) => x.id === Number(req.params.id));
+  if (!n) return fail(res, 404, "通知不存在");
+  n.read = true;
+  ok(res, { ok: true });
+});
+
+app.post("/api/v1/user/notifications/read-all", (req, res) => {
+  const list = ensureNotifications(req.user.sub);
+  list.forEach((n) => (n.read = true));
+  ok(res, { ok: true });
+});
+
+app.delete("/api/v1/user/notifications/:id", (req, res) => {
+  const list = ensureNotifications(req.user.sub);
+  const kept = list.filter((n) => n.id !== Number(req.params.id));
+  if (kept.length === list.length) return fail(res, 404, "通知不存在");
+  notifications.set(req.user.sub, kept);
+  ok(res, { ok: true });
 });
 
 // ---------- 现货 ----------

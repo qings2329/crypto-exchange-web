@@ -7,6 +7,26 @@ const COLUMNS: { title: string; links: string[] }[] = [
   { title: "Support", links: ["Help Center", "Trading Rules", "Security", "Contact Us"] },
 ];
 
+// 页脚链接 -> 路由（无对应页的暂指向首页，保持导航可达）。
+const LINK_MAP: Record<string, string> = {
+  "Help Center": "#/help",
+  "Trading Rules": "#/help",
+  "Security": "#/security",
+  "Contact Us": "#/help",
+  Announcements: "#/announcements",
+  Spot: "#/markets",
+  Futures: "#/futures/BTCUSDT",
+  Earn: "#/lending",
+  Launchpad: "#/launchpad",
+  Referral: "#/referral",
+  APIs: "#/apikeys",
+  "About Us": "#/home",
+  Careers: "#/home",
+  News: "#/announcements",
+  Downloads: "#/home",
+  Fees: "#/help",
+};
+
 export function Footer() {
   return (
     <footer className="border-t border-border bg-surface">
@@ -30,7 +50,7 @@ export function Footer() {
               <ul className="mt-3 space-y-2">
                 {col.links.map((label) => (
                   <li key={label}>
-                    <a href="#/home" className="text-xs text-muted transition-colors hover:text-accent">
+                    <a href={LINK_MAP[label] ?? "#/home"} className="text-xs text-muted transition-colors hover:text-accent">
                       {label}
                     </a>
                   </li>

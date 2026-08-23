@@ -5,7 +5,7 @@
 // - 提交写入 orders-store：市价单立即 filled，限价单进入当前委托（open），
 //   行情穿越限价时自动撮合。接真实链时把 submit() 替换为合约 writeContract / 后端 API 即可。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../../api/client";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
@@ -14,6 +14,7 @@ import { fmtPrice, fmtQty } from "../../lib/format";
 import { useMockBalances } from "../../hooks/use-mock-balances";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { leverageOf, marginModeOf, useFuturesStore } from "../../store/futures-store";
+import { useTradeDraft } from "../../store/trade-draft-store";
 import { LeverageMarginBar } from "./LeverageMarginBar";
 import { useToast } from "../Toast";
 import { useGuardedAction } from "../../hooks/use-guarded-action";
@@ -55,6 +56,17 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
   const [pct, setPct] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
+  // 订单簿点击回填：盘口选中价写入后，切换到限价并填入价格（币安交互）
+  const draftPrice = useTradeDraft((s) => s.priceBySymbol[symbol] ?? null);
+  const draftRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (draftPrice == null) return;
+    if (draftRef.current === draftPrice) return;
+    draftRef.current = draftPrice;
+    setOrderType("limit");
+    setPriceStr(String(draftPrice));
+  }, [draftPrice]);
+
   const base = symbol.replace(/USDT$/, "");
   const isBuy = side === "buy";
   // 合约双边均以 USDT 计保证金；现货卖出消耗币余额
@@ -86,8 +98,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
   const valid = errors.length === 0 && authed;
 
   // 百分比 → 数量：买入按可用 USDT 折算，卖出直接按持仓数量
-  const applyPct = (p: number) => {
-    setPct(p);
+  const applyPct = (p: number) => {    setPct(p);
     if (!authed || !balances || p <= 0) return;
     let q = 0;
     if (isBuy) {
@@ -243,13 +254,18 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
         <label className="flex flex-col gap-1 text-xs text-muted">
           {t("orderPanel.price")}
           {orderType === "limit" ? (
-            <input
-              inputMode="decimal"
-              placeholder="0.00"
-              value={priceStr}
-              onChange={(e) => setPriceStr(e.target.value)}
-              className="h-9 w-full rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums text-foreground outline-none transition-colors focus:border-accent"
-            />
+            <div className="relative">
+              <input
+                inputMode="decimal"
+                placeholder="0.00"
+                value={priceStr}
+                onChange={(e) => setPriceStr(e.target.value)}
+                className="h-9 w-full rounded-lg border border-border bg-background px-3 pr-14 font-mono text-sm tabular-nums text-foreground outline-none transition-colors focus:border-accent"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-muted">
+                USDT
+              </span>
+            </div>
           ) : (
             <div className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-panel-2/40 px-3 font-mono text-sm tabular-nums text-muted">
               {t("orderPanel.market")}
@@ -261,16 +277,29 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
         {/* 数量输入 */}
         <label className="flex flex-col gap-1 text-xs text-muted">
           {`${t("orderPanel.amount")} (${base})`}
-          <input
-            inputMode="decimal"
-            placeholder={`0.00000`}
-            value={qtyStr}
-            onChange={(e) => {
-              setQtyStr(e.target.value);
-              setPct(0);
-            }}
-            className="h-9 w-full rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums text-foreground outline-none transition-colors focus:border-accent"
-          />
+          <div className="relative">
+            <input
+              inputMode="decimal"
+              placeholder={`0.00000`}
+              value={qtyStr}
+              onChange={(e) => {
+                setQtyStr(e.target.value);
+                setPct(0);
+              }}
+              className="h-9 w-full rounded-lg border border-border bg-background px-3 pr-16 font-mono text-sm tabular-nums text-foreground outline-none transition-colors focus:border-accent"
+            />
+            <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
+              <span className="text-[11px] font-medium text-muted">{base}</span>
+              <button
+                type="button"
+                onClick={() => applyPct(100)}
+                disabled={!authed}
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] font-semibold text-accent transition-colors hover:border-accent/60 disabled:opacity-40"
+              >
+                Max
+              </button>
+            </div>
+          </div>
         </label>
 
         {/* 百分比滑条 + 快捷档 */}
@@ -282,7 +311,8 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
             step={25}
             value={pct}
             onChange={(e) => applyPct(Number(e.target.value))}
-            className="h-1 w-full cursor-pointer appearance-none rounded-full accent-accent bg-panel-2"
+            className="pct-range w-full"
+            style={{ background: `linear-gradient(to right, var(--accent) ${pct}%, var(--panel-2) ${pct}%)` }}
             aria-label="Percentage of available balance"
           />
           <div className="grid grid-cols-4 gap-1.5">

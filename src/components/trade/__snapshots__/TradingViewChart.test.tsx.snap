@@ -38,6 +38,31 @@ exports[`TradingViewChart 错误态快照 > K 线加载失败 → 覆盖层渲�
       <div
         class="flex items-center gap-3"
       >
+        <button
+          aria-pressed="true"
+          class="flex items-center gap-1 rounded border px-2 py-1 text-[11px] font-medium transition-colors border-accent/60 text-accent"
+          title="均线"
+          type="button"
+        >
+          <span
+            class="flex items-center gap-0.5"
+          >
+            <span
+              class="size-2 rounded-full"
+              style="background: rgb(240, 185, 11);"
+            />
+            <span
+              class="size-2 rounded-full"
+              style="background: rgb(224, 102, 255);"
+            />
+          </span>
+          均线
+          <span
+            class="text-[10px] opacity-70"
+          >
+            均线：开
+          </span>
+        </button>
         <span
           class="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted"
           title="LIVE"

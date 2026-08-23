@@ -9,13 +9,16 @@ import {
   createChart,
   CandlestickSeries,
   HistogramSeries,
+  LineSeries,
   type IChartApi,
   type ISeriesApi,
   type CandlestickData,
   type HistogramData,
+  type LineData,
   type Time,
 } from "lightweight-charts";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api, connectKlineWS, type Kline } from "../../api/client";
 import type { BinanceWsStatus } from "../../services/binance-ws";
 import { fmtPrice } from "../../lib/format";
@@ -26,6 +29,12 @@ import { InlineError } from "../InlineError";
 
 export const INTERVALS = ["1m", "15m", "1h", "1d"] as const;
 export type ChartInterval = (typeof INTERVALS)[number];
+
+// 均线参数：币安默认 MA(7) / MA(25)，叠加在 K 线主图。
+const MA_CONFIG: { period: number; color: string }[] = [
+  { period: 7, color: "#F0B90B" },
+  { period: 25, color: "#E066FF" },
+];
 
 interface Props {
   symbol: string;
@@ -46,14 +55,29 @@ function readTheme() {
   };
 }
 
+/** 由收盘价序列计算移动平均线数据点。 */
+function maPoints(klines: Kline[], period: number): LineData<Time>[] {
+  const out: LineData<Time>[] = [];
+  let sum = 0;
+  for (let i = 0; i < klines.length; i++) {
+    sum += klines[i].c;
+    if (i >= period) sum -= klines[i - period].c;
+    if (i >= period - 1) out.push({ time: (klines[i].t / 1000) as Time, value: sum / period });
+  }
+  return out;
+}
+
 export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, limit = 300 }: Props) {
+  const { t } = useTranslation();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const maRefs = useRef<(ISeriesApi<"Line"> | null)[]>([]);
   const seededRef = useRef(false);
   const candlesRef = useRef<Kline[]>([]);
   const [themeVer, setThemeVer] = useState(0);
+  const [showMA, setShowMA] = useState(true);
 
   // REST 种子数据：走自建后端 /api/v1/market/kline（经 Vite 代理），
   // 而非直连 api.binance.com，规避受限网络下的地域封锁。
@@ -62,6 +86,16 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     queryFn: () => api.getKline(symbol, interval, limit),
     staleTime: 60_000,
   });
+
+  // 重新计算并落 MA 线（每次种子更新或开关切换时调用）。
+  const paintMA = () => {
+    const list = candlesRef.current;
+    MA_CONFIG.forEach((cfg, idx) => {
+      const s = maRefs.current[idx];
+      if (!s) return;
+      s.setData(showMA && list.length ? maPoints(list, cfg.period) : []);
+    });
+  };
 
   // 种子落图
   useEffect(() => {
@@ -72,7 +106,9 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     candle.setData(data.map(toCandle));
     vol.setData(data.map(toVolume));
     seededRef.current = true;
-  }, [data]);
+    paintMA();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, showMA]);
 
   // WS 实时增量：走自建后端 /api/v1/market/kline/ws（与 KLineChart 一致），
   // 合并最后一根/追加新根，仅 update 当前 bar；连接状态驱动顶栏指示灯。
@@ -92,6 +128,12 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
         if (!seededRef.current) return;
         candleRef.current?.update(toCandle(k));
         volRef.current?.update(toVolume(k));
+        if (showMA) {
+          MA_CONFIG.forEach((cfg, idx) => {
+            const pt = maPoints(next, cfg.period).at(-1);
+            if (pt) maRefs.current[idx]?.update(pt);
+          });
+        }
       },
       () => setWsStatus("closed"),
     );
@@ -100,7 +142,7 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
       stop();
       setWsStatus("closed");
     };
-  }, [symbol, interval]);
+  }, [symbol, interval, showMA]);
 
   // 建图（一次）与销毁
   useEffect(() => {
@@ -134,11 +176,26 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
     volRef.current = vol;
 
+    // 均线叠加层（固定在主价格刻度，不占额外空间）
+    maRefs.current = MA_CONFIG.map((cfg) =>
+      chart.addSeries(LineSeries, {
+        color: cfg.color,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      }),
+    );
+
+    // 若种子数据已就绪（极少见：查询早于建图完成），补绘一次 MA。
+    if (seededRef.current) paintMA();
+
     return () => {
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
       volRef.current = null;
+      maRefs.current = [];
       seededRef.current = false;
       candlesRef.current = [];
     };
@@ -183,7 +240,7 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
-      {/* 周期 Tab：下划线式，激活币安黄加粗 */}
+      {/* 周期 Tab + 指标开关：下划线式，激活币安黄加粗 */}
       <div className="flex items-center justify-between border-b border-border px-3">
         <div className="flex items-center gap-0.5">
           {INTERVALS.map((i) => {
@@ -204,8 +261,29 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
           })}
         </div>
         <div className="flex items-center gap-3">
+          {/* 均线 MA 开关 */}
+          <button
+            type="button"
+            onClick={() => setShowMA((v) => !v)}
+            aria-pressed={showMA}
+            title={t("trade.ma")}
+            className={cn(
+              "flex items-center gap-1 rounded border px-2 py-1 text-[11px] font-medium transition-colors",
+              showMA
+                ? "border-accent/60 text-accent"
+                : "border-border text-muted hover:text-foreground"
+            )}
+          >
+            <span className="flex items-center gap-0.5">
+              {MA_CONFIG.map((cfg) => (
+                <span key={cfg.period} className="size-2 rounded-full" style={{ background: cfg.color }} />
+              ))}
+            </span>
+            {t("trade.ma")}
+            <span className="text-[10px] opacity-70">{showMA ? t("trade.maOn") : t("trade.maOff")}</span>
+          </button>
           {lastClose !== undefined && (
-            <span className="text-xs tabular-nums text-muted">
+            <span className="hidden text-xs tabular-nums text-muted sm:inline">
               Close <span className="font-semibold text-foreground">{fmtPrice(lastClose)}</span>
             </span>
           )}

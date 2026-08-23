@@ -233,6 +233,22 @@ export const api = {
   userKycGet: () =>
     request<{ kyc: UserKyc | null; limits: KycLimits }>("/api/v1/user/kyc"),
 
+  // ---- 用户通知（站内信） ----
+  userNotifications: async (params?: { limit?: number; unread_only?: boolean }) => {
+    const d = await request<{ notifications: UserNotification[]; unread: number }>(
+      withQuery("/api/v1/user/notifications", params as Record<string, string | number | undefined>)
+    );
+    return d;
+  },
+  userNotificationUnread: () =>
+    request<{ count: number }>("/api/v1/user/notifications/unread-count"),
+  userNotificationRead: (id: number) =>
+    request<{ ok: boolean }>(`/api/v1/user/notifications/${id}/read`, { method: "POST" }),
+  userNotificationReadAll: () =>
+    request<{ ok: boolean }>("/api/v1/user/notifications/read-all", { method: "POST" }),
+  userNotificationDelete: (id: number) =>
+    request<{ ok: boolean }>(`/api/v1/user/notifications/${id}`, { method: "DELETE" }),
+
   // ---- 现货 ----
   getDepth: (symbol: string) =>
     request<{ bids: DepthRow[]; asks: DepthRow[] }>(
@@ -989,6 +1005,15 @@ export interface AnnouncementInput {
 }
 
 // ---------- 通知 ----------
+// 用户侧站内信/通知（GET /api/v1/user/notifications 返回）。
+export interface UserNotification {
+  id: number;
+  level: NotificationLevel; // 复用管理端等级枚举
+  title: string;
+  content: string;
+  read: boolean;
+  created_at: string;
+}
 // 通知等级。
 export type NotificationLevel = "info" | "warning" | "critical";
 // 通知接收范围。

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
 import { useI18n, LOCALES, type Locale } from "../../i18n";
+import { api } from "../../api/client";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
+import { UserMenu } from "./UserMenu";
 
 // 导航项：用户前端无角色权限差异，所有已登录用户可见同一套导航。
 const LINKS: { path: string; key: string; auth?: boolean }[] = [
@@ -16,6 +18,7 @@ const LINKS: { path: string; key: string; auth?: boolean }[] = [
   { path: "/launchpad", key: "nav.launchpad" },
   { path: "/bot", key: "nav.bot" },
   { path: "/referral", key: "nav.referral" },
+  { path: "/help", key: "help.title" },
   { path: "/security", key: "nav.security", auth: true },
 ];
 
@@ -25,10 +28,27 @@ const LINKS: { path: string; key: string; auth?: boolean }[] = [
  * - 品牌 Logo 使用币安黄；导航项为下划线式 Tab：激活项黄色加粗，非激活灰字无背景变化。
  */
 export function Header() {
-  const { uid, logout } = useAuth();
+  const { uid } = useAuth();
   const { locale, setLocale } = useI18n();
   const { t } = useTranslation();
   const current = (location.hash.replace(/^#/, "") || "/home").split("?")[0];
+
+  // 未读通知数：挂载拉取 + 路由切换时刷新（进入通知页后回到任意页都应更新红点）。
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const refresh = () =>
+      api
+        .userNotificationUnread()
+        .then((d) => alive && setUnread(d.count))
+        .catch(() => {});
+    refresh();
+    window.addEventListener("hashchange", refresh);
+    return () => {
+      alive = false;
+      window.removeEventListener("hashchange", refresh);
+    };
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 h-14 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
@@ -66,10 +86,22 @@ export function Header() {
 
           {uid ? (
             <>
-              <span className="flex items-center gap-1.5 text-xs text-muted">#{uid}</span>
-              <Button variant="ghost" size="sm" onClick={logout}>
-                {t("header.logout")}
-              </Button>
+              <a
+                href="#/notifications"
+                aria-label={t("nav.notifications")}
+                className="relative grid size-8 place-items-center rounded-md text-muted transition-colors hover:bg-[#2B3139]/60 hover:text-foreground"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4.5">
+                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {unread > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 grid min-w-[16px] place-items-center rounded-full bg-[#F6465D] px-1 text-[10px] font-bold leading-4 text-white">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+              </a>
+              <UserMenu />
             </>
           ) : (
             <>

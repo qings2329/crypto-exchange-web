@@ -19,6 +19,7 @@ vi.mock("lightweight-charts", () => ({
   })),
   CandlestickSeries: class {},
   HistogramSeries: class {},
+  LineSeries: class {},
 }));
 
 // REST 种子与实时流：均走自建后端（../../api/client），mock 使其 reject / 不建立连接，

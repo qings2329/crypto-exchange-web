@@ -31,6 +31,8 @@ const History = lazy(() => import("./pages/History").then((m) => ({ default: m.H
 const Lending = lazy(() => import("./pages/Lending").then((m) => ({ default: m.Lending })));
 const BotGrid = lazy(() => import("./pages/BotGrid").then((m) => ({ default: m.BotGrid })));
 const Referral = lazy(() => import("./pages/Referral").then((m) => ({ default: m.Referral })));
+const Notifications = lazy(() => import("./pages/Notifications").then((m) => ({ default: m.Notifications })));
+const Help = lazy(() => import("./pages/Help").then((m) => ({ default: m.Help })));
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || "#/home");
@@ -59,6 +61,8 @@ const PAGES: Record<string, React.ComponentType> = {
   "/settings": Settings,
   "/apikeys": ApiKeys,
   "/referral": Referral,
+  "/notifications": Notifications,
+  "/help": Help,
 };
 
 // 公开页面白名单见 src/lib/routes.ts（与 api/client 的 401 处理共享）。

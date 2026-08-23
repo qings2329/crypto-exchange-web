@@ -168,7 +168,10 @@ function LeverageModal({ symbol, current, onClose }: { symbol: string; current: 
           onChange={(e) => setLev(Number(e.target.value))}
           data-testid="leverage-slider"
           aria-label="Leverage multiplier"
-          className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-panel-2 accent-accent"
+          className="pct-range h-1.5 w-full"
+          style={{
+            background: `linear-gradient(to right, var(--accent) ${((lev - 1) / 124) * 100}%, var(--panel-2) ${((lev - 1) / 124) * 100}%)`,
+          }}
         />
 
         {/* 快捷档 */}
