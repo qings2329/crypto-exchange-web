@@ -25,6 +25,7 @@ import { PositionsPanel } from "../components/trade/PositionsPanel";
 import { StreamDot } from "../components/trade/StreamDot";
 import { MobileSwipeViews } from "../components/trade/MobileSwipeViews";
 import { SymbolSelect } from "../components/trade/SymbolSelect";
+import { hallRoute } from "../lib/routes";
 import { Badge } from "../components/ui/badge";
 import { useTickerLive } from "../hooks/use-ticker-live";
 import { useMediaQuery } from "../hooks/use-media-query";
@@ -89,10 +90,17 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
 
   const degraded = status === "reconnecting" || status === "closed";
 
-  // 切换交易对：保留当前 /trade 或 /futures 路由前缀，更新 hash 触发重新加载。
+  // 切换交易对：以当前模式为准生成路由（修复：Perp 模式下切对曾按 hash 旧前缀跳回现货页）。
   const onSymbolChange = (s: string) => {
-    const prefix = location.hash.toLowerCase().startsWith("#/futures") ? "futures" : "trade";
-    location.hash = `#/${prefix}/${s}`;
+    location.hash = hallRoute(mode, s);
+  };
+
+  // 切换市场模式：本地 state 驱动渲染，同时把路由前缀改写一致（#/trade ↔ #/futures），
+  // 保证刷新/分享链接后仍处于所选模式；同元素类型不会导致组件重挂载。
+  const onModeChange = (m: MarketMode) => {
+    setMode(m);
+    const target = hallRoute(m, symbol);
+    if (location.hash !== target) location.hash = target;
   };
 
   // 委托区：永续=持仓/委托/历史 Tab；现货=我的当前委托/历史订单（桌面与移动端共用）
@@ -186,7 +194,7 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
                 key={m}
                 role="tab"
                 aria-selected={mode === m}
-                onClick={() => setMode(m)}
+                onClick={() => onModeChange(m)}
                 data-testid={`mode-${m}`}
                 className={cn(
                   "relative pb-0.5 text-[13px] font-semibold capitalize transition-colors",

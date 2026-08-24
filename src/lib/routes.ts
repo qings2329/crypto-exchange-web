@@ -13,3 +13,8 @@ export function currentPath(): string {
 export function isPublicRoute(): boolean {
   return PUBLIC_PAGES.has(currentPath());
 }
+
+/** 交易大厅路由：模式对应的 hash（spot → #/trade/:SYMBOL，perp → #/futures/:SYMBOL）。 */
+export function hallRoute(mode: "spot" | "perp", symbol: string): string {
+  return `#/${mode === "perp" ? "futures" : "trade"}/${symbol.toUpperCase()}`;
+}
