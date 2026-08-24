@@ -60,3 +60,6 @@ Thumbs.db
 /mock/node_modules
 /mock/package-lock.json
 client_paths.txt
+
+# local temp
+/.tmp/

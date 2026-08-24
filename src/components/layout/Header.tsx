@@ -11,6 +11,7 @@ import { UserMenu } from "./UserMenu";
 const LINKS: { path: string; key: string; auth?: boolean }[] = [
   { path: "/home", key: "nav.home" },
   { path: "/trade", key: "nav.trade" },
+  { path: "/margin", key: "nav.margin" },
   { path: "/futures", key: "nav.futures" },
   { path: "/markets", key: "nav.markets" },
   { path: "/wallet", key: "nav.wallet" },

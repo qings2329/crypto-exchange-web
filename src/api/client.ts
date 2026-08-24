@@ -294,8 +294,7 @@ export const api = {
   },
 
   // ---- 合约 ----
-  futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
-  // POST /api/v1/futures/wallet/deposit 充值（模拟链上确认后即时入账）。
+  futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),  // POST /api/v1/futures/wallet/deposit 充值（模拟链上确认后即时入账）。
   futuresDeposit: (payload: { asset: string; amount: number; network?: string }) =>
     request<{ asset: string; available: number; frozen: number }>("/api/v1/futures/wallet/deposit", {
       method: "POST",
@@ -307,6 +306,37 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  // ---- 杠杆（现货杠杆，契约对齐 Go internal/margin/handler.go）----
+  // POST /api/v1/margin/borrow 借入 asset 数量 amount，杠杆 leverage（抵押 USDT = amount/leverage，冻结）。
+  marginBorrow: (payload: { asset: string; amount: number; leverage: number }) =>
+    request<MarginAccountRaw>("/api/v1/margin/borrow", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then(normalizeMarginAccount),
+  // POST /api/v1/margin/repay 还款（先冲本金后冲利息；超额自动截断；还清解冻抵押并关户）。
+  marginRepay: (payload: { asset: string; amount: number }) =>
+    request<{ ok: boolean }>("/api/v1/margin/repay", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // GET /api/v1/margin/account?asset= 本人单币种杠杆账户（无活跃账户 → 404 ApiError）。
+  marginAccount: async (asset: string) => {
+    const raw = await request<MarginAccountRaw>(withQuery("/api/v1/margin/account", { asset }));
+    return normalizeMarginAccount(raw);
+  },
+  // GET /api/v1/margin/accounts 本人全部杠杆账户。
+  marginAccounts: async () => {
+    const d = await request<{ accounts: MarginAccountRaw[] }>("/api/v1/margin/accounts");
+    return (d.accounts ?? []).map(normalizeMarginAccount);
+  },
+  // GET /api/v1/margin/liq-price?asset= 强平标记价（借入资产以抵押资产计价；无债务返回 0）。
+  marginLiqPrice: async (asset: string) => {
+    const d = await request<{ user_id: number; asset: string; liq_price: number }>(
+      withQuery("/api/v1/margin/liq-price", { asset })
+    );
+    return Number(d.liq_price) || 0;
+  },
   walletLedger: async (params?: { asset?: string; limit?: number }) => {
     const d = await request<{ entries: LedgerEntry[] }>(
       withQuery("/api/v1/futures/wallet/ledger", params as Record<string, string | number | undefined>)
@@ -1122,6 +1152,63 @@ export interface TradeView {
 
 // 用户侧资金流水条目（GET /api/v1/futures/wallet/ledger）。
 // delta / balance 由后端按人类可读十进制数字序列化（JSON 数字，正负表示入账/出账）。
+// ---- 杠杆（契约对齐 Go internal/margin/model.go MarginAccount）----
+// 后端金额为定点 AssetAmount：{Value: <big.Int 整数>, Decimals: n}，人类值 = Value / 10^Decimals。
+export interface AssetAmountRaw {
+  Value: number | string;
+  Decimals: number;
+}
+
+/** 服务端原始杠杆账户结构（未归一化）。 */
+export interface MarginAccountRaw {
+  user_id: number;
+  asset: string; // 借入资产，如 BTC
+  collateral_asset: string; // 抵押资产，固定 USDT
+  collateral_amount: AssetAmountRaw;
+  debt: AssetAmountRaw;
+  interest_accrued: AssetAmountRaw;
+  leverage: number;
+  status: string; // active | liquidated
+  last_accrual: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 前端归一化后的杠杆账户（金额已转为人类可读浮点）。 */
+export interface MarginAccount {
+  asset: string;
+  collateralAsset: string;
+  collateral: number;
+  debt: number;
+  interest: number;
+  totalOwed: number;
+  leverage: number;
+  status: string;
+}
+
+/** 定点金额 → 人类浮点（防御 Value 为字符串大整数的场景）。 */
+function humanAmount(a: AssetAmountRaw | undefined): number {
+  if (!a) return 0;
+  const v = Number(a.Value ?? 0);
+  if (!Number.isFinite(v)) return 0;
+  return v / 10 ** (a.Decimals || 0);
+}
+
+function normalizeMarginAccount(raw: MarginAccountRaw): MarginAccount {
+  const debt = humanAmount(raw.debt);
+  const interest = humanAmount(raw.interest_accrued);
+  return {
+    asset: raw.asset,
+    collateralAsset: raw.collateral_asset,
+    collateral: humanAmount(raw.collateral_amount),
+    debt,
+    interest,
+    totalOwed: debt + interest,
+    leverage: raw.leverage ?? 1,
+    status: raw.status ?? "active",
+  };
+}
+
 export interface LedgerEntry {
   id: number;
   user_id: number;

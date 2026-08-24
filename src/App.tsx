@@ -15,6 +15,8 @@ import { Register } from "./pages/Register";
 // 路由级代码分割：各业务页面按需懒加载，首屏仅加载登录/注册等必要模块，
 // 其余页面进入对应路由时才加载对应 chunk（见 README 性能优化）。
 const TradeHall = lazy(() => import("./pages/TradeHall").then((m) => ({ default: m.TradeHall })));
+const FuturesPage = lazy(() => import("./pages/FuturesPage").then((m) => ({ default: m.FuturesPage })));
+const MarginPage = lazy(() => import("./pages/MarginPage").then((m) => ({ default: m.MarginPage })));
 const SecurityCenter = lazy(() => import("./pages/SecurityCenter").then((m) => ({ default: m.SecurityCenter })));
 const KycPage = lazy(() => import("./pages/KycPage").then((m) => ({ default: m.KycPage })));
 const OtcPage = lazy(() => import("./pages/OtcPage").then((m) => ({ default: m.OtcPage })));
@@ -73,16 +75,25 @@ function Router() {
   if (path === "/login") return <Login />;
   if (path === "/register") return <Register />;
 
-  // /trade/:SYMBOL 与 /futures/:SYMBOL —— 交易大厅（现货 / 永续合约模式）
-  // 全宽终端布局：不套 .content 容器，由 TradeHall 自管内边距
-  const hall = path.match(/^\/(trade|futures)\/([a-z0-9]{5,20})$/i);
+  // /trade/:SYMBOL —— 现货交易大厅
+  // /futures/:SYMBOL —— 期货专属终端（资金费条带/持仓布局）
+  // /margin/:SYMBOL —— 杠杆交易终端（借币/还款/强平价）
+  // 全宽终端布局：不套 .content 容器，由各页自管内边距
+  const hall = path.match(/^\/(trade|futures|margin)\/([a-z0-9]{5,20})$/i);
   if (hall) {
-    const initialMode = hall[1].toLowerCase() === "futures" ? "perp" : "spot";
+    const prefix = hall[1].toLowerCase();
+    const sym = hall[2].toUpperCase();
     return (
       <Layout>
         <ErrorBoundary>
           <Suspense fallback={<div className="page muted">{""}</div>}>
-            <TradeHall symbol={hall[2].toUpperCase()} initialMode={initialMode} />
+            {prefix === "futures" ? (
+              <FuturesPage key={`futures-${sym}`} symbol={sym} />
+            ) : prefix === "margin" ? (
+              <MarginPage key={`margin-${sym}`} symbol={sym} />
+            ) : (
+              <TradeHall key={`trade-${sym}`} symbol={sym} initialMode="spot" />
+            )}
           </Suspense>
         </ErrorBoundary>
       </Layout>
@@ -96,6 +107,10 @@ function Router() {
   }
   if (path === "/futures") {
     location.hash = "#/futures/BTCUSDT";
+    return null;
+  }
+  if (path === "/margin") {
+    location.hash = "#/margin/BTCUSDT";
     return null;
   }
 

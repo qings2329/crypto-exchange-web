@@ -115,6 +115,7 @@ const futuresOrders = [];
 const futuresTrades = [];
 const futuresWithdrawRecords = [];
 
+
 // ---------- 提现地址簿（白名单） ----------
 const addressBooks = new Map(); // userId -> [{ id, asset, network, address, label, added_at }]
 seedAddressBook(3);
@@ -267,10 +268,102 @@ function mockLoginEntry(userId, success) {
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
+
 // 1) 公开端点（登录/刷新/登出，register/send-code 在 PUBLIC_PATHS 内由网关放行）
 app.use(authRouter);
 // 2) 网关：校验除公开端点外的所有 /api/v1 请求的 Bearer 令牌（401）
 app.use(gateway);
+
+// ---------- 现货杠杆（契约对齐 Go internal/margin：抵押=借入/杠杆，先本后息，强平价=抵押/(债务×1.05)） ----------
+const MARGIN_ASSETS = new Set(["BTC", "ETH"]); // 可借资产（对齐 KnownAsset 演示子集）
+const MARGIN_MAX_LEVERAGE = 5;
+const MARGIN_MAINT_RATIO = 1.05;
+const marginAccounts = new Map(); // userId -> Map(asset -> account)
+// 定点金额：与后端 AssetAmount JSON 一致（Value 整数 + Decimals；口径对齐 settlement.AssetDecimalsByName：BTC=8、ETH=18、USDT=6）
+const decOf = (asset) => (asset === "BTC" ? 8 : asset === "ETH" ? 18 : 6);
+const fixed = (asset, h) => ({ Value: Math.round(h * 10 ** decOf(asset)), Decimals: decOf(asset) });
+const human = (a) => Number(a.Value) / 10 ** a.Decimals;
+
+app.post("/api/v1/margin/borrow", (req, res) => {
+  const b = req.body || {};
+  const asset = String(b.asset || "").toUpperCase();
+  const amount = Number(b.amount);
+  const leverage = Math.floor(Number(b.leverage));
+  if (!MARGIN_ASSETS.has(asset)) return fail(res, 400, "unsupported asset");
+  if (!(amount > 0) || Number.isNaN(amount)) return fail(res, 400, "amount must be positive");
+  if (!(leverage >= 1) || leverage > MARGIN_MAX_LEVERAGE) return fail(res, 400, "invalid leverage");
+  let mine = marginAccounts.get(req.user.sub);
+  if (!mine) marginAccounts.set(req.user.sub, (mine = new Map()));
+  if (mine.get(asset)?.status === "active") return fail(res, 400, "already borrowed");
+  const collateral = r2(amount / leverage);
+  const acc = {
+    user_id: req.user.sub,
+    asset,
+    collateral_asset: "USDT",
+    collateral_amount: fixed("USDT", collateral),
+    debt: fixed(asset, amount),
+    interest_accrued: fixed(asset, 0),
+    leverage,
+    status: "active",
+    last_accrual: ns(),
+    created_at: ns(),
+    updated_at: ns(),
+  };
+  mine.set(asset, acc);
+  // 联动演示余额（增量层）：冻结 USDT 抵押、贷出借入资产
+  const d = deltaOf(req.user.sub);
+  d.set("USDT", { avail: 0, frozen: (d.get("USDT")?.frozen ?? 0) + collateral });
+  d.set(asset, { avail: (d.get(asset)?.avail ?? 0) + amount, frozen: d.get(asset)?.frozen ?? 0 });
+  ok(res, acc);
+});
+
+app.post("/api/v1/margin/repay", (req, res) => {
+  const b = req.body || {};
+  const asset = String(b.asset || "").toUpperCase();
+  const amount = Number(b.amount);
+  const mine = marginAccounts.get(req.user.sub);
+  const acc = mine?.get(asset);
+  if (!acc || acc.status !== "active") return fail(res, 404, "no active margin account");
+  if (!(amount > 0)) return fail(res, 400, "amount must be positive");
+  // 先冲本金后冲利息；超额截断
+  let left = amount;
+  const principal = Math.min(left, human(acc.debt));
+  left -= principal;
+  const interestPortion = Math.min(left, human(acc.interest_accrued));
+  // 偿还金额离开可用余额（增量层）
+  const d = deltaOf(req.user.sub);
+  d.set(asset, { avail: (d.get(asset)?.avail ?? 0) - (principal + interestPortion), frozen: d.get(asset)?.frozen ?? 0 });
+  acc.debt = fixed(asset, human(acc.debt) - principal);
+  acc.interest_accrued = fixed(asset, human(acc.interest_accrued) - interestPortion);
+  acc.updated_at = ns();
+  // 还清：解冻抵押并关户
+  if (human(acc.debt) === 0 && human(acc.interest_accrued) === 0) {
+    d.set("USDT", { avail: 0, frozen: (d.get("USDT")?.frozen ?? 0) - human(acc.collateral_amount) });
+    acc.status = "closed";
+  }
+  ok(res, { ok: true });
+});
+
+app.get("/api/v1/margin/account", (req, res) => {
+  const asset = String(req.query.asset || "").toUpperCase();
+  const acc = marginAccounts.get(req.user.sub)?.get(asset);
+  if (!acc || acc.status !== "active") return fail(res, 404, "no active margin account");
+  ok(res, acc);
+});
+
+app.get("/api/v1/margin/accounts", (req, res) => {
+  const mine = [...(marginAccounts.get(req.user.sub)?.values() ?? [])].filter((a) => a.status === "active");
+  ok(res, { accounts: mine });
+});
+
+app.get("/api/v1/margin/liq-price", (req, res) => {
+  const asset = String(req.query.asset || "").toUpperCase();
+  const acc = marginAccounts.get(req.user.sub)?.get(asset);
+  if (!acc || acc.status !== "active") return fail(res, 404, "no active margin account");
+  const debt = human(acc.debt);
+  const liq = debt > 0 ? r2(human(acc.collateral_amount) / (debt * MARGIN_MAINT_RATIO)) : 0;
+  ok(res, { user_id: req.user.sub, asset, liq_price: liq });
+});
 
 // ---------- 认证补充：注册 / 发码 ----------
 app.post("/api/v1/user/register", (req, res) => {
