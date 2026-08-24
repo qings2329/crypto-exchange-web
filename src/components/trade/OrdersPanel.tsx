@@ -21,16 +21,19 @@ interface Props {
 
 type Tab = "open" | "history";
 
-/** 服务端订单 → 本地镜像结构 */
-function toLocalOrder(o: {
-  id: number | string;
-  symbol: string;
-  side: string;
-  price: number;
-  qty: number;
-  status: string;
-  created_at?: number;
-}): TradeOrder {
+/** 服务端订单 → 本地镜像结构（market 由调用方按当前面板标注，供撤单路由到对应服务端） */
+function toLocalOrder(
+  o: {
+    id: number | string;
+    symbol: string;
+    side: string;
+    price: number;
+    qty: number;
+    status: string;
+    created_at?: number;
+  },
+  market: "spot" | "perp"
+): TradeOrder {
   const status: TradeOrder["status"] =
     o.status === "filled"
       ? "filled"
@@ -48,6 +51,7 @@ function toLocalOrder(o: {
     ts: o.created_at ? Number(o.created_at) : Date.now(),
     status,
     settledTs: status !== "open" ? (o.created_at ? Number(o.created_at) : undefined) : undefined,
+    market,
   };
 }
 
@@ -66,11 +70,11 @@ export function OrdersPanel({ symbol, initialTab = "open", market = "spot" }: Pr
         if (market === "perp") {
           const list = await api.futuresOrders({ symbol });
           if (!alive) return;
-          hydrate(symbol, (list ?? []).map(toLocalOrder));
+          hydrate(symbol, (list ?? []).map((o) => toLocalOrder(o, "perp")));
         } else {
           const list = await api.spotOrders({ symbol });
           if (!alive) return;
-          hydrate(symbol, (list ?? []).map(toLocalOrder));
+          hydrate(symbol, (list ?? []).map((o) => toLocalOrder(o, "spot")));
         }
       } catch {
         /* 未登录/网络失败时保留本地镜像 */
@@ -107,8 +111,13 @@ export function OrdersPanel({ symbol, initialTab = "open", market = "spot" }: Pr
       } catch (e) {
         toast.error(e instanceof ApiError ? e.message : t("common.requestFailed"));
       }
+    } else {
+      try {
+        await api.futuresCancelOrder({ symbol, orderId: srvId });
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : t("common.requestFailed"));
+      }
     }
-    // 合约无用户级撤单端点：本地屏蔽已撤单即可（服务端不再返回则自然消失）。
   };
 
   return (

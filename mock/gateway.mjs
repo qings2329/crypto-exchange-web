@@ -1084,6 +1084,23 @@ app.get("/api/v1/futures/trades", (req, res) => {
   if (symbol) list = list.filter((o) => o.symbol === symbol.toString());
   ok(res, { trades: list });
 });
+// 撤单（现货/合约同一契约，对齐 Go spotapi/futuresapi handleCancel）：
+// 订单不存在 → canceled:false；非本人订单 → 403；open → 置为 cancelled。
+const cancelOrderIn = (list) => (req, res) => {
+  const { symbol, order_id } = req.body || {};
+  const oid = Number(order_id);
+  const o = list.find((x) => x.id === oid);
+  if (o && o.user_id !== req.user.sub) return fail(res, 403, "forbidden");
+  let canceled = false;
+  if (o && o.status === "open") {
+    o.status = "cancelled";
+    o.updated_at = ns();
+    canceled = true;
+  }
+  ok(res, { symbol: symbol || (o ? o.symbol : ""), order_id: oid, canceled });
+};
+app.post("/api/v1/spot/cancel", cancelOrderIn(spotOrders));
+app.post("/api/v1/futures/cancel", cancelOrderIn(futuresOrders));
 app.post("/api/v1/futures/wallet/withdraw", (req, res) => {
   const b = req.body || {};
   // 白名单：已设置地址簿的用户只能提到簿内地址

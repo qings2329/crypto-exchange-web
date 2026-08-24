@@ -177,6 +177,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
       const order: TradeOrder = {
         id: `SPOT-${serverId}`,
         symbol,
+        market: "spot",
         side,
         type: orderType,
         price: effectivePrice,

@@ -20,6 +20,8 @@ export interface TradeOrder {
   ts: number; // 创建时间
   status: OrderStatus;
   settledTs?: number; // 成交/撤销时间
+  /** 订单归属市场：撤单时决定调用现货/合约服务端端点（本地单必填，服务端水合时由面板标注） */
+  market?: "spot" | "perp";
 }
 
 interface OrdersState {

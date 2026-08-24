@@ -1,10 +1,12 @@
 // 历史订单：当前委托 / 历史委托 / 成交明细 三 Tab，带时间筛选与撤单确认。
 // 数据源为本地模拟订单 store（与交易页下单面板共享）。
 import { useMemo, useState } from "react";
+import { api, ApiError } from "../../api/client";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { withinRange, type TimeRange } from "../../lib/order-filters";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { useConfirm } from "../Confirm";
+import { useToast } from "../Toast";
 
 type Tab = "open" | "history" | "trades";
 
@@ -50,6 +52,7 @@ export function OrderHistory() {
   const [toDay, setToDay] = useState("");
   const orders = useOrdersStore((s) => s.orders);
   const cancel = useOrdersStore((s) => s.cancel);
+  const toast = useToast();
   const confirm = useConfirm();
 
   // 自定义区间：日期字符串 -> 时间戳闭区间
@@ -78,7 +81,18 @@ export function OrderHistory() {
       danger: true,
       confirmText: "Confirm Cancel",
     });
-    if (ok) cancel(o.id);
+    if (!ok) return;
+    cancel(o.id); // 本地乐观撤销 + 记入已撤集合
+    // 同步服务端：按订单归属市场路由（本地单均带 market；无标注的旧数据仅本地撤销）
+    const srvId = Number(o.id.startsWith("SRV-") ? o.id.slice(4) : o.id);
+    try {
+      if (Number.isFinite(srvId) && srvId > 0) {
+        if (o.market === "perp") await api.futuresCancelOrder({ symbol: o.symbol, orderId: srvId });
+        else await api.spotCancelOrder({ symbol: o.symbol, orderId: srvId });
+      }
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : String((e as Error)?.message || e));
+    }
   };
 
   const isTrades = tab === "trades";
