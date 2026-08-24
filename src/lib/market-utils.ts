@@ -53,3 +53,14 @@ export function sortTickers(rows: Ticker[], sort: SortState): Ticker[] {
     : t.quoteVolume;
   return [...rows].sort((a, b) => (val(a) - val(b)) * sort.dir);
 }
+
+/** 成交流水的本人方向：我是 taker 则与吃单方同向，我是 maker 则相反（用于买卖徽标展示）。 */
+export function myTradeSide(iAmTaker: boolean, takerSide: "buy" | "sell"): "buy" | "sell" {
+  if (iAmTaker) return takerSide;
+  return takerSide === "buy" ? "sell" : "buy";
+}
+
+/** 下单占用的资产：合约保证金与现货买入均用 USDT；现货卖出消耗 base 币种（回归：ETHUSDT 卖单曾误用 BTC 余额）。 */
+export function orderCostAsset(isPerp: boolean, side: "buy" | "sell", symbol: string): string {
+  return isPerp || side === "buy" ? "USDT" : baseAsset(symbol);
+}

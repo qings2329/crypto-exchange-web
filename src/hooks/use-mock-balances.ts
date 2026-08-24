@@ -24,8 +24,7 @@ export interface MockBalances {
   frozenEth: number;
 }
 
-export function mockBalancesFor(address: string): MockBalances {
-  const s = seedFrom(address.toLowerCase());
+export function mockBalancesFor(address: string): MockBalances {  const s = seedFrom(address.toLowerCase());
   // 注意用 >>>（无符号右移）：s 可能超过 2^31，>> 会按有符号处理产生负数
   const usdt = 5_000 + (s % 45_000) + ((s >>> 8) % 100) / 100;
   const btc = 0.05 + ((s >>> 4) % 900) / 1_000;
@@ -54,4 +53,18 @@ export function useMockBalances(): MockBalances | null {
     const seed = address ?? (uid ? `session-${uid}` : null);
     return seed ? mockBalancesFor(seed) : null;
   }, [address, uid]);
+}
+
+/** 取某资产的模拟可用余额（演示用：仅覆盖 USDT/BTC/ETH，未知资产视为 0）。 */
+export function mockBalanceOf(balances: MockBalances, asset: string): number {
+  switch (asset) {
+    case "USDT":
+      return balances.usdt;
+    case "BTC":
+      return balances.btc;
+    case "ETH":
+      return balances.eth;
+    default:
+      return 0;
+  }
 }

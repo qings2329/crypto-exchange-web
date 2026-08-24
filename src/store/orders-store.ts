@@ -57,13 +57,12 @@ export const useOrdersStore = create<OrdersState>((set) => ({
 
   hydrate: (symbol, orders) =>
     set((s) => {
-      // 过滤掉已本地撤单的服务端订单：撤单后服务端可能仍短暂返回 open（尤其合约无用户级撤单端点），
-      // 若不过滤会在 5s 轮询后“复活”为当前委托。
+      // 过滤掉已本地撤单的服务端订单：撤单后服务端可能仍短暂返回 open，
+      // 若不过滤会在 5s 轮询后“复活”为当前委托。仅 SRV- 前缀参与对账。
       const cancelled = new Set(s.cancelledIds);
-      const incoming = orders.filter((o) => {
-        const srv = Number(o.id.startsWith("SRV-") ? o.id.slice(4) : o.id);
-        return !cancelled.has(srv);
-      });
+      const incoming = orders.filter(
+        (o) => !o.id.startsWith("SRV-") || !cancelled.has(Number(o.id.slice(4)))
+      );
       return { orders: [...incoming, ...s.orders.filter((o) => o.symbol !== symbol)] };
     }),
 
@@ -71,7 +70,15 @@ export const useOrdersStore = create<OrdersState>((set) => ({
 
   cancel: (id) =>
     set((s) => {
-      const srv = Number(id.startsWith("SRV-") ? id.slice(4) : id);
+      // 仅真实服务端订单（SRV-<num>）记入黑名单；本地模拟 id 不参与
+      if (!id.startsWith("SRV-")) {
+        return {
+          orders: s.orders.map((o) =>
+            o.id === id && o.status === "open" ? { ...o, status: "canceled", settledTs: Date.now() } : o
+          ),
+        };
+      }
+      const srv = Number(id.slice(4));
       return {
         orders: s.orders.map((o) =>
           o.id === id && o.status === "open" ? { ...o, status: "canceled", settledTs: Date.now() } : o

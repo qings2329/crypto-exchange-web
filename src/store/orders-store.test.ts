@@ -19,7 +19,7 @@ function order(partial: Partial<TradeOrder>): TradeOrder {
 }
 
 beforeEach(() => {
-  useOrdersStore.setState({ orders: [] });
+  useOrdersStore.setState({ orders: [], cancelledIds: [] });
 });
 
 describe("findFillable", () => {
@@ -96,5 +96,41 @@ describe("useOrdersStore", () => {
     place(order({ id: "ETH", symbol: "ETHUSDT", price: 90 }));
     fillMatching("BTCUSDT", 200);
     expect(useOrdersStore.getState().orders.find((o) => o.id === "ETH")?.status).toBe("open");
+  });
+});
+
+describe("cancelledIds 黑名单（撤单对账）", () => {
+  it("cancel：SRV- 单记录服务端号且去重；本地 id 不入黑名单", () => {
+    const { place, cancel } = useOrdersStore.getState();
+    place(order({ id: "SRV-101" }));
+    cancel("SRV-101");
+    expect(useOrdersStore.getState().cancelledIds).toEqual([101]);
+    // 重复撤同一单不重复记录
+    cancel("SRV-101");
+    expect(useOrdersStore.getState().cancelledIds).toEqual([101]);
+    // 本地模拟单撤销不污染黑名单
+    place(order({ id: "SPOT-9" }));
+    cancel("SPOT-9");
+    expect(useOrdersStore.getState().cancelledIds).toEqual([101]);
+  });
+
+  it("hydrate：黑名单内的服务端单被过滤，不再“复活”", () => {
+    const { hydrate, cancel } = useOrdersStore.getState();
+    hydrate("BTCUSDT", [order({ id: "SRV-7" }), order({ id: "SRV-8" })]);
+    cancel("SRV-7");
+    // 轮询仍返回 SRV-7（服务端尚未确认撤销）→ 应被丢弃
+    hydrate("BTCUSDT", [order({ id: "SRV-7" }), order({ id: "SRV-8" }), order({ id: "SRV-9", price: 111 })]);
+    const ids = useOrdersStore.getState().orders.map((o) => o.id);
+    expect(ids).not.toContain("SRV-7");
+    expect(ids).toContain("SRV-8");
+    expect(ids).toContain("SRV-9");
+  });
+
+  it("hydrate：本地镜像单不受黑名单影响（其他交易对订单保留）", () => {
+    const { place, cancel, hydrate } = useOrdersStore.getState();
+    place(order({ id: "SPOT-1", symbol: "ETHUSDT" }));
+    cancel("SPOT-1"); // 本地撤单：不污染黑名单
+    hydrate("BTCUSDT", []); // 仅替换 BTCUSDT 集合
+    expect(useOrdersStore.getState().orders.map((o) => o.id)).toEqual(["SPOT-1"]);
   });
 });

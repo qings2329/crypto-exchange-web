@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, tokenStore, type OrderView, type TradeView } from "../api/client";
 import { useI18n } from "../i18n";
 import { formatDateTime } from "../lib/timezone";
+import { myTradeSide } from "../lib/market-utils";
 import { InlineError } from "../components/InlineError";
 
 // 订单状态 -> 文案 key（对齐 history.status.*）。
@@ -110,7 +111,7 @@ function TradesTable({ rows, t }: { rows: TradeView[]; t: (k: string) => string 
           {rows.map((t2) => {
             const iAmTaker = t2.taker_id === me;
             // 展示本人方向：我是 maker 时与吃单方（taker_side）相反，否则同向
-            const mySide: "buy" | "sell" = iAmTaker ? t2.taker_side : t2.taker_side === "buy" ? "sell" : "buy";
+            const mySide = myTradeSide(iAmTaker, t2.taker_side);
             const role = iAmTaker ? t("history.taker") : t("history.maker");
             return (
               <tr key={t2.id}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseAsset, coinName, fuzzyFilter, sortTickers } from "./market-utils";
+import { baseAsset, coinName, fuzzyFilter, myTradeSide, orderCostAsset, sortTickers } from "./market-utils";
 import type { Ticker } from "../types";
 
 const t = (symbol: string, lastPrice: number, priceChangePercent: number, quoteVolume: number): Ticker => ({
@@ -65,5 +65,30 @@ describe("sortTickers", () => {
     const out = sortTickers(ROWS, { key: "volume", dir: -1 });
     expect(out[0].symbol).toBe("BTCUSDT");
     expect(ROWS[0].symbol).toBe("BTCUSDT");
+  });
+});
+
+describe("myTradeSide（成交流水本人方向）", () => {
+  it("我是 taker：与吃单方同向", () => {
+    expect(myTradeSide(true, "buy")).toBe("buy");
+    expect(myTradeSide(true, "sell")).toBe("sell");
+  });
+
+  it("我是 maker：与吃单方相反（回归：卖出成交不再显示为绿色买入）", () => {
+    expect(myTradeSide(false, "buy")).toBe("sell");
+    expect(myTradeSide(false, "sell")).toBe("buy");
+  });
+});
+
+describe("orderCostAsset（下单占用资产）", () => {
+  it("现货买入 / 合约一律 USDT", () => {
+    expect(orderCostAsset(false, "buy", "BTCUSDT")).toBe("USDT");
+    expect(orderCostAsset(true, "buy", "BTCUSDT")).toBe("USDT");
+    expect(orderCostAsset(true, "sell", "ETHUSDT")).toBe("USDT");
+  });
+
+  it("现货卖出消耗 base 币种（回归：ETHUSDT 卖单曾误用 BTC 余额）", () => {
+    expect(orderCostAsset(false, "sell", "ETHUSDT")).toBe("ETH");
+    expect(orderCostAsset(false, "sell", "BTCUSDT")).toBe("BTC");
   });
 });
