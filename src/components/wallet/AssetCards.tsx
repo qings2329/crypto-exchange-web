@@ -70,7 +70,7 @@ export function AssetCards({
               data-testid={`card-deposit-${r.asset}`}
               className="rounded-lg border border-[#0ECB81]/50 py-1.5 text-xs font-medium text-[#0ECB81] transition-colors hover:bg-[#0ECB81]/10"
             >
-              {t("wallet.applyDeposit")}
+              {t("wallet.deposit")}
             </button>
             <button
               type="button"

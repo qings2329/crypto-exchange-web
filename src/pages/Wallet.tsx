@@ -6,6 +6,7 @@ import { useI18n } from "../i18n";
 import { isPublicRoute } from "../lib/routes";
 import { formatDateTime } from "../lib/timezone";
 import { isValidCryptoAddress, validateAmount } from "../lib/validate";
+import { demoDepositAddress } from "../lib/deposit-address";
 import { AssetOverview, TransferModal, type WalletRow } from "../components/wallet/AssetOverview";
 import { AssetCards, type AssetCardRow } from "../components/wallet/AssetCards";
 import { useSecureAction } from "../components/security/SecureActionProvider";
@@ -301,7 +302,7 @@ export function Wallet() {
     debounceMs: 500,
   });
 
-  // ---- 充值表单（与提现对称：模拟链上充值即时入账）----
+  // ---- 充值（展示充值地址；模拟链上到账即时入账）----
   const [showDeposit, setShowDeposit] = useState(false);
   const [dAsset, setDAsset] = useState("");
   const [dAmount, setDAmount] = useState("");
@@ -309,11 +310,23 @@ export function Wallet() {
   const [dSubmitting, setDSubmitting] = useState(false);
   const [dFormMsg, setDFormMsg] = useState("");
   const [dAmtErr, setDAmtErr] = useState("");
+  const [dCopied, setDCopied] = useState(false);
 
   const openDepositForm = (asset?: string) => {
     if (asset) setDAsset(asset);
     else if (!dAsset) setDAsset(assetOptions[0] || "USDT");
     setShowDeposit(true);
+  };
+  // 充值地址：按 账户+资产+网络 确定性派生（演示），同一组合恒定不变
+  const dAddr = useMemo(
+    () => demoDepositAddress(tokenStore.uid, dAsset || "USDT", dNetwork || undefined),
+    [dAsset, dNetwork]
+  );
+  const copyAddr = () => {
+    navigator.clipboard?.writeText(dAddr).then(() => {
+      setDCopied(true);
+      setTimeout(() => setDCopied(false), 1500);
+    });
   };
   // 划转：从卡片化列表取该资产的可用/冻结余额，打开划转弹窗
   const [trRow, setTrRow] = useState<WalletRow | null>(null);
@@ -444,10 +457,10 @@ export function Wallet() {
         )}
       </section>
 
-      {/* 充值：模拟链上充值，即时入账（与提现对称） */}
+      {/* 充值：展示充值地址（演示派生），模拟链上到账即时入账 */}
       <section className="card">
         <div className="card-head">
-          <h3>{t("wallet.applyDeposit")}</h3>
+          <h3>{t("wallet.deposit")}</h3>
           <button
             className="btn"
             data-testid="wallet-deposit-toggle"
@@ -459,13 +472,13 @@ export function Wallet() {
               openDepositForm();
             }}
           >
-            {showDeposit ? t("otc.collapse") : t("wallet.applyDeposit")}
+            {showDeposit ? t("otc.collapse") : t("wallet.deposit")}
           </button>
         </div>
 
         {showDeposit && (
           <div className="card">
-            <div className="form-hint">{t("wallet.depositHint")}</div>
+            <div className="form-hint">{t("wallet.depositAddrHint")}</div>
             <label>
               {t("wallet.asset")}
               <input
@@ -481,6 +494,30 @@ export function Wallet() {
               ))}
             </datalist>
             <label>
+              {t("wallet.network")}
+              <input value={dNetwork} onChange={(e) => setDNetwork(e.target.value)} placeholder={t("wallet.phNetwork")} />
+            </label>
+
+            {/* 充值地址：随资产/网络联动，一键复制 */}
+            <label>
+              {t("wallet.depositAddress")}
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <code
+                  className="mono"
+                  data-testid="wallet-deposit-address"
+                  style={{ flex: 1, wordBreak: "break-all" }}
+                >
+                  {dAddr}
+                </code>
+                <button type="button" className="btn" data-testid="wallet-deposit-copy" onClick={copyAddr}>
+                  {dCopied ? t("wallet.addrCopied") : t("wallet.addrCopy")}
+                </button>
+              </div>
+            </label>
+
+            {/* 演示入账：无需真实转账，模拟确认后余额即时到账 */}
+            <div className="form-hint">{t("wallet.simulateCredit")}</div>
+            <label>
               {t("wallet.amount")}
               <input
                 value={dAmount}
@@ -489,10 +526,6 @@ export function Wallet() {
                 inputMode="decimal"
               />
               {dAmtErr && <div className="error">{dAmtErr}</div>}
-            </label>
-            <label>
-              {t("wallet.network")}
-              <input value={dNetwork} onChange={(e) => setDNetwork(e.target.value)} placeholder={t("wallet.phNetwork")} />
             </label>
             <button className="btn primary" onClick={() => void doDeposit()} disabled={dSubmitting}>
               {dSubmitting ? t("common.loading") : t("wallet.submitDeposit")}
