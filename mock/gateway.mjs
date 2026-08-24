@@ -48,7 +48,7 @@ const TICK_MS = 600; // 行情推送频率
 
 const ok = (res, data, status = 200) => res.status(status).json({ code: 0, message: "ok", data });
 const fail = (res, code, message) =>
-  res.status(code === 401 ? 401 : 400).json({ code, message, data: null });
+  res.status(code === 401 || code === 404 ? code : 400).json({ code, message, data: null });
 
 let seq = 1;
 const nextId = () => seq++;
