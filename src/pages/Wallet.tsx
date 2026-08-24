@@ -428,17 +428,7 @@ export function Wallet() {
         </div>
       </div>
 
-      {/* 顶部操作栏：充值 / 提现 快捷入口（划转位于资产卡片） */}
-      <div className="wallet-actions" style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <button className="btn buy" style={{ padding: "10px 22px" }} data-testid="wallet-deposit-top" onClick={() => openDepositForm()}>
-          {t("wallet.applyDeposit")}
-        </button>
-        <button className="btn sell" style={{ padding: "10px 22px" }} data-testid="wallet-withdraw-top" onClick={() => openWithdrawForm("")}>
-          {t("wallet.applyWithdraw")}
-        </button>
-      </div>
-
-      {/* 资产总览：总资产折算 + 分布饼图（纯汇总卡片） */}
+      {/* 资产总览：总资产折算 + 分布饼图（纯汇总卡片）；充值/提现入口位于下方资产卡片 */}
       <AssetOverview />
 
       <section className="card">
