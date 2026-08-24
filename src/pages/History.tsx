@@ -175,9 +175,10 @@ export function History() {
     }
   }, [isOrders, isSpot, symbol]);
 
-  // 切换 Tab 或筛选条件时重新加载。
+  // 切换 Tab 或筛选条件时重新加载；输入防抖 300ms，避免每击键触发一次请求。
   useEffect(() => {
-    load();
+    const id = setTimeout(load, 300);
+    return () => clearTimeout(id);
   }, [load]);
 
   const ready = useMemo(() => {
