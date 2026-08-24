@@ -109,12 +109,14 @@ function TradesTable({ rows, t }: { rows: TradeView[]; t: (k: string) => string 
         <tbody>
           {rows.map((t2) => {
             const iAmTaker = t2.taker_id === me;
+            // 展示本人方向：我是 maker 时与吃单方（taker_side）相反，否则同向
+            const mySide: "buy" | "sell" = iAmTaker ? t2.taker_side : t2.taker_side === "buy" ? "sell" : "buy";
             const role = iAmTaker ? t("history.taker") : t("history.maker");
             return (
               <tr key={t2.id}>
                 <td>{t2.id}</td>
                 <td>
-                  <SideBadge side={t2.taker_side} t={t} />
+                  <SideBadge side={mySide} t={t} />
                 </td>
                 <td>{t2.symbol}</td>
                 <td>{t2.price.toLocaleString()}</td>
