@@ -261,19 +261,6 @@ export const api = {
     request<{ ok: boolean }>(`/api/v1/user/notifications/${id}`, { method: "DELETE" }),
 
   // ---- 现货 ----
-  getDepth: (symbol: string) =>
-    request<{ bids: DepthRow[]; asks: DepthRow[] }>(
-      `/api/v1/spot/depth?symbol=${encodeURIComponent(symbol)}`
-    ),
-  getTicker: (symbol: string) =>
-    request<Ticker>(`/api/v1/market/ticker?symbol=${encodeURIComponent(symbol)}`),
-  // ---- 行情 K 线 ----
-  getKline: (symbol: string, interval = "1m", limit = 500) =>
-    request<Kline[]>(
-      `/api/v1/market/kline?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(
-        interval
-      )}&limit=${limit}`
-    ),
   placeOrder: (symbol: string, side: "buy" | "sell", price: number, qty: number) =>
     request<{ order_id: number; status: string }>("/api/v1/spot/order", {
       method: "POST",
@@ -307,19 +294,6 @@ export const api = {
   },
 
   // ---- 合约 ----
-  // GET /api/v1/futures/funding?symbol= 指数价/标记价/溢价 EMA/资金费率（契约对齐 Go）。
-  futuresFunding: (symbol: string) =>
-    request<{
-      symbol: string;
-      index_price: number;
-      mark_price: number;
-      premium_ema: number;
-      funding_rate: number;
-      last_settle_rate: number;
-      funding_interval: number;
-    }>(withQuery("/api/v1/futures/funding", { symbol })),
-  // GET /api/v1/futures/index 预言机聚合指数价。
-  futuresIndex: () => request<{ index_prices: Record<string, number>; raw_samples: unknown[] }>("/api/v1/futures/index"),
   futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
   // POST /api/v1/futures/wallet/deposit 充值（模拟链上确认后即时入账）。
   futuresDeposit: (payload: { asset: string; amount: number; network?: string }) =>
@@ -678,22 +652,6 @@ export const api = {
 };
 
 // ---------- 类型 ----------
-export interface DepthRow {
-  price: number;
-  volume: number;
-}
-export interface Depth {
-  bids: DepthRow[];
-  asks: DepthRow[];
-}
-export interface Ticker {
-  symbol: string;
-  last: number;
-  best_bid: number;
-  best_ask: number;
-  timestamp: number;
-}
-
 // 单根 K 线（OHLCV）。t 为毫秒时间戳，o/h/l/c/v 分别为开/高/低/收/量。
 export interface Kline {
   t: number;
@@ -1296,118 +1254,3 @@ export interface BotCreatePayload {
   params: BotParams;
 }
 
-// ---------- WebSocket 助手 ----------
-// 连接现货行情 WS：推送 {type:'depth',data} 与 {type:'trade',data}。
-// 带指数退避自动重连的 WS 连接工厂：掉线后按 1s,2s,4s…（上限 10s）重试；
-// 调用方主动关闭（返回的函数）时停止重连。onClose 在每次掉线（含最终用户关闭）时回调，
-// 供上层切到轮询态；重连成功后首条消息会把上层 live 标记重新置真（见 Ticker/OrderBook）。
-function connectWithRetry(
-  url: string,
-  onMessage: (ev: MessageEvent) => void,
-  onClose?: () => void
-): () => void {
-  let ws: WebSocket | null = null;
-  let closedByUser = false;
-  let retries = 0;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const clearTimer = () => {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-
-  const open = () => {
-    if (closedByUser) return;
-    const sock = new WebSocket(url);
-    ws = sock;
-    sock.onmessage = onMessage;
-    // 错误会紧接着触发 onclose，由 onclose 统一负责重连，这里无需额外处理。
-    sock.onerror = () => {};
-    sock.onclose = () => {
-      if (closedByUser) {
-        onClose?.();
-        return;
-      }
-      onClose?.(); // 通知上层掉线（UI 切到轮询态）
-      const delay = Math.min(1000 * 2 ** retries, 10000);
-      retries++;
-      timer = setTimeout(open, delay);
-    };
-  };
-
-  open();
-
-  return () => {
-    closedByUser = true;
-    clearTimer();
-    if (ws) {
-      ws.onclose = null;
-      ws.onerror = null;
-      ws.close();
-    }
-  };
-}
-
-export function connectSpotWS(
-  symbol: string,
-  onDepth: (d: Depth) => void,
-  onTrade?: (t: any) => void,
-  onClose?: () => void
-): () => void {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const url = `${proto}://${location.host}/api/v1/spot/ws?symbol=${encodeURIComponent(symbol)}`;
-  const onMessage = (ev: MessageEvent) => {
-    try {
-      const msg = JSON.parse(ev.data);
-      if (msg.type === "depth") onDepth(msg.data as Depth);
-      else if (msg.type === "trade") onTrade?.(msg.data);
-    } catch {
-      /* ignore */
-    }
-  };
-  return connectWithRetry(url, onMessage, onClose);
-}
-
-// 连接行情 WS：直接广播 Ticker 快照（即 ticker 对象本身）。
-export function connectMarketWS(
-  symbol: string,
-  onTicker: (t: Ticker) => void,
-  onClose?: () => void
-): () => void {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const url = `${proto}://${location.host}/api/v1/market/ws?symbol=${encodeURIComponent(symbol)}`;
-  const onMessage = (ev: MessageEvent) => {
-    try {
-      onTicker(JSON.parse(ev.data) as Ticker);
-    } catch {
-      /* ignore */
-    }
-  };
-  return connectWithRetry(url, onMessage, onClose);
-}
-
-// 连接 K 线 WS：按 symbol+interval 订阅，每次成交推送当前整根蜡烛（含量、自动翻根）。
-// 消息体约定为 Kline 对象本身，或 {type:'kline',data} 包裹。
-export function connectKlineWS(
-  symbol: string,
-  interval: string,
-  onKline: (k: Kline) => void,
-  onClose?: () => void
-): () => void {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const url = `${proto}://${location.host}/api/v1/market/kline/ws?symbol=${encodeURIComponent(
-    symbol
-  )}&interval=${encodeURIComponent(interval)}`;
-  const onMessage = (ev: MessageEvent) => {
-    try {
-      const msg = JSON.parse(ev.data);
-      const k: Kline | undefined = msg && "t" in msg ? (msg as Kline) : msg?.data;
-      if (k && typeof k.t === "number") onKline(k);
-    } catch {
-      /* ignore */
-    }
-  };
-  return connectWithRetry(url, onMessage, onClose);
-}
