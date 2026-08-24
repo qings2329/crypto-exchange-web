@@ -270,8 +270,9 @@ export function Wallet() {
       await api.addressBookAdd({ asset: asset || "USDT", network: network || undefined, address: address.trim(), label: "" });
       loadBook();
       setAddrConfirmed(true);
-    } catch {
-      // 重复添加等错误静默；白名单刷新后 addrBlocked 自然解除
+    } catch (e) {
+      // 重复添加等错误给出反馈（白名单刷新后 addrBlocked 自然解除）
+      toast.error(e instanceof Error && e.message ? e.message : t("common.requestFailed"));
       loadBook();
     } finally {
       setSavingBook(false);
