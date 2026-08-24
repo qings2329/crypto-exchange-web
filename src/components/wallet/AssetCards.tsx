@@ -78,7 +78,7 @@ export function AssetCards({
               data-testid={`card-withdraw-${r.asset}`}
               className="rounded-lg border border-[#F6465D]/50 py-1.5 text-xs font-medium text-[#F6465D] transition-colors hover:bg-[#F6465D]/10"
             >
-              {t("wallet.applyWithdraw")}
+              {t("wallet.withdraw")}
             </button>
             <button
               type="button"

@@ -562,7 +562,7 @@ export function Wallet() {
               });
             }}
           >
-            {showForm ? t("otc.collapse") : t("wallet.applyWithdraw")}
+            {showForm ? t("otc.collapse") : t("wallet.withdraw")}
           </button>
         </div>
 
