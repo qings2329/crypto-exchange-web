@@ -65,6 +65,15 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
     refetchInterval: 30_000,
   });
   const fillMatching = useOrdersStore((s) => s.fillMatching);
+  // 资金费率倒计时需每秒跳动：行情推送驱动的重渲染在冷清市场可能数秒一次，本地 1s 计时兜底
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (mode !== "perp") return;
+    setNowMs(Date.now());
+    // 注意：本组件内 setInterval 已被图表周期 state 遮蔽，须用 window.setInterval
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [mode]);
   // lg+ 桌面终端布局；以下单实例分支挂载，避免双份 WS 订阅
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
@@ -211,7 +220,7 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
                 label="Funding / Countdown"
                 value={
                   funding
-                    ? `${(funding.funding_rate * 100).toFixed(4)}% · ${fundingCountdown(funding.nextFundingTime)}`
+                    ? `${(funding.funding_rate * 100).toFixed(4)}% · ${fundingCountdown(funding.nextFundingTime, nowMs)}`
                     : "--"
                 }
                 tone={(funding?.funding_rate ?? 0) >= 0 ? "buy" : "sell"}
@@ -263,9 +272,9 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   );
 }
 
-// 资金费率倒计时：nextFundingTime 为 Binance 下个结算时刻（epoch ms）。
-function fundingCountdown(nextFundingTime: number): string {
-  const ms = Math.max(0, nextFundingTime - Date.now());
+// 资金费率倒计时：nextFundingTime 为 Binance 下个结算时刻（epoch ms）；now 由调用方每秒刷新。
+function fundingCountdown(nextFundingTime: number, now: number): string {
+  const ms = Math.max(0, nextFundingTime - now);
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
