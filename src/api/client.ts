@@ -294,12 +294,17 @@ export const api = {
   },
 
   // ---- 合约 ----
-  futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),  // POST /api/v1/futures/wallet/deposit 充值（模拟链上确认后即时入账）。
+  futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
+  // POST /api/v1/futures/wallet/deposit/self 用户侧自助充值（uid 取 token；单笔上限+频控）。
+  // 管理端 faucet 为 POST /deposit（AdminGuard），二者并存。
   futuresDeposit: (payload: { asset: string; amount: number; network?: string }) =>
-    request<{ asset: string; available: number; frozen: number }>("/api/v1/futures/wallet/deposit", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+    request<{ status?: string; asset: string; available: number; frozen: number }>(
+      "/api/v1/futures/wallet/deposit/self",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
   // POST /api/v1/futures/wallet/transfer 内部划转：资金账户(可用) ⇄ 合约保证金(冻结)。
   futuresTransfer: (payload: { asset: string; amount: number; direction: "to_futures" | "to_funding" }) =>
     request<{ asset: string; available: number; frozen: number }>("/api/v1/futures/wallet/transfer", {

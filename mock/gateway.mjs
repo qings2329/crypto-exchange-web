@@ -728,7 +728,8 @@ app.get("/api/v1/futures/wallet/balance", (req, res) => {
 });
 
 // POST /api/v1/futures/wallet/deposit 充值：模拟链上确认后即时入账（CE 语义）。
-app.post("/api/v1/futures/wallet/deposit", (req, res) => {
+// 用户侧自助充值（对齐真实后端 /deposit/self）与管理端 faucet（/deposit）共用实现。
+const depositHandler = (req, res) => {
   const uid = req.user.sub;
   const b = req.body || {};
   const asset = String(b.asset || "").toUpperCase();
@@ -742,8 +743,10 @@ app.post("/api/v1/futures/wallet/deposit", (req, res) => {
   m.set(asset, cur);
   pushLedger(uid, { asset, delta: amount, balance: row.available + amount, biz_type: "deposit", ref: `dep_${Date.now().toString(36)}` });
   appendAudit(req.user, "wallet.deposit", `${asset} ${amount}`, "模拟链上到账");
-  ok(res, { asset, available: row.available + amount, frozen: row.frozen }, 201);
-});
+  ok(res, { status: "ok", asset, available: row.available + amount, frozen: row.frozen }, 201);
+};
+app.post("/api/v1/futures/wallet/deposit/self", depositHandler);
+app.post("/api/v1/futures/wallet/deposit", depositHandler);
 
 // POST /api/v1/futures/wallet/transfer 内部划转：资金账户(可用) ⇄ 合约保证金(冻结)。
 app.post("/api/v1/futures/wallet/transfer", (req, res) => {
