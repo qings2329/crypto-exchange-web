@@ -343,15 +343,35 @@ export const api = {
     );
     return d.entries ?? [];
   },
-  futuresWithdraw: (payload: {
+  // 提现为三步流（对齐后端契约）：request 冻结资金进入冷静期 → 冷却结束后 finalize 链上放行，
+  // 或 cancel 撤销解冻。finalize 在冷静期内会返回 HTTP 409。
+  futuresWithdrawRequest: (payload: {
     asset: string;
     address: string;
     amount: number;
     network?: string;
   }) =>
-    request<{ order_id: number; status: string }>("/api/v1/futures/wallet/withdraw", {
+    request<{
+      status: string;
+      hold_id: string;
+      asset: string;
+      amount: number;
+      fee: number;
+      hold_until: number;
+      hold_seconds: number;
+    }>("/api/v1/futures/wallet/withdraw/request", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  futuresWithdrawFinalize: (holdId: string) =>
+    request<{ status: string; hold_id: string; tx_hash: string; amount: number; fee: number }>(
+      "/api/v1/futures/wallet/withdraw/finalize",
+      { method: "POST", body: JSON.stringify({ hold_id: holdId }) }
+    ),
+  futuresWithdrawCancel: (holdId: string) =>
+    request<{ status: string; hold_id: string }>("/api/v1/futures/wallet/withdraw/cancel", {
+      method: "POST",
+      body: JSON.stringify({ hold_id: holdId }),
     }),
 
   // ---- 提现地址簿（白名单） ----

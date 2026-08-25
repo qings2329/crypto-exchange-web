@@ -218,6 +218,15 @@ export function Wallet() {
   const [network, setNetwork] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formMsg, setFormMsg] = useState("");
+  // 冷静期提现：request 成功后进入 held 状态，倒计时归零后可放行上链或撤销解冻
+  const [wdHold, setWdHold] = useState<{ id: string; left: number } | null>(null);
+  useEffect(() => {
+    if (!wdHold || wdHold.left <= 0) return;
+    const timer = setInterval(() => {
+      setWdHold((h) => (h && h.left > 0 ? { ...h, left: h.left - 1 } : h));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [wdHold?.id, wdHold !== null]);
   const [addrErr, setAddrErr] = useState("");
   const [amtErr, setAmtErr] = useState("");
   // ---- 地址簿（白名单）----
@@ -410,18 +419,47 @@ export function Wallet() {
     }
     setSubmitting(true);
     try {
-      const r = await api.futuresWithdraw({
+      const r = await api.futuresWithdrawRequest({
         asset,
         address: address.trim(),
         amount: amtRes.value as number,
         network: network || undefined,
       });
-      setFormMsg(t("wallet.submitted", { id: r.order_id }));
-      setShowForm(false);
-      setAsset("");
-      setAddress("");
+      setWdHold({ id: r.hold_id, left: Math.max(0, r.hold_seconds) });
+      setFormMsg(t("wallet.withdrawCooling", { seconds: r.hold_seconds }));
+    } catch (e) {
+      setFormMsg(t("wallet.fail", { err: (e as Error).message }));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const doFinalizeWithdraw = async () => {
+    if (!wdHold) return;
+    setSubmitting(true);
+    setFormMsg("");
+    try {
+      const r = await api.futuresWithdrawFinalize(wdHold.id);
+      setWdHold(null);
+      // 保持表单展开以展示结果消息（收起会连同消息一起隐藏）
       setAmount("");
-      setNetwork("");
+      setFormMsg(t("wallet.withdrawFinalized", { hash: r.tx_hash }));
+      load();
+    } catch (e) {
+      setFormMsg(t("wallet.fail", { err: (e as Error).message }));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const doCancelWithdraw = async () => {
+    if (!wdHold) return;
+    setSubmitting(true);
+    setFormMsg("");
+    try {
+      await api.futuresWithdrawCancel(wdHold.id);
+      setWdHold(null);
+      setFormMsg(t("wallet.withdrawCancelled"));
       load();
     } catch (e) {
       setFormMsg(t("wallet.fail", { err: (e as Error).message }));
@@ -643,6 +681,21 @@ export function Wallet() {
             {formMsg && (
               <div className={formMsg.startsWith(t("wallet.fail", { err: "" })) ? "error" : "ok"}>
                 {formMsg}
+              </div>
+            )}
+            {wdHold && (
+              <div className="panel" data-testid="withdraw-cooling" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span className="mono" data-testid="withdraw-cooling-countdown">
+                  {wdHold.left > 0
+                    ? t("wallet.withdrawCoolingLeft", { seconds: wdHold.left })
+                    : t("wallet.withdrawReady")}
+                </span>
+                <button className="btn" onClick={doFinalizeWithdraw} disabled={submitting || wdHold.left > 0}>
+                  {t("wallet.withdrawRelease")}
+                </button>
+                <button className="btn" onClick={doCancelWithdraw} disabled={submitting}>
+                  {t("wallet.withdrawCancelTx")}
+                </button>
               </div>
             )}
           </div>

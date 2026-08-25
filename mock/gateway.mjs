@@ -48,7 +48,7 @@ const TICK_MS = 600; // 行情推送频率
 
 const ok = (res, data, status = 200) => res.status(status).json({ code: 0, message: "ok", data });
 const fail = (res, code, message) =>
-  res.status(code === 401 || code === 404 ? code : 400).json({ code, message, data: null });
+  res.status([401, 404, 409].includes(code) ? code : 400).json({ code, message, data: null });
 
 let seq = 1;
 const nextId = () => seq++;
@@ -1194,37 +1194,84 @@ const cancelOrderIn = (list) => (req, res) => {
 };
 app.post("/api/v1/spot/cancel", cancelOrderIn(spotOrders));
 app.post("/api/v1/futures/cancel", cancelOrderIn(futuresOrders));
-app.post("/api/v1/futures/wallet/withdraw", (req, res) => {
+// ---------- 提现三步流（对齐后端契约）----------
+// request：白名单/余额校验 → 资金划入冻结 → 生成冷静期 hold（默认 10s，可用 MOCK_WITHDRAW_COOLDOWN 覆盖）
+// finalize：冷静期内 409；到期后冻结扣除、生成模拟 tx_hash、记录落 withdraws 列表
+// cancel：解冻归还可用，hold 作废
+const MOCK_WITHDRAW_COOLDOWN = Number(process.env.MOCK_WITHDRAW_COOLDOWN || 10);
+const withdrawHolds = new Map(); // hold_id -> { id, user_id, asset, address, amount, network, until, rec }
+const wdWhitelistCheck = (uid, address) => {
+  const book = bookOf(uid);
+  if (book.length === 0) return true;
+  return book.some((x) => x.address.toLowerCase() === String(address || "").trim().toLowerCase());
+};
+app.post("/api/v1/futures/wallet/withdraw/request", (req, res) => {
   const b = req.body || {};
-  // 白名单：已设置地址簿的用户只能提到簿内地址
-  const book = bookOf(req.user.sub);
-  if (book.length > 0) {
-    const hit = book.some((x) => x.address.toLowerCase() === String(b.address || "").trim().toLowerCase());
-    if (!hit) return fail(res, 403, "提现地址不在白名单内，请先在地址簿中添加并验证");
-  }
+  if (!wdWhitelistCheck(req.user.sub, b.address))
+    return fail(res, 403, "提现地址不在白名单内，请先在地址簿中添加并验证");
+  const amount = Number(b.amount) || 0;
+  const asset = b.asset ?? "USDT";
+  const row = walletOf(req.user.sub).find((x) => x.asset === asset);
+  if (!row || amount <= 0 || amount > row.available) return fail(res, 400, "可用余额不足");
+  // 冻结资金
+  const m = deltaOf(req.user.sub);
+  const cur = m.get(asset) ?? { avail: 0, frozen: 0 };
+  cur.avail -= amount;
+  cur.frozen += amount;
+  m.set(asset, cur);
   const id = nextId();
   const rec = {
     id,
     user_id: req.user.sub,
-    asset: b.asset ?? "USDT",
+    asset,
     address: b.address ?? "",
-    amount: Number(b.amount) || 0,
+    amount,
     network: b.network ?? "ERC20",
     status: "pending",
     created_at: ns(),
   };
   futuresWithdrawRecords.push(rec);
-  // 余额联动：审核期间金额从可用划入冻结；approve 后扣除，reject 解冻
-  {
-    const m = deltaOf(req.user.sub);
-    const cur = m.get(rec.asset) ?? { avail: 0, frozen: 0 };
-    const row = walletOf(req.user.sub).find((x) => x.asset === rec.asset);
-    if (rec.amount > row.available) return fail(res, 400, "可用余额不足");
-    cur.avail -= rec.amount; cur.frozen += rec.amount;
-    m.set(rec.asset, cur);
-    pushLedger(req.user.sub, { asset: rec.asset, delta: -rec.amount, balance: row.available - rec.amount, biz_type: "withdraw", ref: `wd_${id}` });
-  }
-  ok(res, { order_id: id, status: "pending" }, 201);
+  const holdSeconds = MOCK_WITHDRAW_COOLDOWN;
+  withdrawHolds.set(`h_${id}`, { ...rec, until: Date.now() + holdSeconds * 1000, rec });
+  ok(res, {
+    status: "held",
+    hold_id: `h_${id}`,
+    asset,
+    amount,
+    fee: 0,
+    hold_until: Math.floor((Date.now() + holdSeconds * 1000) / 1000),
+    hold_seconds: holdSeconds,
+  }, 201);
+});
+app.post("/api/v1/futures/wallet/withdraw/finalize", (req, res) => {
+  const holdId = req.body?.hold_id;
+  const h = withdrawHolds.get(holdId);
+  if (!h) return fail(res, 404, "withdraw hold not found");
+  if (Date.now() < h.until) return fail(res, 409, "withdraw hold in cooling period");
+  const m = deltaOf(h.user_id);
+  const cur = m.get(h.asset) ?? { avail: 0, frozen: 0 };
+  cur.frozen -= h.amount;
+  m.set(h.asset, cur);
+  pushLedger(h.user_id, { asset: h.asset, delta: -h.amount, balance: cur.avail, biz_type: "withdraw", ref: `wd_${h.id}` });
+  h.rec.status = "sent";
+  h.rec.tx_hash = `0xmock${String(h.id).padStart(8, "0")}`;
+  h.rec.finalized_at = ns();
+  withdrawHolds.delete(holdId);
+  ok(res, { status: "finalized", hold_id: holdId, tx_hash: h.rec.tx_hash, amount: h.amount, fee: 0 });
+});
+app.post("/api/v1/futures/wallet/withdraw/cancel", (req, res) => {
+  const holdId = req.body?.hold_id;
+  const h = withdrawHolds.get(holdId);
+  if (!h) return fail(res, 404, "withdraw hold not found");
+  const m = deltaOf(h.user_id);
+  const cur = m.get(h.asset) ?? { avail: 0, frozen: 0 };
+  cur.frozen -= h.amount;
+  cur.avail += h.amount;
+  m.set(h.asset, cur);
+  const idx = futuresWithdrawRecords.indexOf(h.rec);
+  if (idx >= 0) futuresWithdrawRecords.splice(idx, 1);
+  withdrawHolds.delete(holdId);
+  ok(res, { status: "cancelled", hold_id: holdId });
 });
 // ---------- 地址簿 ----------
 app.get("/api/v1/futures/wallet/address-book", (req, res) => {
