@@ -14,6 +14,7 @@
     "test": "npm --prefix mock install --no-audit --no-fund && npm --prefix mock test && node mock/monitor-e2e.mjs",
     "test:mock": "npm --prefix mock install --no-audit --no-fund && npm --prefix mock test",
     "test:e2e": "npm --prefix mock install --no-audit --no-fund && node mock/monitor-e2e.mjs",
+    "test:login-e2e": "npm --prefix mock install --no-audit --no-fund && node mock/login-state.e2e.mjs",
     "test:kline": "npm --prefix mock install --no-audit --no-fund && node mock/kline-ws.e2e.mjs"
   },
   "dependencies": {
