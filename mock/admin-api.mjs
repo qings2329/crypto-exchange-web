@@ -2,6 +2,12 @@
 // 覆盖前端 admin 后台调用的全部端点：风控（规则/黑名单/事件）、通知、合约（提现/持仓）、
 // 期权（合约/持仓）、杠杆（账户）、管理总览/审计；含各模块的批量端点。
 //
+// 契约说明：本 mock 的「管理后台」端点统一挂在 /api/admin/* 前缀下（如 /api/admin/risk、
+// /api/admin/notifications、/api/admin/overview、/api/admin/audit-logs），与真实后端
+// crypto-exchange cmd/admin（路由前缀 /api/admin）保持一致。用户端前端 crypto-exchange-web
+// 本身不含 admin 页面，真正的 admin 前端是独立仓库 ce-admin-web（直连真实后端）；因此本
+// 文件下 /api/admin/* 的 admin 路由对 crypto-exchange-web 属于孤儿代码，仅作为 dev/demo 骨架。
+//
 // 与 ./monitor-express.mjs 等骨架一致：内存存储，无持久化，仅用于联调前端。
 // 运行：  cd server && npm install && npm run start:admin
 //         （默认监听 :8801；仅作为独立骨架运行，开发联调请使用统一网关 :8787）
@@ -70,32 +76,32 @@ export function buildAdminApp() {
 
   // 服务端 RBAC：admin 业务前缀仅 admin 可访问；otc 为运营及以上（operator/admin）可访问。
   app.use(
-    ["/api/v1/risk", "/api/v1/notification", "/api/v1/futures", "/api/v1/options", "/api/v1/margin", "/api/v1/admin"],
+    ["/api/admin/risk", "/api/admin/notifications", "/api/v1/futures", "/api/v1/options", "/api/v1/margin", "/api/admin"],
     authorize("admin")
   );
   app.use(["/api/v1/otc"], authorize("operator"));
 
   // ---------- 风控：规则 ----------
-  app.get("/api/v1/risk/rules", (req, res) => ok(res, rules));
-  app.post("/api/v1/risk/rules", (req, res) => {
+  app.get("/api/admin/risk/rules", (req, res) => ok(res, rules));
+  app.post("/api/admin/risk/rules", (req, res) => {
     const b = req.body || {};
     const r = { id: nextId(), name: b.name, type: b.type ?? "trade", condition: b.condition ?? "", action: b.action ?? "block", priority: b.priority ?? 100, enabled: b.enabled ?? true, created_at: new Date().toISOString() };
     rules.push(r);
     ok(res, r, 201);
   });
-  app.put("/api/v1/risk/rules/:id(\\d+)", (req, res) => {
+  app.put("/api/admin/risk/rules/:id(\\d+)", (req, res) => {
     const r = rules.find((x) => x.id === Number(req.params.id));
     if (!r) return fail(res, 404, "规则不存在");
     Object.assign(r, req.body, { id: r.id });
     ok(res, r);
   });
-  app.delete("/api/v1/risk/rules/:id(\\d+)", (req, res) => {
+  app.delete("/api/admin/risk/rules/:id(\\d+)", (req, res) => {
     const i = rules.findIndex((x) => x.id === Number(req.params.id));
     if (i < 0) return fail(res, 404, "规则不存在");
     rules.splice(i, 1);
     ok(res, { ok: true });
   });
-  app.delete("/api/v1/risk/rules/batch", (req, res) => {
+  app.delete("/api/admin/risk/rules/batch", (req, res) => {
     const ids = (req.body?.ids || []).map(Number);
     let count = 0;
     for (let i = rules.length - 1; i >= 0; i--) if (ids.includes(rules[i].id)) { rules.splice(i, 1); count++; }
@@ -103,20 +109,20 @@ export function buildAdminApp() {
   });
 
   // ---------- 风控：黑名单 ----------
-  app.get("/api/v1/risk/blacklist", (req, res) => ok(res, blacklist));
-  app.post("/api/v1/risk/blacklist", (req, res) => {
+  app.get("/api/admin/risk/blacklist", (req, res) => ok(res, blacklist));
+  app.post("/api/admin/risk/blacklist", (req, res) => {
     const b = req.body || {};
     const it = { id: nextId(), target_type: b.target_type ?? "user", target: b.target ?? "", reason: b.reason ?? "", expire_at: b.expire_at, created_at: new Date().toISOString() };
     blacklist.push(it);
     ok(res, it, 201);
   });
-  app.delete("/api/v1/risk/blacklist/:id(\\d+)", (req, res) => {
+  app.delete("/api/admin/risk/blacklist/:id(\\d+)", (req, res) => {
     const i = blacklist.findIndex((x) => x.id === Number(req.params.id));
     if (i < 0) return fail(res, 404, "黑名单条目不存在");
     blacklist.splice(i, 1);
     ok(res, { ok: true });
   });
-  app.delete("/api/v1/risk/blacklist/batch", (req, res) => {
+  app.delete("/api/admin/risk/blacklist/batch", (req, res) => {
     const ids = (req.body?.ids || []).map(Number);
     let count = 0;
     for (let i = blacklist.length - 1; i >= 0; i--) if (ids.includes(blacklist[i].id)) { blacklist.splice(i, 1); count++; }
@@ -124,14 +130,14 @@ export function buildAdminApp() {
   });
 
   // ---------- 风控：事件 ----------
-  app.get("/api/v1/risk/events", (req, res) => ok(res, events));
-  app.post("/api/v1/risk/events/:id(\\d+)/resolve", (req, res) => {
+  app.get("/api/admin/risk/events", (req, res) => ok(res, events));
+  app.post("/api/admin/risk/events/:id(\\d+)/resolve", (req, res) => {
     const e = events.find((x) => x.id === Number(req.params.id));
     if (!e) return fail(res, 404, "事件不存在");
     e.status = req.body?.status === "ignored" ? "ignored" : "resolved";
     ok(res, { ok: true });
   });
-  app.post("/api/v1/risk/events/batch/resolve", (req, res) => {
+  app.post("/api/admin/risk/events/batch/resolve", (req, res) => {
     const ids = (req.body?.ids || []).map(Number);
     const status = req.body?.status === "ignored" ? "ignored" : "resolved";
     let count = 0;
@@ -140,20 +146,20 @@ export function buildAdminApp() {
   });
 
   // ---------- 通知 ----------
-  app.get("/api/v1/notification/admin/list", (req, res) => ok(res, notifications));
-  app.post("/api/v1/notification/admin", (req, res) => {
+  app.get("/api/admin/notifications/list", (req, res) => ok(res, notifications));
+  app.post("/api/admin/notifications", (req, res) => {
     const b = req.body || {};
     const n = { id: nextId(), title: b.title ?? "", content: b.content ?? "", level: b.level ?? "info", target: b.target ?? "all", target_user: b.target_user, status: "sent", created_at: new Date().toISOString() };
     notifications.push(n);
     ok(res, n, 201);
   });
-  app.delete("/api/v1/notification/admin/:id(\\d+)", (req, res) => {
+  app.delete("/api/admin/notifications/:id(\\d+)", (req, res) => {
     const i = notifications.findIndex((x) => x.id === Number(req.params.id));
     if (i < 0) return fail(res, 404, "通知不存在");
     notifications.splice(i, 1);
     ok(res, { ok: true });
   });
-  app.delete("/api/v1/notification/admin/batch", (req, res) => {
+  app.delete("/api/admin/notifications/batch", (req, res) => {
     const ids = (req.body?.ids || []).map(Number);
     let count = 0;
     for (let i = notifications.length - 1; i >= 0; i--) if (ids.includes(notifications[i].id)) { notifications.splice(i, 1); count++; }
@@ -358,7 +364,7 @@ export function buildAdminApp() {
   });
 
   // ---------- 管理总览 / 审计 ----------
-  app.get("/api/v1/admin/overview", (req, res) =>
+  app.get("/api/admin/overview", (req, res) =>
     ok(res, {
       users_total: 1000,
       users_today: 12,
@@ -370,7 +376,7 @@ export function buildAdminApp() {
       online_users: 137,
     })
   );
-  app.get("/api/v1/admin/audit", (req, res) => ok(res, audit));
+  app.get("/api/admin/audit-logs", (req, res) => ok(res, audit));
 
   // ---------- 其它只读占位（避免前端表格 404）----------
   app.get("/api/v1/futures/funding", (req, res) => ok(res, [{ symbol: "BTC-PERP", rate: 0.0001 }]));

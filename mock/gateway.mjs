@@ -1354,14 +1354,14 @@ app.post("/api/v1/futures/wallet/withdraws/batch/review", authorize("admin"), (r
 });
 
 // ---------- 风控事件 ----------
-app.get("/api/v1/risk/events", (req, res) => {
+app.get("/api/admin/risk/events", (req, res) => {
   const { status, level } = req.query;
   let list = [...riskEvents].sort((a, b) => b.id - a.id);
   if (status) list = list.filter((e) => e.status === status.toString());
   if (level) list = list.filter((e) => e.level === level.toString());
   ok(res, list);
 });
-app.post("/api/v1/risk/events/batch/resolve", authorize("admin"), (req, res) => {
+app.post("/api/admin/risk/events/batch/resolve", authorize("admin"), (req, res) => {
   const { ids = [], status } = req.body || {};
   if (!["resolved", "ignored"].includes(status)) return fail(res, 400, "status 必须为 resolved/ignored");
   let count = 0;
@@ -1375,7 +1375,7 @@ app.post("/api/v1/risk/events/batch/resolve", authorize("admin"), (req, res) => 
   if (count > 0) appendAudit(req.user, "risk.batchResolve", `${count} 条`, status);
   ok(res, { ok: true, count });
 });
-app.post("/api/v1/risk/events/:id/resolve", authorize("admin"), (req, res) => {
+app.post("/api/admin/risk/events/:id/resolve", authorize("admin"), (req, res) => {
   const ev = riskEvents.find((x) => x.id === Number(req.params.id));
   if (!ev) return fail(res, 404, "风控事件不存在");
   const { status } = req.body || {};
@@ -1422,7 +1422,7 @@ app.get("/api/v1/announcement/list", (req, res) =>
   ok(res, { announcements: announcements.filter((a) => a.active) })
 );
 // ---------- 后台总览 / 审计 ----------
-app.get("/api/v1/admin/overview", authorize("admin"), (req, res) => {
+app.get("/api/admin/overview", authorize("admin"), (req, res) => {
   const today = new Date().toDateString();
   ok(res, {
     users_total: users.length,
@@ -1435,16 +1435,16 @@ app.get("/api/v1/admin/overview", authorize("admin"), (req, res) => {
     online_users: Math.max(1, Math.round(users.length / 2)),
   });
 });
-app.get("/api/v1/admin/audit", authorize("admin"), (req, res) => {
+app.get("/api/admin/audit-logs", authorize("admin"), (req, res) => {
   const { action } = req.query;
   let list = [...auditLogs].sort((a, b) => b.id - a.id);
   if (action) list = list.filter((l) => l.action.includes(action.toString()));
   ok(res, list);
 });
 
-app.use("/api/v1/announcement/admin", authorize("admin"));
-app.get("/api/v1/announcement/admin", (req, res) => ok(res, { announcements }));
-app.post("/api/v1/announcement/admin", (req, res) => {
+app.use("/api/admin/announcements", authorize("admin"));
+app.get("/api/admin/announcements", (req, res) => ok(res, { announcements }));
+app.post("/api/admin/announcements", (req, res) => {
   const b = req.body || {};
   const a = {
     id: nextId(),
@@ -1458,14 +1458,14 @@ app.post("/api/v1/announcement/admin", (req, res) => {
   announcements.push(a);
   ok(res, a, 201);
 });
-app.put("/api/v1/announcement/admin/:id(\\d+)", (req, res) => {
+app.put("/api/admin/announcements/:id(\\d+)", (req, res) => {
   const a = announcements.find((x) => x.id === Number(req.params.id));
   if (!a) return fail(res, 404, "公告不存在");
   Object.assign(a, req.body, { id: a.id });
   if (a.active && !a.published_at) a.published_at = new Date().toISOString();
   ok(res, a);
 });
-app.delete("/api/v1/announcement/admin/:id(\\d+)", (req, res) => {
+app.delete("/api/admin/announcements/:id(\\d+)", (req, res) => {
   const i = announcements.findIndex((x) => x.id === Number(req.params.id));
   if (i < 0) return fail(res, 404, "公告不存在");
   announcements.splice(i, 1);
