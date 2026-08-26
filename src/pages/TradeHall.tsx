@@ -31,6 +31,9 @@ import { useTickerLive } from "../hooks/use-ticker-live";
 import { useMediaQuery } from "../hooks/use-media-query";
 import { useOrdersStore } from "../store/orders-store";
 import { useTradeDraft } from "../store/trade-draft-store";
+import { useTradePrefs } from "../store/trade-prefs-store";
+import { useDisplayChange } from "../hooks/use-display-change";
+import { TradePrefsPopover } from "../components/trade/TradePrefsPopover";
 import { fmtPercent, fmtPrice, fmtQty } from "../lib/format";
 import { cn } from "../lib/utils";
 
@@ -45,7 +48,10 @@ type BottomTab = "positions" | "orders" | "history";
 
 export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   const { t } = useTranslation();
-  const [interval, setInterval] = useState<ChartInterval>("1m");
+  const prefsInterval = useTradePrefs((s) => s.interval);
+  const setPrefsInterval = useTradePrefs((s) => s.setInterval);
+  const changeBasis = useTradePrefs((s) => s.changeBasis);
+  const [interval, setInterval] = useState<ChartInterval>(prefsInterval);
   const [mode, setMode] = useState<MarketMode>(initialMode);
   const [bottomTab, setBottomTab] = useState<BottomTab>("orders");
   const { ticker, status } = useTickerLive(symbol);
@@ -82,6 +88,9 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
   const quote = symbol.slice(base.length);
   const rising = (ticker?.priceChangePercent ?? 0) >= 0;
   const last = ticker?.lastPrice;
+
+  // 顶栏展示的涨跌幅：依据偏好基准（24h / 1h / 今日开盘）计算
+  const { percent: changePercent, rising: changeRising } = useDisplayChange(symbol, changeBasis, last, ticker);
 
   // 行情驱动撮合：最新价每次变动都检查 open 单是否可成交
   useEffect(() => {
@@ -144,7 +153,14 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
 
   // K 线图节点（桌面网格与移动端滑动视图共用同一实例位置，按断点二选一挂载）
   const chartNode = (
-    <TradingViewChart symbol={symbol} interval={interval} onIntervalChange={setInterval} />
+    <TradingViewChart
+      symbol={symbol}
+      interval={interval}
+      onIntervalChange={(i) => {
+        setInterval(i);
+        setPrefsInterval(i);
+      }}
+    />
   );
   const bookNode = (
     <aside className="flex h-full min-h-0 flex-col gap-2">
@@ -213,9 +229,10 @@ export function TradeHall({ symbol, initialMode = "spot" }: Props) {
         >
           {last !== undefined ? fmtPrice(last) : "--"}
         </span>
-        <Badge variant={rising ? "success" : "danger"}>{fmtPercent(ticker?.priceChangePercent ?? NaN)}</Badge>
+        <Badge variant={changeRising ? "success" : "danger"}>{fmtPercent(changePercent)}</Badge>
 
         <StreamDot status={status} />
+        <TradePrefsPopover />
 
         <dl className="ml-auto hidden gap-6 text-xs md:flex">
           <Stat label="24h High" value={ticker ? fmtPrice(ticker.highPrice) : "--"} />

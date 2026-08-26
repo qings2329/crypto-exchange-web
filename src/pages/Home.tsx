@@ -94,9 +94,11 @@ export function Home() {
         <h2>{t("home.heroTitle")}</h2>
         <p className="hero-sub">{t("home.heroSub")}</p>
         <div className="hero-actions">
-          <a href="#/register" className="btn-primary">
-            {t("home.heroCta")}
-          </a>
+          {!me && (
+            <a href="#/register" className="btn-primary">
+              {t("home.heroCta")}
+            </a>
+          )}
           <a href="#/trade" className="btn-outline">
             {t("home.heroTrade")}
           </a>

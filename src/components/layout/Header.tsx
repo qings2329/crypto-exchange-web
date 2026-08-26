@@ -14,6 +14,7 @@ const LINKS: { path: string; key: string; auth?: boolean }[] = [
   { path: "/margin", key: "nav.margin" },
   { path: "/futures", key: "nav.futures" },
   { path: "/markets", key: "nav.markets" },
+  { path: "/otc", key: "nav.otc" },
   { path: "/wallet", key: "nav.wallet" },
   { path: "/lending", key: "nav.lending" },
   { path: "/launchpad", key: "nav.launchpad" },

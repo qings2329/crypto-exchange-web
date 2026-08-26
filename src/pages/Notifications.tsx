@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type UserNotification } from "../api/client";
 import { useI18n } from "../i18n";
 import { InlineError } from "../components/InlineError";
+import { notificationSocket } from "../services/notification-ws";
 
 // 等级 -> 文案 key（对齐 notify.level*）。
 const LEVEL_KEY: Record<string, string> = {
@@ -52,6 +53,23 @@ export function Notifications() {
     setLoading(true);
     load();
   }, [load]);
+
+  // 实时推送：建立通知 WebSocket，新通知（KYC/风控/充值/提现）到达时即时插入列表并刷新未读。
+  // 替代前端轮询——初始列表仍由 REST 拉取，之后仅由推送增量更新。
+  useEffect(() => {
+    const off = notificationSocket.onNotification((n) => {
+      setList((prev) => {
+        if (prev.some((x) => x.id === n.id)) return prev;
+        return [n, ...prev];
+      });
+      if (!n.read) setUnread((u) => u + 1);
+    });
+    notificationSocket.connect();
+    return () => {
+      off();
+      notificationSocket.disconnect();
+    };
+  }, []);
 
   const markRead = async (id: number) => {
     setBusyId(id);

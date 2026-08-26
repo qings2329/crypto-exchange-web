@@ -35,6 +35,18 @@ const ITEMS = [
     ),
   },
   {
+    path: "/otc",
+    key: "tab.otc",
+    icon: (
+      <>
+        <path d="M8 3 4 7l4 4" />
+        <path d="M4 7h16" />
+        <path d="m16 21 4-4-4-4" />
+        <path d="M20 17H4" />
+      </>
+    ),
+  },
+  {
     path: "/wallet",
     key: "tab.wallet",
     icon: (
@@ -54,7 +66,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="mobile-tabbar"
-      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-background/95 backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {ITEMS.map((item) => {

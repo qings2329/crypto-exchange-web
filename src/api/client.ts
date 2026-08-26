@@ -948,6 +948,10 @@ export interface UserPreferences {
   notify_order: boolean;
   notify_security: boolean;
   notify_marketing: boolean;
+  /** 交易页 K 线默认周期：1m / 15m / 1h / 1d（前端新增，后端无此字段时忽略即可） */
+  trade_interval?: string;
+  /** 涨跌幅基准：24h / 1h / today（今日开盘），前端新增 */
+  change_basis?: string;
   updated_at?: string;
 }
 

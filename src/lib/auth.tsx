@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, tokenStore } from "../api/client";
+import { useTradePrefs } from "../store/trade-prefs-store";
 import { isPublicRoute } from "./routes";
 
 // 用户前端仅存在「已登录 / 未登录」两种状态，不区分角色（无管理员/运营概念）。
@@ -43,6 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true;
     api
       .userMe()
+      .then(() => {
+        void useTradePrefs.getState().hydrate();
+      })
       .catch(() => {
         if (!alive) return;
         tokenStore.clear();
@@ -60,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.set(res.access_token, res.refresh_token, String(res.user_id), res.role);
     setUid(String(res.user_id));
     if (res.role) setRole(res.role);
+    void useTradePrefs.getState().hydrate();
   };
 
   const logout = () => {
