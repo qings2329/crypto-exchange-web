@@ -37,12 +37,17 @@ export function useDisplayChange(
     return { percent: p, rising: (ticker?.priceChangePercent ?? 0) >= 0 };
   }
 
-  const rows = basis === "1h" ? q1h.data : qDay.data;
-  if (!rows || rows.length === 0 || last === undefined) {
-    return { percent: NaN, rising: true };
+  // 1h / 今日开盘：以最新价 ÷ K 线开盘价计算
+  const q = basis === "1h" ? q1h : qDay;
+  const rows = q.data;
+  if (rows && rows.length > 0 && last !== undefined) {
+    const base = rows[rows.length - 1]?.open;
+    if (base) {
+      const percent = ((last - base) / base) * 100;
+      return { percent, rising: percent >= 0 };
+    }
   }
-  const base = rows[rows.length - 1]?.open;
-  if (!base) return { percent: NaN, rising: true };
-  const percent = ((last - base) / base) * 100;
-  return { percent, rising: percent >= 0 };
+  // 降级：K 线拉取失败 / 尚未就绪 → 回退到交易所原生 24h 涨跌幅，避免显示「--」
+  const fallback = ticker?.priceChangePercent ?? NaN;
+  return { percent: fallback, rising: (ticker?.priceChangePercent ?? 0) >= 0 };
 }
