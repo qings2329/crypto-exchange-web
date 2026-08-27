@@ -193,7 +193,7 @@ export function BotGrid() {
             <span className="form-label">{t("bot.form.token")}</span>
             <input className="filter" value={token} onChange={(e) => setToken(e.target.value)} placeholder={t("bot.form.tokenPh")} type="password" />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+          <div className="grid grid-cols-2 gap-2">
             <div className="form-field">
               <span className="form-label">{t("bot.form.lower")}</span>
               <input className="filter" type="number" min="0" step="any" value={lower} onChange={(e) => setLower(e.target.value)} />
@@ -203,7 +203,7 @@ export function BotGrid() {
               <input className="filter" type="number" min="0" step="any" value={upper} onChange={(e) => setUpper(e.target.value)} />
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+          <div className="grid grid-cols-3 gap-2">
             <div className="form-field">
               <span className="form-label">{t("bot.form.gridNum")}</span>
               <input className="filter" type="number" min="2" value={gridNum} onChange={(e) => setGridNum(e.target.value)} />
@@ -266,7 +266,7 @@ export function BotGrid() {
                           {t(STATUS_KEY[s.status] ?? s.status)}
                         </span>
                       </td>
-                      <td style={{ color: (gs?.pnl ?? 0) >= 0 ? "var(--green, #22c55e)" : "var(--red, #ef4444)" }}>
+                       <td className={(gs?.pnl ?? 0) >= 0 ? "text-buy" : "text-sell"}>
                         {gs ? fmtPnL(gs.pnl) : "—"}
                       </td>
                       <td>{gs?.trade_count ?? 0}</td>

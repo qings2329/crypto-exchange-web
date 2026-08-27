@@ -1,5 +1,6 @@
 // 杠杆与保证金设置栏：逐仓/全仓切换弹窗、杠杆滑条弹窗（1-125x，高风险预警）、计算器入口。
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { Modal } from "../Modal";
 import { useFuturesStore, leverageOf, marginModeOf, type MarginMode } from "../../store/futures-store";
@@ -11,6 +12,7 @@ const LEV_PRESETS = [1, 5, 10, 20, 25, 50, 75, 100, 125] as const;
 const HIGH_RISK_LEV = 20;
 
 export function LeverageMarginBar({ symbol }: { symbol: string }) {
+  const { t } = useTranslation();
   const [modeModal, setModeModal] = useState(false);
   const [levModal, setLevModal] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
@@ -25,7 +27,7 @@ export function LeverageMarginBar({ symbol }: { symbol: string }) {
         data-testid="margin-mode-btn"
         className="cursor-pointer rounded-md border border-border px-2 py-1 text-xs font-medium text-muted transition-colors hover:border-accent/50 hover:text-foreground"
       >
-        {mode === "isolated" ? "Isolated" : "Cross"}
+        {mode === "isolated" ? t("trade.leverage.isolated") : t("trade.leverage.cross")}
       </button>
       <button
         onClick={() => setLevModal(true)}
@@ -46,7 +48,7 @@ export function LeverageMarginBar({ symbol }: { symbol: string }) {
         title="Futures Calculator"
         className="cursor-pointer rounded-md border border-border px-2 py-1 text-xs font-medium text-muted transition-colors hover:border-accent/50 hover:text-foreground"
       >
-        Calc
+        {t("trade.leverage.calc")}
       </button>
 
       {modeModal && <MarginModeModal symbol={symbol} current={mode} onClose={() => setModeModal(false)} />}
@@ -65,22 +67,23 @@ function MarginModeModal({
   current: MarginMode;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const setMarginMode = useFuturesStore((s) => s.setMarginMode);
   const [picked, setPicked] = useState<MarginMode>(current);
 
   const options: { key: MarginMode; title: string; desc: string }[] = [
-    { key: "cross", title: "Cross", desc: "All cross margin balance is shared as collateral; liquidation may drain the whole account." },
-    { key: "isolated", title: "Isolated", desc: "Margin is capped per position; max loss is the position's initial margin." },
+    { key: "cross", title: t("trade.leverage.cross"), desc: t("trade.leverage.marginMode.crossDesc") },
+    { key: "isolated", title: t("trade.leverage.isolated"), desc: t("trade.leverage.marginMode.isolatedDesc") },
   ];
 
   return (
     <Modal
-      title={`Margin Mode · ${symbol}`}
+      title={t("trade.leverage.marginMode.title", { symbol })}
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             className="btn primary"
@@ -90,7 +93,7 @@ function MarginModeModal({
               onClose();
             }}
           >
-            Confirm
+            {t("common.confirm")}
           </button>
         </>
       }
@@ -119,6 +122,7 @@ function MarginModeModal({
 }
 
 function LeverageModal({ symbol, current, onClose }: { symbol: string; current: number; onClose: () => void }) {
+  const { t } = useTranslation();
   const setLeverage = useFuturesStore((s) => s.setLeverage);
   const [lev, setLev] = useState(current);
   const highRisk = lev > HIGH_RISK_LEV;
@@ -127,12 +131,12 @@ function LeverageModal({ symbol, current, onClose }: { symbol: string; current: 
 
   return (
     <Modal
-      title={`Adjust Leverage · ${symbol}`}
+      title={t("trade.leverage.adjust.title", { symbol })}
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             className="btn primary"
@@ -142,14 +146,14 @@ function LeverageModal({ symbol, current, onClose }: { symbol: string; current: 
               onClose();
             }}
           >
-            Confirm
+            {t("common.confirm")}
           </button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted">Leverage</span>
+          <span className="text-sm text-muted">{t("trade.leverage.adjust.label")}</span>
           <span
             className={cn("font-mono text-2xl font-bold tabular-nums", highRisk ? "text-sell" : "text-accent")}
             data-testid="leverage-value"
@@ -198,12 +202,11 @@ function LeverageModal({ symbol, current, onClose }: { symbol: string; current: 
             data-testid="leverage-risk-warning"
             className="rounded-lg border border-sell/40 bg-sell/10 p-3 text-xs leading-relaxed text-sell"
           >
-            ⚠ High risk: at {lev}x leverage, an adverse move of only ~{liqMovePct.toFixed(2)}% can trigger
-            liquidation. Consider lower leverage.
+            ⚠ {t("trade.leverage.adjust.highRiskWarning", { lev, pct: liqMovePct.toFixed(2) })}
           </div>
         ) : (
           <p className="text-xs text-muted">
-            Estimated adverse move to liquidation: ~{liqMovePct.toFixed(2)}%
+            {t("trade.leverage.adjust.liqHint", { pct: liqMovePct.toFixed(2) })}
           </p>
         )}
       </div>

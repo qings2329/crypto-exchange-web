@@ -39,18 +39,18 @@ function MarketRow({ symbol, icon, label }: { symbol: string; icon: string; labe
           {label}
         </div>
       </td>
-      <td className="price mono" style={{ textAlign: "right" }}>
+      <td className="price mono text-right">
         {ticker ? fmtPrice(ticker.lastPrice) : "--"}
       </td>
-      <td className="mono" style={{ textAlign: "right" }}>
+      <td className="mono text-right">
         {ticker ? fmtQty(ticker.quoteVolume) : "--"}
       </td>
-      <td style={{ textAlign: "right" }}>
+      <td className="text-right">
         <span className={`mono ${up ? "change-up" : "change-down"}`}>
           {ticker ? fmtPercent(ticker.priceChangePercent) : "--"}
         </span>
       </td>
-      <td style={{ textAlign: "right" }}>
+      <td className="text-right">
         <a href={`#/trade/${symbol}`} className="trade-btn">
           {t("home.mktTrade")}
         </a>
@@ -115,10 +115,10 @@ export function Home() {
           <thead>
             <tr>
               <th>{t("home.mktPair")}</th>
-              <th style={{ textAlign: "right" }}>{t("home.mktPrice")}</th>
-              <th style={{ textAlign: "right" }}>24h Vol(USDT)</th>
-              <th style={{ textAlign: "right" }}>{t("home.mktChange")}</th>
-              <th style={{ textAlign: "right" }}>{t("home.mktAction")}</th>
+              <th className="text-right">{t("home.mktPrice")}</th>
+              <th className="text-right">24h Vol(USDT)</th>
+              <th className="text-right">{t("home.mktChange")}</th>
+              <th className="text-right">{t("home.mktAction")}</th>
             </tr>
           </thead>
           <tbody>

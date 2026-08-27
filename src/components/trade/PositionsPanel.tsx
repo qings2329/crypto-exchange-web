@@ -1,6 +1,7 @@
 // 未结平仓头寸面板：合约对/杠杆/开仓均价/标记价格/未实现盈亏（着色）/保证金率。
 // 提供 Market Close（确认弹窗）与 TP/SL 设置弹窗；标记价格用实时行情现算。
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useFuturesStore, type Position } from "../../store/futures-store";
 import { api, ApiError } from "../../api/client";
 import { useTickerLive } from "../../hooks/use-ticker-live";
@@ -36,6 +37,7 @@ function toLocal(p: {
 }
 
 export function PositionsPanel({ symbol }: { symbol: string }) {
+  const { t } = useTranslation();
   const positions = useFuturesStore((s) => s.positions);
   const hydrate = useFuturesStore((s) => s.hydrate);
   const mine = positions.filter((p) => p.symbol === symbol);
@@ -66,24 +68,24 @@ export function PositionsPanel({ symbol }: { symbol: string }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card" data-testid="positions-panel">
-      <div className="border-b border-border px-4 py-2.5 text-[13px] font-semibold">Positions</div>
+      <div className="border-b border-border px-4 py-2.5 text-[13px] font-semibold">{t("trade.positions.title")}</div>
       <div className="min-h-0 flex-1 overflow-auto">
         {mine.length === 0 && others.length === 0 ? (
           <div className="flex h-full items-center justify-center text-xs text-muted" data-testid="positions-empty">
-            No open positions
+            {t("trade.positions.empty")}
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-muted">
-                <th className="px-3 py-2 text-left font-normal">Contract</th>
-                <th className="px-3 py-2 text-left font-normal">Side</th>
-                <th className="px-3 py-2 text-right font-normal">Entry</th>
-                <th className="px-3 py-2 text-right font-normal">Mark</th>
-                <th className="px-3 py-2 text-right font-normal">PNL (ROE)</th>
-                <th className="px-3 py-2 text-right font-normal">Margin Ratio</th>
-                <th className="px-3 py-2 text-left font-normal">TP/SL</th>
-                <th className="px-3 py-2 text-right font-normal">Actions</th>
+                <th className="px-3 py-2 text-left font-normal">{t("trade.positions.col.contract")}</th>
+                <th className="px-3 py-2 text-left font-normal">{t("trade.positions.col.side")}</th>
+                <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.entry")}</th>
+                <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.mark")}</th>
+                <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.pnl")}</th>
+                <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.marginRatio")}</th>
+                <th className="px-3 py-2 text-left font-normal">{t("trade.positions.col.tpSl")}</th>
+                <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -99,6 +101,7 @@ export function PositionsPanel({ symbol }: { symbol: string }) {
 }
 
 function PositionRow({ pos }: { pos: Position }) {
+  const { t } = useTranslation();
   const close = useFuturesStore((s) => s.close);
   const setTpSl = useFuturesStore((s) => s.setTpSl);
   const confirm = useConfirm();
@@ -115,15 +118,15 @@ function PositionRow({ pos }: { pos: Position }) {
 
   const onMarketClose = async () => {
     const ok = await confirm({
-      title: "Market Close",
+      title: t("trade.positions.closeConfirm.title"),
       message: (
         <span>
-          Close <b>{pos.side === "long" ? "LONG" : "SHORT"}</b> {fmtQty(pos.qty)} {pos.symbol} at market?{" "}
+          Close <b>{pos.side === "long" ? t("trade.positions.long") : t("trade.positions.short")}</b> {fmtQty(pos.qty)} {pos.symbol} {t("trade.positions.closeConfirm.atMarket")}{" "}
           Est. PNL <b className={win ? "text-buy" : "text-sell"}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} USDT</b>
         </span>
       ),
       danger: true,
-      confirmText: "Confirm Close",
+      confirmText: t("trade.positions.closeConfirm.confirm"),
     });
     if (!ok) return;
     try {
@@ -136,9 +139,9 @@ function PositionRow({ pos }: { pos: Position }) {
       });
       close(pos.id);
       const realized = typeof r.realized_pnl === "number" ? r.realized_pnl : pnl;
-      toast.success(`Position closed · realized ${realized >= 0 ? "+" : ""}${realized.toFixed(2)} USDT`);
+      toast.success(t("trade.positions.toast.closed", { sign: realized >= 0 ? "+" : "", amount: realized.toFixed(2) }));
     } catch (e) {
-      toast.error(e instanceof ApiError ? e : (e as Error).message || "Close failed");
+      toast.error(e instanceof ApiError ? e : (e as Error).message || t("trade.positions.toast.closeFailed"));
     }
   };
 
@@ -148,7 +151,7 @@ function PositionRow({ pos }: { pos: Position }) {
         <div className="flex items-center gap-1.5">
           <a href={`#/trade/${pos.symbol}`} className="font-semibold hover:text-accent">
             {pos.symbol.replace(/USDT$/, "")}
-            <span className="text-muted">Perp</span>
+            <span className="text-muted">{t("trade.positions.perp")}</span>
           </a>
           <span className="rounded border border-border px-1 text-[10px] font-bold text-muted">{pos.leverage}x</span>
         </div>
@@ -160,7 +163,7 @@ function PositionRow({ pos }: { pos: Position }) {
             pos.side === "long" ? "bg-buy/15 text-buy" : "bg-sell/15 text-sell"
           )}
         >
-          {pos.side === "long" ? "Long" : "Short"}
+          {pos.side === "long" ? t("trade.positions.longFull") : t("trade.positions.shortFull")}
         </span>
       </td>
       <td className="px-3 py-2.5 text-right font-mono tabular-nums">{fmtPrice(pos.entryPrice)}</td>
@@ -202,14 +205,14 @@ function PositionRow({ pos }: { pos: Position }) {
             data-testid={`tpsl-btn-${pos.id}`}
             className="cursor-pointer rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors hover:border-accent/50 hover:text-foreground"
           >
-            TP/SL
+            {t("trade.positions.action.tpsl")}
           </button>
           <button
             onClick={onMarketClose}
             data-testid={`close-${pos.id}`}
             className="cursor-pointer rounded-md bg-sell px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-sell/90"
           >
-            Market Close
+            {t("trade.positions.action.marketClose")}
           </button>
         </div>
       </td>
@@ -229,9 +232,9 @@ function PositionRow({ pos }: { pos: Position }) {
               });
               setTpSl(pos.id, tp, sl);
               setTpslOpen(false);
-              toast.success("TP/SL updated");
+              toast.success(t("trade.positions.toast.tpslUpdated"));
             } catch (e) {
-              toast.error(e instanceof ApiError ? e : (e as Error).message || "TP/SL update failed");
+              toast.error(e instanceof ApiError ? e : (e as Error).message || t("trade.positions.toast.tpslFailed"));
             }
           }}
         />
@@ -249,6 +252,7 @@ function TpSlModal({
   onClose: () => void;
   onSave: (tp: number | undefined, sl: number | undefined) => void;
 }) {
+  const { t } = useTranslation();
   const [tpStr, setTpStr] = useState(pos.tp ? String(pos.tp) : "");
   const [slStr, setSlStr] = useState(pos.sl ? String(pos.sl) : "");
 
@@ -257,44 +261,44 @@ function TpSlModal({
 
   return (
     <Modal
-      title={`TP/SL · ${pos.symbol} ${pos.side === "long" ? "Long" : "Short"} ${pos.leverage}x`}
+      title={`TP/SL · ${pos.symbol} ${pos.side === "long" ? t("trade.positions.longFull") : t("trade.positions.shortFull")} ${pos.leverage}x`}
       onClose={onClose}
       width={420}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button className="btn primary" data-testid="tpsl-save" onClick={() => onSave(tp, sl)}>
-            Save
+            {t("common.save")}
           </button>
         </>
       }
     >
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-xs text-muted">
-          Take Profit trigger price (USDT)
+          {t("trade.positions.tpSlModal.takeProfitLabel")}
           <input
             inputMode="decimal"
             value={tpStr}
             onChange={(e) => setTpStr(e.target.value)}
             data-testid="tp-input"
-            placeholder="e.g. 55000"
+            placeholder={t("trade.positions.tpSlModal.tpPlaceholder")}
             className="h-9 rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums outline-none focus:border-buy"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
-          Stop Loss trigger price (USDT)
+          {t("trade.positions.tpSlModal.stopLossLabel")}
           <input
             inputMode="decimal"
             value={slStr}
             onChange={(e) => setSlStr(e.target.value)}
             data-testid="sl-input"
-            placeholder="e.g. 45000"
+            placeholder={t("trade.positions.tpSlModal.slPlaceholder")}
             className="h-9 rounded-lg border border-border bg-background px-3 font-mono text-sm tabular-nums outline-none focus:border-sell"
           />
         </label>
-        <p className="text-[11px] text-muted">Leave a field empty to remove that trigger.</p>
+        <p className="text-[11px] text-muted">{t("trade.positions.tpSlModal.hint")}</p>
       </div>
     </Modal>
   );

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import i18next from "i18next";
 
 interface Props {
   children: ReactNode;
@@ -41,10 +42,10 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="error-boundary">
           <div className="error-boundary-card">
-            <h2>页面出错了</h2>
+            <h2>{i18next.t("error.boundary.title")}</h2>
             <p className="error-boundary-msg">{error.message}</p>
             <button className="btn primary" onClick={this.reset}>
-              重试
+              {i18next.t("error.boundary.retry")}
             </button>
           </div>
         </div>

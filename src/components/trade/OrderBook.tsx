@@ -4,6 +4,7 @@
 // - tabular-nums 保证高频刷新不抖动。
 
 import { memo, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useDepthLive } from "../../hooks/use-depth-live";
 import { fmtPrice, fmtQty } from "../../lib/format";
 import { cn } from "../../lib/utils";
@@ -29,6 +30,7 @@ function cumulative(levels: OrderBookLevel[]): number[] {
 }
 
 export function OrderBook({ symbol, rows = 10, onPriceClick, lastPrice, rising }: Props) {
+  const { t } = useTranslation();
   const { book, status } = useDepthLive(symbol);
 
   const view = useMemo(() => {
@@ -51,15 +53,15 @@ export function OrderBook({ symbol, rows = 10, onPriceClick, lastPrice, rising }
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
-        <h3 className="text-[13px] font-semibold">Order Book</h3>
+        <h3 className="text-[13px] font-semibold">{t("trade.orderBook.title")}</h3>
         <StreamDot status={status} />
       </div>
 
       {/* 表头 */}
       <div className="flex items-center px-3 py-1.5 text-[11px] text-muted">
-        <span className="flex-1">Price (USDT)</span>
-        <span className="flex-1 text-right">Amount ({symbol.replace("USDT", "")})</span>
-        <span className="w-20 text-right">Total</span>
+        <span className="flex-1">{t("trade.orderBook.col.price")}</span>
+        <span className="flex-1 text-right">{t("trade.orderBook.col.amount", { symbol: symbol.replace("USDT", "") })}</span>
+        <span className="w-20 text-right">{t("trade.orderBook.col.total")}</span>
       </div>
 
       {!view ? (
@@ -92,7 +94,7 @@ export function OrderBook({ symbol, rows = 10, onPriceClick, lastPrice, rising }
               {fmtPrice(lastPrice ?? view.spread ?? NaN)}
             </span>
             <div className="flex flex-col items-end leading-tight">
-              <span className="text-[10px] text-muted">Spread</span>
+              <span className="text-[10px] text-muted">{t("trade.orderBook.spread")}</span>
               <span className="font-mono text-[11px] font-medium tabular-nums text-foreground">
                 {fmtPrice(view.spread ?? NaN)}
               </span>
@@ -135,12 +137,13 @@ const Row = memo(function Row({
   side: "ask" | "bid";
   onPriceClick?: (price: number) => void;
 }) {
+  const { t } = useTranslation();
   const width = `${Math.min((total / maxTotal) * 100, 100)}%`;
   return (
     <div
       role="button"
       tabIndex={0}
-      title="Click to use this price"
+      title={t("trade.orderBook.priceTooltip")}
       onClick={() => onPriceClick?.(price)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

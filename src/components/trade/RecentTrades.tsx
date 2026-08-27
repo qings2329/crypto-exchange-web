@@ -5,6 +5,7 @@
 // - 行级 hover 高亮，价格随上一笔对比闪烁涨跌色。
 
 import { memo, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTradesLive } from "../../hooks/use-trades-live";
 import { fmtPrice, fmtQty, fmtTime } from "../../lib/format";
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function RecentTrades({ symbol, max = 30 }: Props) {
+  const { t } = useTranslation();
   const { trades, status } = useTradesLive(symbol, max);
   const [flash, setFlash] = useState<"up" | "down" | null>(null);
   const prevPriceRef = useRef<number | null>(null);
@@ -49,15 +51,15 @@ export function RecentTrades({ symbol, max = 30 }: Props) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
-        <h3 className="text-[13px] font-semibold">Recent Trades</h3>
+        <h3 className="text-[13px] font-semibold">{t("trade.recentTrades.title")}</h3>
         <StreamDot status={status} />
       </div>
 
       {/* 表头 */}
       <div className="flex items-center px-3 py-1.5 text-[11px] text-muted">
-        <span className="w-20">Time</span>
-        <span className="flex-1 text-right">Price (USDT)</span>
-        <span className="flex-1 text-right">Qty</span>
+        <span className="w-20">{t("trade.recentTrades.col.time")}</span>
+        <span className="flex-1 text-right">{t("trade.recentTrades.col.price")}</span>
+        <span className="flex-1 text-right">{t("trade.recentTrades.col.qty")}</span>
       </div>
 
       <div

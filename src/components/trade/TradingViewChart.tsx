@@ -19,7 +19,7 @@ import {
 } from "lightweight-charts";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { type Kline } from "../../api/client";
+import { type Kline } from "../../types";
 import { fetchKlines } from "../../services/binance";
 import { useKlineLive } from "../../hooks/use-kline-live";
 import { fmtPrice } from "../../lib/format";
@@ -61,9 +61,9 @@ function maPoints(klines: Kline[], period: number): LineData<Time>[] {
   const out: LineData<Time>[] = [];
   let sum = 0;
   for (let i = 0; i < klines.length; i++) {
-    sum += klines[i].c;
-    if (i >= period) sum -= klines[i - period].c;
-    if (i >= period - 1) out.push({ time: (klines[i].t / 1000) as Time, value: sum / period });
+    sum += klines[i].close;
+    if (i >= period) sum -= klines[i - period].close;
+    if (i >= period - 1) out.push({ time: (klines[i].time / 1000) as Time, value: sum / period });
   }
   return out;
 }
@@ -103,10 +103,9 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     const candle = candleRef.current;
     const vol = volRef.current;
     if (!candle || !vol || !data || data.length === 0) return;
-    const rows = data.map(norm);
-    candlesRef.current = rows;
-    candle.setData(rows.map(toCandle));
-    vol.setData(rows.map(toVolume));
+    candlesRef.current = data;
+    candle.setData(data.map(toCandle));
+    vol.setData(data.map(toVolume));
     seededRef.current = true;
     paintMA();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,8 +118,8 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     const list = candlesRef.current;
     if (list.length === 0) return; // 种子未到，REST 会带回最新一根
     const last = list[list.length - 1];
-    if (k.t < last.t) return;
-    const next = k.t === last.t ? [...list.slice(0, -1), k] : [...list, k];
+    if (k.time < last.time) return;
+    const next = k.time === last.time ? [...list.slice(0, -1), k] : [...list, k];
     candlesRef.current = next;
     if (!seededRef.current) return;
     candleRef.current?.update(toCandle(k));
@@ -132,7 +131,7 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
       });
     }
   };
-  const wsStatus = useKlineLive(symbol, interval, (k) => onKlineRef.current(norm(k)));
+  const wsStatus = useKlineLive(symbol, interval, (k) => onKlineRef.current(k));
 
   // 建图（一次）与销毁
   useEffect(() => {
@@ -231,7 +230,7 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
     });
   }, [themeVer]);
 
-  const lastClose = candlesRef.current.at(-1)?.c;
+  const lastClose = candlesRef.current.at(-1)?.close;
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
@@ -309,20 +308,14 @@ export function TradingViewChart({ symbol, interval = "1m", onIntervalChange, li
 }
 
 function toCandle(k: Kline): CandlestickData<Time> {
-  return { time: (k.t / 1000) as Time, open: k.o, high: k.h, low: k.l, close: k.c };
-}
-
-// Binance K 线事件/REST 返回 {time,open,high,low,close,volume}，统一归一为图表内部 Kline {t,o,h,l,c,v}。
-type BinanceKline = { time: number; open: number; high: number; low: number; close: number; volume: number };
-function norm(k: BinanceKline): Kline {
-  return { t: k.time, o: k.open, h: k.high, l: k.low, c: k.close, v: k.volume };
+  return { time: (k.time / 1000) as Time, open: k.open, high: k.high, low: k.low, close: k.close };
 }
 
 function toVolume(k: Kline): HistogramData<Time> {
   // 收盘 ≥ 开盘为阳线（绿），否则阴线（红）；提高不透明度使成交量柱更醒目。
   return {
-    time: (k.t / 1000) as Time,
-    value: k.v,
-    color: k.c >= k.o ? "rgba(14,203,129,0.6)" : "rgba(246,70,93,0.6)",
+    time: (k.time / 1000) as Time,
+    value: k.volume,
+    color: k.close >= k.open ? "rgba(14,203,129,0.6)" : "rgba(246,70,93,0.6)",
   };
 }

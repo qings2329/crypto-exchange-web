@@ -1,11 +1,13 @@
 // 合约计算器：多头/空头 + 开仓价/目标价/杠杆/数量 → 预估收益 PNL、收益率 ROE%、预估强平价。
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { Modal } from "../Modal";
 import { calcLiquidationPrice, calcPnl, calcRoe } from "../../lib/futures-math";
 import type { PerpSide } from "../../lib/futures-math";
 
 export function FuturesCalculator({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const [side, setSide] = useState<PerpSide>("long");
   const [entryStr, setEntryStr] = useState("");
   const [targetStr, setTargetStr] = useState("");
@@ -41,7 +43,7 @@ export function FuturesCalculator({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <Modal title="Futures Calculator" onClose={onClose} width={440}>
+    <Modal title={t("trade.calculator.title")} onClose={onClose} width={440}>
       <div className="flex flex-col gap-4">
         {/* Long / Short */}
         <div className="grid grid-cols-2 gap-2">
@@ -59,40 +61,39 @@ export function FuturesCalculator({ onClose }: { onClose: () => void }) {
                   : "border-border text-muted hover:text-foreground"
               )}
             >
-              {s === "long" ? "Long (Buy)" : "Short (Sell)"}
+              {s === "long" ? t("trade.calculator.longBuy") : t("trade.calculator.shortSell")}
             </button>
           ))}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {num("Entry Price (USDT)", entryStr, setEntryStr, "calc-entry")}
-          {num("Target Price (USDT)", targetStr, setTargetStr, "calc-target")}
-          {num("Leverage (1-125x)", levStr, setLevStr, "calc-leverage")}
-          {num("Quantity (coins)", qtyStr, setQtyStr, "calc-qty")}
+          {num(t("trade.calculator.entryPrice"), entryStr, setEntryStr, "calc-entry")}
+          {num(t("trade.calculator.targetPrice"), targetStr, setTargetStr, "calc-target")}
+          {num(t("trade.calculator.leverage"), levStr, setLevStr, "calc-leverage")}
+          {num(t("trade.calculator.quantity"), qtyStr, setQtyStr, "calc-qty")}
         </div>
 
         {/* 结果 */}
         {result && (
           <div className="flex flex-col gap-2 rounded-lg border border-border bg-panel-2/40 p-3" data-testid="calc-result">
             <Row
-              label="Est. PNL"
+              label={t("trade.calculator.estPnl")}
               value={`${result.pnl >= 0 ? "+" : ""}${result.pnl.toFixed(2)} USDT`}
               cls={result.pnl >= 0 ? "text-buy" : "text-sell"}
               testid="calc-pnl"
             />
             <Row
-              label="ROE"
+              label={t("trade.calculator.roe")}
               value={`${result.roe >= 0 ? "+" : ""}${result.roe.toFixed(2)}%`}
               cls={result.roe >= 0 ? "text-buy" : "text-sell"}
               testid="calc-roe"
             />
-            <Row label="Est. Liquidation Price" value={result.liq.toFixed(2)} cls="text-accent" testid="calc-liq" />
+            <Row label={t("trade.calculator.estLiqPrice")} value={result.liq.toFixed(2)} cls="text-accent" testid="calc-liq" />
           </div>
         )}
 
         <p className="text-[11px] leading-relaxed text-muted">
-          Simplified isolated-margin model (MMR 0.5%). Actual liquidation depends on tiered margin, funding fees and
-          insurance fund.
+          {t("trade.calculator.disclaimer")}
         </p>
       </div>
     </Modal>

@@ -707,15 +707,6 @@ export const api = {
 };
 
 // ---------- 类型 ----------
-// 单根 K 线（OHLCV）。t 为毫秒时间戳，o/h/l/c/v 分别为开/高/低/收/量。
-export interface Kline {
-  t: number;
-  o: number;
-  h: number;
-  l: number;
-  c: number;
-  v: number;
-}
 
 // ---- 理财（Earn）----
 export interface EarnProduct {
