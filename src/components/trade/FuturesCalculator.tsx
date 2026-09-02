@@ -1,17 +1,26 @@
 // 合约计算器：多头/空头 + 开仓价/目标价/杠杆/数量 → 预估收益 PNL、收益率 ROE%、预估强平价。
+// 强平价按当前保证金模式计算：逐仓用本笔保证金，全仓用该交易对的共享池余额。
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { useAuth } from "../../lib/auth";
 import { Modal } from "../Modal";
-import { calcLiquidationPrice, calcPnl, calcRoe } from "../../lib/futures-math";
+import { crossPoolOf, leverageOf, marginModeOf, useFuturesStore } from "../../store/futures-store";
+import { calcPnl, calcPositionRisk, calcRoe } from "../../lib/futures-math";
 import type { PerpSide } from "../../lib/futures-math";
 
-export function FuturesCalculator({ onClose }: { onClose: () => void }) {
+export function FuturesCalculator({ symbol, onClose }: { symbol: string; onClose: () => void }) {
   const { t } = useTranslation();
+  const { uid } = useAuth();
+
+  const mode = useFuturesStore((s) => marginModeOf(s, symbol));
+  const lev = useFuturesStore((s) => leverageOf(s, symbol));
+  const crossPool = useFuturesStore((s) => crossPoolOf(s, uid));
+
   const [side, setSide] = useState<PerpSide>("long");
   const [entryStr, setEntryStr] = useState("");
   const [targetStr, setTargetStr] = useState("");
-  const [levStr, setLevStr] = useState("20");
+  const [levStr, setLevStr] = useState(String(lev));
   const [qtyStr, setQtyStr] = useState("0.1");
 
   const entry = parseFloat(entryStr) || 0;
@@ -21,12 +30,27 @@ export function FuturesCalculator({ onClose }: { onClose: () => void }) {
 
   const result = useMemo(() => {
     if (!(entry > 0) || !(target > 0) || !(qty > 0)) return null;
+    // 开仓瞬间本腿盈亏为 0，同池其他腿由持仓面板另行聚合；计算器只做单笔预估
+    const risk = calcPositionRisk({
+      side,
+      entryPrice: entry,
+      qty,
+      markPrice: entry,
+      leverage,
+      positionMargin: (entry * qty) / leverage,
+      mode,
+      crossPool,
+      otherPnl: 0,
+      otherNotional: 0,
+    });
     return {
       pnl: calcPnl(side, entry, target, qty),
       roe: calcRoe(side, entry, target, leverage),
-      liq: calcLiquidationPrice(side, entry, leverage),
+      liq: risk.liquidationPrice,
     };
-  }, [side, entry, target, leverage, qty]);
+  }, [side, entry, target, leverage, qty, mode, crossPool]);
+
+  const modeLabel = mode === "cross" ? t("trade.leverage.cross") : t("trade.leverage.isolated");
 
   const num = (label: string, value: string, onChange: (v: string) => void, testid: string) => (
     <label className="flex flex-col gap-1 text-xs text-muted">
@@ -45,6 +69,15 @@ export function FuturesCalculator({ onClose }: { onClose: () => void }) {
   return (
     <Modal title={t("trade.calculator.title")} onClose={onClose} width={440}>
       <div className="flex flex-col gap-4">
+        {/* 当前合约 / 保证金模式 / 杠杆：强平价按此口径计算 */}
+        <div className="rounded-lg border border-border bg-panel-2/40 px-3 py-2 text-xs text-muted">
+          <span className="font-semibold text-foreground">{symbol}</span>
+          {" · "}
+          {modeLabel}
+          {" · "}
+          {lev}x
+        </div>
+
         {/* Long / Short */}
         <div className="grid grid-cols-2 gap-2">
           {(["long", "short"] as const).map((s) => (

@@ -348,6 +348,7 @@
   "trade.positions.col.side": "Side",
   "trade.positions.col.entry": "Entry",
   "trade.positions.col.mark": "Mark",
+  "trade.positions.col.liqPrice": "Liq. Price",
   "trade.positions.col.pnl": "PNL (ROE)",
   "trade.positions.col.marginRatio": "Margin Ratio",
   "trade.positions.col.tpSl": "TP/SL",

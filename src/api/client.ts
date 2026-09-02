@@ -416,19 +416,24 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
-  // GET /api/v1/futures/positions 本人持仓（服务端结构 {mark_price, positions, cross_balances}，字段为 Go 导出名）。
+  // GET /api/v1/futures/positions 持仓。
+  // 服务端结构 {mark_price, positions, cross_balances}，字段为 Go 导出名。
+  // Go 的 Position 未声明 json tag（仅 TP/SL 有），故 Side/Mode 序列化为数字枚举：
+  //   Side: 0=Long / 1=Short，Mode: 0=Isolated / 1=Cross（见 internal/futures/position.go）。
+  // cross_balances 的 key 是 userID 字符串，value 为该用户在该 symbol 的全仓共享保证金
+  // （CrossAccount.Balance）；逐仓用户不出现在 map 中。用 parsePosSide / parseMarginMode 归一化。
   futuresPositions: async (symbol?: string) => {
     const d = await request<{
       mark_price: number | null;
       positions: Array<{
         UserID: number;
         Symbol: string;
-        Side: "long" | "short";
+        Side: number | string;
         Size: number;
         EntryPrice: number;
         Margin: number;
         Leverage: number;
-        Mode: string;
+        Mode: number | string;
         OpenTime: number;
         LiqPriceVal: number;
         TP?: number | null;

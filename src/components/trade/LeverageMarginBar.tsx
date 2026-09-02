@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { Modal } from "../Modal";
 import { useFuturesStore, leverageOf, marginModeOf, type MarginMode } from "../../store/futures-store";
-import { calcLiquidationPrice } from "../../lib/futures-math";
 import { FuturesCalculator } from "./FuturesCalculator";
 
 const LEV_PRESETS = [1, 5, 10, 20, 25, 50, 75, 100, 125] as const;
@@ -53,7 +52,7 @@ export function LeverageMarginBar({ symbol }: { symbol: string }) {
 
       {modeModal && <MarginModeModal symbol={symbol} current={mode} onClose={() => setModeModal(false)} />}
       {levModal && <LeverageModal symbol={symbol} current={lev} onClose={() => setLevModal(false)} />}
-      {calcOpen && <FuturesCalculator onClose={() => setCalcOpen(false)} />}
+      {calcOpen && <FuturesCalculator symbol={symbol} onClose={() => setCalcOpen(false)} />}
     </div>
   );
 }
@@ -212,13 +211,4 @@ function LeverageModal({ symbol, current, onClose }: { symbol: string; current: 
       </div>
     </Modal>
   );
-}
-
-/** 供计算器默认展示当前交易对与杠杆 */
-export function currentLeverageFor(symbol: string): number {
-  return leverageOf(useFuturesStore.getState(), symbol);
-}
-
-export function liqPreview(side: "long" | "short", entry: number, lev: number): number {
-  return calcLiquidationPrice(side, entry, lev);
 }

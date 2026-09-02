@@ -789,6 +789,32 @@ const futuresPosStore = new Map(); // uid -> positions[]
 const futuresFrozen = new Map(); // uid -> 冻结保证金累计
 let futOrderId = 4700;
 
+// 契约对齐 Go internal/futures/position.go：PosSide 与 MarginMode 均无 json tag，
+// 序列化为数字枚举。请求体仍用字符串（Go handler 的 req 结构体是 string）。
+const POS_LONG = 0;
+const POS_SHORT = 1;
+const MODE_ISOLATED = 0;
+const MODE_CROSS = 1;
+const posSideNum = (s) => (s === "short" ? POS_SHORT : POS_LONG);
+const modeNum = (m) => (m === "cross" ? MODE_CROSS : MODE_ISOLATED);
+
+// 全仓共享保证金池：(uid, symbol) -> Balance，等价 Go 的 CrossAccount.Balance。
+// 池按用户+交易对分桶，不跨交易对共享；全仓单腿的 Position.Margin 恒为 0。
+const futuresCrossBalances = new Map(); // uid -> Map(symbol -> balance)
+
+function crossBalanceOf(uid, symbol) {
+  return futuresCrossBalances.get(uid)?.get(symbol) ?? 0;
+}
+
+function addCrossBalance(uid, symbol, delta) {
+  if (!futuresCrossBalances.has(uid)) futuresCrossBalances.set(uid, new Map());
+  const m = futuresCrossBalances.get(uid);
+  const next = r2((m.get(symbol) ?? 0) + delta);
+  if (next > 0) m.set(symbol, next);
+  else m.delete(symbol);
+  return Math.max(0, next);
+}
+
 function futuresMarkPrice(symbol) {
   const m = getMarket(symbol);
   return m ? r2(m.price) : null;
@@ -817,16 +843,26 @@ app.post("/api/v1/futures/order", (req, res) => {
     const frozen = futuresFrozen.get(uid) ?? 0;
     if (marginAmt > r2(usdtTotal - frozen)) return fail(res, 400, "insufficient margin");
     futuresFrozen.set(uid, r2(frozen + marginAmt));
-    const liq = pos_side === "long" ? r2(px * (1 - 1 / lev)) : r2(px * (1 + 1 / lev));
+    const side = posSideNum(pos_side);
+    const mode = modeNum(margin_mode);
+    // 全仓：保证金划入共享池，单腿 Margin 记 0（对齐 Go CrossAccount.Open）
+    if (mode === MODE_CROSS) addCrossBalance(uid, symbol, marginAmt);
+    // 强平价：逐仓反解「保证金 + 盈亏 = 维持保证金」；全仓用共享池余额（单边有解）
+    const mmr = 0.005;
+    const pool = mode === MODE_CROSS ? crossBalanceOf(uid, symbol) : marginAmt;
+    const liq =
+      side === POS_LONG
+        ? r2((px * q - pool) / (q * (1 - mmr)))
+        : r2((pool + px * q) / (q * (1 + mmr)));
     const pos = {
       UserID: uid,
       Symbol: symbol,
-      Side: pos_side,
+      Side: side,
       Size: q,
       EntryPrice: px,
-      Margin: marginAmt,
+      Margin: mode === MODE_CROSS ? 0 : marginAmt,
       Leverage: lev,
-      Mode: margin_mode === "cross" ? "cross" : "isolated",
+      Mode: mode,
       OpenTime: Date.now(),
       LiqPriceVal: liq,
     };
@@ -840,16 +876,20 @@ app.post("/api/v1/futures/order", (req, res) => {
     return ok(res, { order_id: String(oid), status: "accepted" });
   }
   // action === close：按标记价平掉本人同向仓位，释放保证金并结算盈亏
-  const idx = positions.findIndex((p) => p.Symbol === symbol && p.Side === pos_side);
+  const side = posSideNum(pos_side);
+  const idx = positions.findIndex((p) => p.Symbol === symbol && p.Side === side);
   if (idx < 0) return fail(res, 400, "position not found");
   const p = positions[idx];
-  const pnl = p.Side === "long" ? (mark - p.EntryPrice) * p.Size : (p.EntryPrice - mark) * p.Size;
+  const pnl = p.Side === POS_LONG ? (mark - p.EntryPrice) * p.Size : (p.EntryPrice - mark) * p.Size;
   positions.splice(idx, 1);
   futuresPosStore.set(uid, positions);
-  futuresFrozen.set(uid, r2(Math.max(0, (futuresFrozen.get(uid) ?? 0) - p.Margin)));
+  // 全仓单腿 Margin 为 0，需按杠杆反推本腿占用额从共享池释放
+  const release = p.Mode === MODE_CROSS ? r2((p.EntryPrice * p.Size) / p.Leverage) : p.Margin;
+  if (p.Mode === MODE_CROSS) addCrossBalance(uid, symbol, -Math.min(release, crossBalanceOf(uid, symbol)));
+  futuresFrozen.set(uid, r2(Math.max(0, (futuresFrozen.get(uid) ?? 0) - release)));
   const oid = ++futOrderId;
   futuresOrders.unshift({
-    id: oid, user_id: uid, symbol, side: pos_side === "long" ? "sell" : "buy",
+    id: oid, user_id: uid, symbol, side: side === POS_LONG ? "sell" : "buy",
     price: mark, qty: p.Size, status: "filled", market: "futures", ts: Date.now(),
   });
   return ok(res, { order_id: String(oid), status: "accepted", realized_pnl: r2(pnl) });
@@ -869,10 +909,11 @@ app.put("/api/v1/futures/tpsl", (req, res) => {
   if (tp != null && !(tp > 0)) return fail(res, 400, "tp 非法");
   if (sl != null && !(sl > 0)) return fail(res, 400, "sl 非法");
   if (tp == null && sl == null) return fail(res, 400, "tp/sl 至少填一项");
-  const pos = (futuresPosStore.get(uid) ?? []).find((p) => p.Symbol === symbol && p.Side === side);
+  const sideNum = posSideNum(side);
+  const pos = (futuresPosStore.get(uid) ?? []).find((p) => p.Symbol === symbol && p.Side === sideNum);
   if (!pos) return fail(res, 404, "position not found");
   if (!futuresTpSl.has(uid)) futuresTpSl.set(uid, new Map());
-  futuresTpSl.get(uid).set(`${symbol}|${side}`, { tp, sl });
+  futuresTpSl.get(uid).set(`${symbol}|${sideNum}`, { tp, sl });
   appendAudit(req.user, "futures.tpsl", `${symbol} ${side}`, `TP ${tp ?? "--"} / SL ${sl ?? "--"}`);
   ok(res, { symbol, pos_side: side, tp, sl });
 });
@@ -885,10 +926,15 @@ app.get("/api/v1/futures/positions", (req, res) => {
     return ts ? { ...p, TP: ts.tp, SL: ts.sl } : { ...p };
   });
   if (symbol) list = list.filter((p) => p.Symbol === symbol.toString());
+  // 全仓用户的共享保证金：key 为 userID 十进制字符串（对齐 Go fmt.Sprintf("%d", p.UserID)）
+  const crossBalances = {};
+  for (const p of list) {
+    if (p.Mode === MODE_CROSS) crossBalances[String(p.UserID)] = crossBalanceOf(p.UserID, p.Symbol);
+  }
   ok(res, {
     mark_price: symbol ? futuresMarkPrice(symbol.toString()) : null,
     positions: list,
-    cross_balances: {},
+    cross_balances: crossBalances,
   });
 });
 

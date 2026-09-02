@@ -348,6 +348,7 @@
   "trade.positions.col.side": "方向",
   "trade.positions.col.entry": "エントリー",
   "trade.positions.col.mark": "マーク",
+  "trade.positions.col.liqPrice": "清算価格",
   "trade.positions.col.pnl": "損益 (ROE)",
   "trade.positions.col.marginRatio": "証拠金率",
   "trade.positions.col.tpSl": "TP/SL",

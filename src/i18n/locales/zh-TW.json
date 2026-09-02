@@ -348,6 +348,7 @@
   "trade.positions.col.side": "方向",
   "trade.positions.col.entry": "開倉價",
   "trade.positions.col.mark": "標記價",
+  "trade.positions.col.liqPrice": "強平價",
   "trade.positions.col.pnl": "盈虧 (ROE)",
   "trade.positions.col.marginRatio": "保證金率",
   "trade.positions.col.tpSl": "止盈/止損",

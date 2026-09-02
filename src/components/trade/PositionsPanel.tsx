@@ -1,34 +1,40 @@
-// 未结平仓头寸面板：合约对/杠杆/开仓均价/标记价格/未实现盈亏（着色）/保证金率。
-// 提供 Market Close（确认弹窗）与 TP/SL 设置弹窗；标记价格用实时行情现算。
+// 未结平仓头寸面板：合约对/杠杆/开仓均价/标记价格/强平价/未实现盈亏（着色）/保证金率。
+// 提供 Market Close（确认弹窗）与 TP/SL 设置弹窗；按逐仓/全仓分别计算强平价与保证金率。
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFuturesStore, type Position } from "../../store/futures-store";
+import { useFuturesStore, crossPoolOf, type Position } from "../../store/futures-store";
 import { api, ApiError } from "../../api/client";
-import { useTickerLive } from "../../hooks/use-ticker-live";
-import { calcMarginRatio, calcPnl } from "../../lib/futures-math";
+import { useMarkPrices, useTickerLive } from "../../hooks/use-ticker-live";
+import { calcPnl, calcPositionRisk, parseMarginMode, parsePosSide, type PositionRisk } from "../../lib/futures-math";
 import { fmtPrice, fmtQty } from "../../lib/format";
+import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/utils";
 import { Modal } from "../Modal";
 import { useConfirm } from "../Confirm";
 import { useToast } from "../Toast";
 
-/** 服务端持仓（Go 导出字段）→ 本地镜像结构；id 用 symbol+side+openTime 稳定映射 */
+/**
+ * 服务端持仓（Go 导出字段）→ 本地镜像结构；id 用 symbol+side+openTime 稳定映射。
+ * Go 的 Position 无 json tag，Side/Mode 序列化为数字枚举，用 parse* 归一化。
+ */
 function toLocal(p: {
+  UserID: number;
   Symbol: string;
-  Side: "long" | "short";
+  Side: number | string;
   Size: number;
   EntryPrice: number;
   Margin: number;
   Leverage: number;
-  Mode: string;
+  Mode: number | string;
   OpenTime: number;
 }): Position {
   return {
     id: `${p.Symbol}-${p.Side}-${p.OpenTime}`,
+    userId: p.UserID,
     symbol: p.Symbol,
-    side: p.Side,
+    side: parsePosSide(p.Side),
     leverage: p.Leverage,
-    marginMode: p.Mode === "cross" ? "cross" : "isolated",
+    marginMode: parseMarginMode(p.Mode),
     entryPrice: p.EntryPrice,
     qty: p.Size,
     margin: p.Margin,
@@ -38,10 +44,18 @@ function toLocal(p: {
 
 export function PositionsPanel({ symbol }: { symbol: string }) {
   const { t } = useTranslation();
+  const { uid } = useAuth();
   const positions = useFuturesStore((s) => s.positions);
   const hydrate = useFuturesStore((s) => s.hydrate);
-  const mine = positions.filter((p) => p.symbol === symbol);
-  const others = positions.filter((p) => p.symbol !== symbol);
+  const setCrossBalances = useFuturesStore((s) => s.setCrossBalances);
+  // 共享池是 (user, symbol) 粒度，本轮只查过 symbol，故该值只对同 symbol 的仓位有效
+  const crossPool = useFuturesStore((s) => crossPoolOf(s, uid));
+
+  // 后端 /futures/positions 未按 token 过滤，返回所有用户持仓：只渲染本人的
+  const own = positions.filter((p) => String(p.userId) === String(uid));
+  const mine = own.filter((p) => p.symbol === symbol);
+  const others = own.filter((p) => p.symbol !== symbol);
+  const rows = [...mine, ...others];
 
   // 服务端为真相源：挂载即拉取，之后每 5s 轮询对账（本地乐观更新仅作即时反馈）
   useEffect(() => {
@@ -50,6 +64,7 @@ export function PositionsPanel({ symbol }: { symbol: string }) {
       try {
         const d = await api.futuresPositions(symbol);
         if (!alive) return;
+        setCrossBalances(d.cross_balances ?? {});
         hydrate(
           symbol,
           (d.positions ?? []).map(toLocal)
@@ -64,7 +79,50 @@ export function PositionsPanel({ symbol }: { symbol: string }) {
       alive = false;
       clearInterval(t);
     };
-  }, [symbol, hydrate]);
+  }, [symbol, hydrate, setCrossBalances]);
+
+  // 标记价：当前交易对走 WS 实时流，其余交易对走批量轮询（仅供全仓共享池聚合，精度要求低）
+  const { ticker } = useTickerLive(symbol);
+  const livePrice = ticker?.lastPrice;
+  const markPrices = useMarkPrices(rows.map((p) => p.symbol));
+  const markOf = (p: Position) =>
+    (p.symbol === symbol && livePrice ? livePrice : markPrices[p.symbol]) ?? p.entryPrice;
+
+  // 全仓池按 (user, symbol) 分桶：先汇总当前 symbol 下所有全仓腿的盈亏与名义值，
+  // 再对每行扣掉自身贡献，得到「同池其他腿」的量。
+  // 其他 symbol 的持仓拿不到本轮池余额（crossPool 传 0），由 calcPositionRisk 回退到杠杆反推。
+  const risks = new Map<string, PositionRisk>();
+  {
+    let sumPnl = 0;
+    let sumNotional = 0;
+    const self = new Map<string, { pnl: number; notional: number }>();
+    for (const p of mine) {
+      if (p.marginMode !== "cross") continue;
+      const mark = markOf(p);
+      const stat = { pnl: calcPnl(p.side, p.entryPrice, mark, p.qty), notional: mark * p.qty };
+      self.set(p.id, stat);
+      sumPnl += stat.pnl;
+      sumNotional += stat.notional;
+    }
+    for (const p of rows) {
+      const own = self.get(p.id); // 有值 ⟺ 该仓在当前 symbol 且为全仓
+      risks.set(
+        p.id,
+        calcPositionRisk({
+          side: p.side,
+          entryPrice: p.entryPrice,
+          qty: p.qty,
+          markPrice: markOf(p),
+          leverage: p.leverage,
+          positionMargin: p.margin,
+          mode: p.marginMode,
+          crossPool: own ? crossPool : 0,
+          otherPnl: own ? sumPnl - own.pnl : 0,
+          otherNotional: own ? sumNotional - own.notional : 0,
+        })
+      );
+    }
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card" data-testid="positions-panel">
@@ -82,6 +140,7 @@ export function PositionsPanel({ symbol }: { symbol: string }) {
                 <th className="px-3 py-2 text-left font-normal">{t("trade.positions.col.side")}</th>
                 <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.entry")}</th>
                 <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.mark")}</th>
+                <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.liqPrice")}</th>
                 <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.pnl")}</th>
                 <th className="px-3 py-2 text-right font-normal">{t("trade.positions.col.marginRatio")}</th>
                 <th className="px-3 py-2 text-left font-normal">{t("trade.positions.col.tpSl")}</th>
@@ -89,8 +148,8 @@ export function PositionsPanel({ symbol }: { symbol: string }) {
               </tr>
             </thead>
             <tbody>
-              {[...mine, ...others].map((p) => (
-                <PositionRow key={p.id} pos={p} />
+              {rows.map((p) => (
+                <PositionRow key={p.id} pos={p} risk={risks.get(p.id)!} />
               ))}
             </tbody>
           </table>
@@ -100,7 +159,7 @@ export function PositionsPanel({ symbol }: { symbol: string }) {
   );
 }
 
-function PositionRow({ pos }: { pos: Position }) {
+function PositionRow({ pos, risk }: { pos: Position; risk: PositionRisk }) {
   const { t } = useTranslation();
   const close = useFuturesStore((s) => s.close);
   const setTpSl = useFuturesStore((s) => s.setTpSl);
@@ -108,12 +167,10 @@ function PositionRow({ pos }: { pos: Position }) {
   const toast = useToast();
   const [tpslOpen, setTpslOpen] = useState(false);
 
-  // 标记价格：实时行情最新价
-  const { ticker } = useTickerLive(pos.symbol);
-  const mark = ticker?.lastPrice ?? pos.entryPrice;
-  const pnl = calcPnl(pos.side, pos.entryPrice, mark, pos.qty);
-  const roePct = (pnl / (pos.margin || 1)) * 100;
-  const marginRatio = calcMarginRatio(pnl, pos.margin, mark * pos.qty);
+  const mark = risk.markPrice;
+  const pnl = risk.pnl;
+  const roePct = risk.roePct;
+  const marginRatio = risk.marginRatio;
   const win = pnl >= 0;
 
   const onMarketClose = async () => {
@@ -154,6 +211,13 @@ function PositionRow({ pos }: { pos: Position }) {
             <span className="text-muted">{t("trade.positions.perp")}</span>
           </a>
           <span className="rounded border border-border px-1 text-[10px] font-bold text-muted">{pos.leverage}x</span>
+          <span
+            className="rounded border border-border px-1 text-[10px] text-muted"
+            data-testid={`margin-mode-${pos.id}`}
+            title={pos.marginMode === "cross" ? t("trade.leverage.cross") : t("trade.leverage.isolated")}
+          >
+            {pos.marginMode === "cross" ? t("trade.leverage.cross") : t("trade.leverage.isolated")}
+          </span>
         </div>
       </td>
       <td className="px-3 py-2.5">
@@ -168,6 +232,9 @@ function PositionRow({ pos }: { pos: Position }) {
       </td>
       <td className="px-3 py-2.5 text-right font-mono tabular-nums">{fmtPrice(pos.entryPrice)}</td>
       <td className="px-3 py-2.5 text-right font-mono tabular-nums">{fmtPrice(mark)}</td>
+      <td className="px-3 py-2.5 text-right font-mono tabular-nums text-accent" data-testid={`liq-${pos.id}`}>
+        {risk.liquidationPrice > 0 ? fmtPrice(risk.liquidationPrice) : "--"}
+      </td>
       <td
         className={cn("px-3 py-2.5 text-right font-mono tabular-nums", win ? "text-buy" : "text-sell")}
         data-testid={`pnl-${pos.id}`}

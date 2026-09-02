@@ -139,6 +139,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
           return;
         }
         openPosition({
+          userId: Number(uid),
           symbol,
           side: isBuy ? "long" : "short",
           leverage,
