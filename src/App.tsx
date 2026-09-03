@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { AuthProvider } from "./lib/auth";
-import { RequireLogin } from "./lib/rbac";
+import { RequireLogin, RequireAdmin } from "./lib/rbac";
+import { AdminLayout } from "./components/admin/AdminLayout";
 import { ConfirmProvider } from "./components/Confirm";
 import { SecureActionProvider } from "./components/security/SecureActionProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -68,12 +69,93 @@ const PAGES: Record<string, React.ComponentType> = {
 // 公开页面白名单见 src/lib/routes.ts（与 api/client 的 401 处理共享）。
 import { PUBLIC_PAGES } from "./lib/routes";
 
+// 管理后台页面（懒加载）
+const AdminLogin = lazy(() => import("./pages/admin/Login"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const AdminUsers = lazy(() => import("./pages/admin/Users"));
+const AdminKyc = lazy(() => import("./pages/admin/Kyc"));
+const AdminOrders = lazy(() => import("./pages/admin/Orders"));
+const AdminTrades = lazy(() => import("./pages/admin/Trades"));
+const AdminSymbols = lazy(() => import("./pages/admin/Symbols"));
+const AdminApiKeys = lazy(() => import("./pages/admin/ApiKeys"));
+const AdminDeposits = lazy(() => import("./pages/admin/Deposits"));
+const AdminWithdrawals = lazy(() => import("./pages/admin/Withdrawals"));
+const AdminDepositAddresses = lazy(() => import("./pages/admin/DepositAddresses"));
+const AdminLedger = lazy(() => import("./pages/admin/Ledger"));
+const AdminChains = lazy(() => import("./pages/admin/Chains"));
+const AdminCoins = lazy(() => import("./pages/admin/Coins"));
+const AdminAnnouncements = lazy(() => import("./pages/admin/Announcements"));
+const AdminNotifications = lazy(() => import("./pages/admin/Notifications"));
+const AdminServices = lazy(() => import("./pages/admin/Services"));
+const AdminWealth = lazy(() => import("./pages/admin/Wealth"));
+const AdminRisk = lazy(() => import("./pages/admin/Risk"));
+const AdminFutures = lazy(() => import("./pages/admin/Futures"));
+const AdminLending = lazy(() => import("./pages/admin/Lending"));
+const AdminBots = lazy(() => import("./pages/admin/Bots"));
+const AdminReferral = lazy(() => import("./pages/admin/Referral"));
+const AdminAdmins = lazy(() => import("./pages/admin/Admins"));
+const AdminRoles = lazy(() => import("./pages/admin/Roles"));
+const AdminAudit = lazy(() => import("./pages/admin/Audit"));
+const AdminProfile = lazy(() => import("./pages/admin/Profile"));
+
+const ADMIN_PAGES: Record<string, React.ComponentType> = {
+  "/admin/dashboard": AdminDashboard,
+  "/admin/users": AdminUsers,
+  "/admin/kyc": AdminKyc,
+  "/admin/orders": AdminOrders,
+  "/admin/trades": AdminTrades,
+  "/admin/symbols": AdminSymbols,
+  "/admin/apikeys": AdminApiKeys,
+  "/admin/deposits": AdminDeposits,
+  "/admin/withdrawals": AdminWithdrawals,
+  "/admin/deposit-addresses": AdminDepositAddresses,
+  "/admin/ledger": AdminLedger,
+  "/admin/chains": AdminChains,
+  "/admin/coins": AdminCoins,
+  "/admin/announcements": AdminAnnouncements,
+  "/admin/notifications": AdminNotifications,
+  "/admin/services": AdminServices,
+  "/admin/wealth": AdminWealth,
+  "/admin/risk": AdminRisk,
+  "/admin/futures": AdminFutures,
+  "/admin/lending": AdminLending,
+  "/admin/bots": AdminBots,
+  "/admin/referral": AdminReferral,
+  "/admin/admins": AdminAdmins,
+  "/admin/roles": AdminRoles,
+  "/admin/audit": AdminAudit,
+  "/admin/profile": AdminProfile,
+};
+
 function Router() {
   const hash = useHash();
   const path = hash.replace(/^#/, "").split("?")[0];
 
   if (path === "/login") return <Login />;
   if (path === "/register") return <Register />;
+  if (path === "/admin/login") {
+    return (
+      <Suspense fallback={<div className="page muted" />}>
+        <AdminLogin />
+      </Suspense>
+    );
+  }
+
+  // /admin/* —— 管理后台：独立登录态（RequireAdmin），独立布局
+  if (path.startsWith("/admin/")) {
+    const Page = ADMIN_PAGES[path] ?? AdminDashboard;
+    return (
+      <RequireAdmin>
+        <AdminLayout>
+          <ErrorBoundary>
+            <Suspense fallback={<div className="page muted" />}>
+              <Page />
+            </Suspense>
+          </ErrorBoundary>
+        </AdminLayout>
+      </RequireAdmin>
+    );
+  }
 
   // /trade/:SYMBOL —— 现货交易大厅
   // /futures/:SYMBOL —— 期货专属终端（资金费条带/持仓布局）
