@@ -31,6 +31,7 @@ const Announcements = lazy(() => import("./pages/Announcements"));
 const History = lazy(() => import("./pages/History").then((m) => ({ default: m.History })));
 const Lending = lazy(() => import("./pages/Lending").then((m) => ({ default: m.Lending })));
 const BotGrid = lazy(() => import("./pages/BotGrid").then((m) => ({ default: m.BotGrid })));
+const CopyTrade = lazy(() => import("./pages/CopyTrade").then((m) => ({ default: m.CopyTrade })));
 const Referral = lazy(() => import("./pages/Referral").then((m) => ({ default: m.Referral })));
 const Notifications = lazy(() => import("./pages/Notifications").then((m) => ({ default: m.Notifications })));
 const Help = lazy(() => import("./pages/Help").then((m) => ({ default: m.Help })));
@@ -58,6 +59,7 @@ const PAGES: Record<string, React.ComponentType> = {
   "/launchpad": LaunchpadPage,
   "/lending": Lending,
   "/bot": BotGrid,
+  "/copytrade": CopyTrade,
   "/settings": Settings,
   "/apikeys": ApiKeys,
   "/referral": Referral,

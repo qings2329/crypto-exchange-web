@@ -619,6 +619,38 @@ export const api = {
     return d.orders ?? [];
   },
 
+  // ---- 跟单交易（Copy Trade） ----
+  copyLeads: async () => {
+    const d = await request<{ leads: CopyLead[] }>("/api/v1/copytrade/leads");
+    return d.leads ?? [];
+  },
+  copyCreateLead: (name: string, bio: string) =>
+    request<CopyLead>("/api/v1/copytrade/leads", {
+      method: "POST",
+      body: JSON.stringify({ name, bio }),
+    }),
+  copyCloseLead: (id: number) =>
+    request<{ id: number; status: string }>(`/api/v1/copytrade/leads/${id}/close`, {
+      method: "POST",
+    }),
+  copyFollow: (payload: CopyFollowPayload) =>
+    request<CopyFollow>("/api/v1/copytrade/follows", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  copyMyFollows: async () => {
+    const d = await request<{ follows: CopyFollow[] }>("/api/v1/copytrade/follows");
+    return d.follows ?? [];
+  },
+  copyStopFollow: (id: number) =>
+    request<{ id: number; status: string }>(`/api/v1/copytrade/follows/${id}/stop`, {
+      method: "POST",
+    }),
+  copyMyCopies: async () => {
+    const d = await request<{ copies: CopyRecord[] }>("/api/v1/copytrade/copies");
+    return d.copies ?? [];
+  },
+
   // ---- 管理总览 ----
   // GET /api/v1/admin/overview 后台总览 KPI（需 admin 角色）。
   // GET /api/v1/admin/audit 后台操作审计日志（需 admin 角色）。
@@ -1366,3 +1398,41 @@ export interface BotCreatePayload {
   params: BotParams;
 }
 
+
+// ---- 跟单交易（Copy Trade） ----
+export interface CopyLead {
+  id: number;
+  name: string;
+  bio: string;
+  status: "active" | "closed";
+  created_at: number;
+}
+export interface CopyFollow {
+  id: number;
+  lead_id: number;
+  lead_name: string;
+  copy_ratio: number;
+  allocated_amount: number;
+  status: "active" | "stopped";
+  created_at: number;
+  stopped_at?: number;
+}
+export interface CopyRecord {
+  id: number;
+  event_id: string;
+  lead_id: number;
+  follow_id: number;
+  symbol: string;
+  side: string;
+  price: number;
+  qty: number;
+  notional: number;
+  status: "done" | "failed";
+  created_at: number;
+}
+export interface CopyFollowPayload {
+  lead_id: number;
+  copy_ratio: number;
+  allocated_amount: number;
+  follower_token: string;
+}
