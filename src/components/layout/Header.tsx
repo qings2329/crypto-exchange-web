@@ -19,6 +19,7 @@ const LINKS: { path: string; key: string; auth?: boolean }[] = [
   { path: "/lending", key: "nav.lending" },
   { path: "/launchpad", key: "nav.launchpad" },
   { path: "/bot", key: "nav.bot" },
+  { path: "/copytrade", key: "nav.copytrade" },
   { path: "/referral", key: "nav.referral" },
   { path: "/help", key: "help.title" },
   { path: "/security", key: "nav.security", auth: true },
