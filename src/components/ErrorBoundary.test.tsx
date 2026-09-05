@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import "../i18n"; // 初始化 i18next（error.boundary.* 核心文本），否则 ErrorBoundary 默认兜底会原样回退 key
 import { ErrorBoundary } from "./ErrorBoundary";
 
 function Boom(): never {
