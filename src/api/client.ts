@@ -651,7 +651,27 @@ export const api = {
     return d.copies ?? [];
   },
 
-  // ---- 管理总览 ----
+  // ---- 期权（Options） ----
+  optionContracts: async () => {
+    const d = await request<{ contracts: OptionContract[] }>("/api/v1/options/contracts");
+    return d.contracts ?? [];
+  },
+  optionQuote: (contractId: number) =>
+    request<OptionQuote>(`/api/v1/options/quote?contract_id=${contractId}`),
+  optionPositions: async () => {
+    const d = await request<{ positions: OptionPosition[] }>("/api/v1/options/positions");
+    return d.positions ?? [];
+  },
+  optionOpen: (payload: OptionOpenPayload) =>
+    request<OptionPosition>("/api/v1/options/positions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  optionExercise: (positionId: number) =>
+    request<{ ok: boolean }>(`/api/v1/options/exercise`, {
+      method: "POST",
+      body: JSON.stringify({ position_id: positionId }),
+    }),
   // GET /api/v1/admin/overview 后台总览 KPI（需 admin 角色）。
   // GET /api/v1/admin/audit 后台操作审计日志（需 admin 角色）。
 
@@ -1435,4 +1455,42 @@ export interface CopyFollowPayload {
   copy_ratio: number;
   allocated_amount: number;
   follower_token: string;
+}
+
+// ---- 期权（Options） ----
+export type OptionType = "call" | "put";
+export type OptionStyle = "european" | "american";
+export type OptionPositionSide = "long" | "short";
+export type OptionPositionStatus = "open" | "exercised" | "expired";
+
+export interface OptionContract {
+  id: number;
+  underlying: string;
+  quote_asset: string;
+  strike: number;
+  expiry: string;
+  type: OptionType;
+  style: OptionStyle;
+  contract_size: number;
+  premium: number;
+}
+export interface OptionPosition {
+  id: number;
+  contract_id: number;
+  side: OptionPositionSide;
+  quantity: number;
+  premium: number;
+  status: OptionPositionStatus;
+  created_at: number;
+  contract?: OptionContract;
+}
+export interface OptionQuote {
+  contract_id: number;
+  premium: number;
+  delta: number;
+}
+export interface OptionOpenPayload {
+  contract_id: number;
+  side: OptionPositionSide;
+  quantity: number;
 }
