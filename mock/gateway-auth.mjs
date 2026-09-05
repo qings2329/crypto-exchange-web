@@ -159,6 +159,16 @@ const PUBLIC_PATHS = new Set([
   // 理财产品列表 / Launchpool 项目列表匿名可读（申购、质押等写操作需登录）
   "/api/v1/earn/products",
   "/api/v1/launchpad/projects",
+  // 公开行情：与 cmd/gateway/main.go 的 AuthWithSkips 豁免清单对齐，
+  // Kline/深度/Ticker/成交均匿名可读（写操作仍需登录）
+  "/api/v1/spot/depth",
+  "/api/v1/spot/ws",
+  "/api/v1/market/ticker",
+  "/api/v1/market/ws",
+  "/api/v1/market/depth",
+  "/api/v1/market/trades",
+  "/api/v1/market/klines",
+  "/api/v1/market/kline",
 ]);
 function gateway(req, res, next) {
   if (PUBLIC_PATHS.has(req.path)) return next();

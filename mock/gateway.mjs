@@ -29,7 +29,7 @@ function isValidCryptoAddress(s) {
 import { buildAdminApp, notFound } from "./admin-api.mjs";
 import { pushEvents, summary, recentEvents } from "./monitor-store.mjs";
 import { getSim, intervalToMs } from "./kline-server.mjs";
-import { livePrice, tickLive } from "./market-state.mjs";
+import { basePrice, livePrice, tickLive } from "./market-state.mjs";
 
 // 演示用种子监控事件：让聚合看板首次打开即有数据（真实环境由前端上报累积）。
 pushEvents([
@@ -86,6 +86,11 @@ function makeTicker(symbol, price) {
     last: r2(price),
     best_bid: r2(price - price * 0.0002),
     best_ask: r2(price + price * 0.0002),
+    // 24h 统计（与 internal/market/market.go 的 Ticker 结构对齐，供前端行情卡片/榜单渲染）
+    open_24h: r2(price - price * 0.003),
+    high_24h: r2(price + price * 0.005),
+    low_24h: r2(price - price * 0.005),
+    volume_24h: r4(price / 100 + ((basePrice(symbol) % 97) + 3) * 5),
     timestamp: Date.now(),
   };
 }
@@ -592,10 +597,18 @@ app.delete("/api/v1/user/notifications/:id", (req, res) => {
 app.get("/api/v1/spot/depth", (req, res) => {
   const symbol = (req.query.symbol || "BTC_USDT").toString();
   const s = getMarket(symbol);
-  ok(res, makeDepth(symbol, s.price));
+  const { bids, asks } = makeDepth(symbol, s.price);
+  ok(res, { symbol, bids, asks, ts: Date.now() });
 });
+// Go 市场服务 /api/v1/market/ticker：symbol 缺省时返回全部交易对数组，否则返回单个快照。
 app.get("/api/v1/market/ticker", (req, res) => {
-  const symbol = (req.query.symbol || "BTC_USDT").toString();
+  const symbol = (req.query.symbol || "").toString();
+  if (!symbol) {
+    // 与 internal/market demo 基座（BTCUSDT/ETHUSDT）及前端 TradeHall/Home 的 symbol 拼写对齐
+    const symbols = ["BTCUSDT", "ETHUSDT"];
+    ok(res, symbols.map((s) => makeTicker(s, livePrice(s))));
+    return;
+  }
   const s = getMarket(symbol);
   ok(res, makeTicker(symbol, s.price));
 });
@@ -606,6 +619,35 @@ app.get("/api/v1/market/kline", (req, res) => {
   const sim = getSim(symbol, intervalToMs(interval));
   const n = Math.min(limit, sim.history.length);
   ok(res, sim.history.slice(sim.history.length - n));
+});
+// Go 市场服务 /api/v1/market/depth 与 /market/trades（前端适配层经 /api/v1/market/* 消费）
+app.get("/api/v1/market/depth", (req, res) => {
+  const symbol = (req.query.symbol || "BTC_USDT").toString();
+  const s = getMarket(symbol);
+  const limit = Number(req.query.limit) || 20;
+  const { bids, asks } = makeDepth(symbol, s.price);
+  ok(res, {
+    symbol,
+    bids: bids.slice(0, limit),
+    asks: asks.slice(0, limit),
+    ts: Date.now(),
+  });
+});
+app.get("/api/v1/market/trades", (req, res) => {
+  const symbol = (req.query.symbol || "BTC_USDT").toString();
+  const s = getMarket(symbol);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+  const rows = [];
+  for (let i = limit; i > 0; i--) {
+    rows.push({
+      symbol,
+      price: r2(s.price + (Math.random() - 0.5) * s.price * 0.002),
+      qty: r4(Math.random() * 2 + 0.01),
+      side: Math.random() < 0.5 ? "buy" : "sell",
+      ts: Date.now() - i * 250,
+    });
+  }
+  ok(res, rows);
 });
 app.post("/api/v1/spot/order", (req, res) => {
   const b = req.body || {};
