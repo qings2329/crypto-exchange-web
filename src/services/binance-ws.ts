@@ -265,15 +265,18 @@ class BinanceStreamManager {
         this.handleGatewayMessage(ev, "main");
       });
     }
-    // kline 连接：每个 distinct symbol+interval 一条；为简化，合并同一 symbol 的不同 interval
+    // kline 连接：按 symbol 聚合，interval 逗号合并为单条连接（Go 网关 /kline/ws 支持多周期）。
     if (kline.length > 0 && !this.klineWs) {
-      // 按 symbol 聚合，interval 各自独立；网关 /kline/ws 只支持单个 interval，
-      // 所以这里对每个 distinct symbol 开一条连接；interval 过滤由 onmessage 处理（server 推全部周期）。
-      // 实际做法：取第一条 kline stream 的 symbol 建连；同一 symbol 不同 interval 在 handleGatewayMessage 里匹配。
+      // 取第一个 stream 的 symbol（同一 symbol 的多 interval 共享一条连接）；
+      // 收集所有 distinct interval 拼入 URL。
       const symbol = parseStream(kline[0]).symbol;
-      this.openKlineGatewayWs(`${resolveWsBase()}${GW_KLINE_WS_PATH}?symbol=${symbol}&interval=1m`, (ev) => {
-        this.handleKlineMessage(ev);
-      });
+      const intervals = [...new Set(kline.map(parseStream).map((p) => p.interval!).filter(Boolean))];
+      this.openKlineGatewayWs(
+        `${resolveWsBase()}${GW_KLINE_WS_PATH}?symbol=${symbol}&interval=${intervals.join(",")}`,
+        (ev) => {
+          this.handleKlineMessage(ev);
+        }
+      );
     }
   }
 
@@ -369,16 +372,17 @@ class BinanceStreamManager {
     }
   }
 
-  /** 网关 kline 消息：{type: "kline", data: {t,o,h,l,c,v}}（BinanceKline 格式，兼容 parseKlineEvent） */
+  /** 网关 kline 消息：{type: "kline", symbol, interval, data: {t,o,h,l,c,v}}（BinanceKline 格式，兼容 parseKlineEvent） */
   private handleKlineMessage(ev: MessageEvent) {
     this.lastMessageAt = Date.now();
     try {
-      const msg = JSON.parse(ev.data as string) as { type?: string; data?: unknown };
+      const msg = JSON.parse(ev.data as string) as { type?: string; interval?: string; data?: unknown };
       if (!msg || msg.type !== "kline" || msg.data === undefined) return;
       for (const [stream, sub] of this.subs) {
         const p = parseStream(stream);
-        if (p.type !== "kline_1m") continue; // 当前网关 kline WS 只推送 1m
-        // symbol 已在 URL 中限定，数据里不含 symbol 字段；这里用 stream 名匹配
+        if (p.type !== "kline_1m") continue; // stream 名仍为 kline_1m/kline_5m/... 格式
+        // 网关已携带 interval 字段（多周期支持），按 interval 精确匹配
+        if (msg.interval && p.interval && msg.interval !== p.interval) continue;
         sub.handlers.forEach((h) => h(stream, msg.data));
       }
     } catch {

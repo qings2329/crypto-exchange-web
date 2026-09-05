@@ -2277,35 +2277,51 @@ server.on("upgrade", (req, socket, head) => {
   }
 });
 
-// K 线实时推送（与 REST 共用 kline-server 的内存行情，价格来自单一数据源）
+// K 线实时推送（与 REST 共用 kline-server 的内存行情，价格来自单一数据源）。
+// 支持逗号分隔的多周期订阅，每条周期独立管理 sim 状态与推送频率。
+// 消息格式对齐 Go 网关：{type:"kline", symbol, interval, data:{t,o,h,l,c,v}}。
+const ROLL_EVERY = 8;
 klineWss.on("connection", (ws, req) => {
-  const { symbol, interval } = parseWsUrl(req.url);
-  const ivMs = intervalToMs(interval);
-  const sim = getSim(symbol, ivMs);
-  const ROLL_EVERY = 8;
-  ws.send(JSON.stringify(sim.current));
-  const timer = setInterval(() => {
+  const { symbol } = parseWsUrl(req.url);
+  const rawInterval = parseWsUrl(req.url).interval;
+  const intervals = rawInterval.split(",").map((s) => s.trim()).filter(Boolean);
+  if (intervals.length === 0) intervals.push("1m");
+  const sims = new Map(); // interval -> sim
+  const timers = [];
+  const send = (iv, sim) => {
     if (ws.readyState !== ws.OPEN) return;
-    const p = tickLive(symbol, 0.003); // 演化单一实时价，深度/Ticker 同步
+    // 以 BTCUSDT 价格驱动所有周期的实时价演化（单一数据源原则）
+    const price = tickLive(symbol, 0.003);
     sim.tick++;
     const cur = sim.current;
     if (sim.tick % ROLL_EVERY === 0) {
-      const t = cur.t + ivMs;
-      const o = p;
+      const t = cur.t + intervalToMs(iv);
+      const o = price;
       sim.current = { t, o, h: o, l: o, c: o, v: Math.round((Math.random() * 2 + 0.2) * 1000) / 1000 };
       sim.history.push(sim.current);
       if (sim.history.length > 500) sim.history.shift();
     } else {
-      cur.c = r2(p);
-      cur.h = r2(Math.max(cur.h, p));
-      cur.l = r2(Math.min(cur.l, p));
+      cur.c = r2(price);
+      cur.h = r2(Math.max(cur.h, price));
+      cur.l = r2(Math.min(cur.l, price));
       cur.v = Math.round((cur.v + Math.random() * 1.5) * 1000) / 1000;
       sim.current = cur;
       sim.history[sim.history.length - 1] = cur;
     }
-    ws.send(JSON.stringify(sim.current));
-  }, TICK_MS);
-  ws.on("close", () => clearInterval(timer));
+    ws.send(JSON.stringify({ type: "kline", symbol, interval: iv, data: sim.current }));
+  };
+  for (const iv of intervals) {
+    const ivMs = intervalToMs(iv);
+    const sim = getSim(symbol, ivMs);
+    sims.set(iv, sim);
+    // 初始推送当前蜡烛
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: "kline", symbol, interval: iv, data: sim.current }));
+    }
+    const t = setInterval(() => send(iv, sim), TICK_MS);
+    timers.push(t);
+  }
+  ws.on("close", () => timers.forEach((t) => clearInterval(t)));
 });
 
 server.on("upgrade", (req, socket, head) => {
