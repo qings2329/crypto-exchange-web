@@ -15,7 +15,8 @@ import { SecureText } from "../components/security/SecureText";
 import { InlineError } from "../components/InlineError";
 import { useToast } from "../components/Toast";
 
-const BALANCE_EP = "/api/v1/futures/wallet/balance";
+// 用户侧全资产余额（F4：uid 取 token，数组契约）；单数路径为管理端上游聚合端点，勿用于用户页。
+const BALANCE_EP = "/api/v1/futures/wallet/balances";
 const WITHDRAWS_EP = "/api/v1/futures/wallet/withdraws";
 
 // 资金流水业务类型 -> 文案 key（对齐 wallet.biz.*）。

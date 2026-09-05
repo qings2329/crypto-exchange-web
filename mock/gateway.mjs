@@ -742,9 +742,16 @@ function walletOf(uid) {
   return baseBalances(uid).map((row) => {
     const m = d.get(row.asset);
     const round = row.asset === "USDT" ? (n) => Math.round(n * 100) / 100 : (n) => Math.round(n * 10000) / 10000;
-    return m
-      ? { asset: row.asset, available: round(row.available + m.avail), frozen: round(row.frozen + m.frozen) }
-      : row;
+    if (m) {
+      return {
+        asset: row.asset,
+        available: round(row.available + m.avail),
+        frozen: round(row.frozen + m.frozen),
+        withdraw_frozen: 0,
+        exists: true,
+      };
+    }
+    return { ...row, withdraw_frozen: 0, exists: true };
   });
 }
 
@@ -766,6 +773,10 @@ function pushLedger(uid, entry) {
 const WALLET_ASSETS = ["USDT", "BTC", "ETH"];
 
 app.get("/api/v1/futures/wallet/balance", (req, res) => {
+  ok(res, walletOf(req.user.sub));
+});
+// 用户侧全资产余额（对齐真实后端 /wallet/balances 数组契约；/balance 单数路径保留给管理端上游聚合）。
+app.get("/api/v1/futures/wallet/balances", (req, res) => {
   ok(res, walletOf(req.user.sub));
 });
 
