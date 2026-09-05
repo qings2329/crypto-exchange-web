@@ -257,7 +257,23 @@ export const depthStream = (symbol: string) => `${symbol.toLowerCase()}@depth10@
 export const tradeStream = (symbol: string) => `${symbol.toLowerCase()}@trade`;
 export const tickerStream = (symbol: string) => `${symbol.toLowerCase()}@ticker`;
 
-/* ------------------------- WS 事件解析器 ------------------------- */
+/* ------------------------- WS 事件解析器（Binance + Go 网关双格式） ------------------------- */
+
+/** Go 网关 /ws 消息封装：{type, symbol, data}；内部 data 字段与 Binance 原始格式兼容。 */
+interface GoWsEnvelope {
+  type: string;
+  symbol?: string;
+  data: unknown;
+}
+
+/** 从 Go 网关信封中取出 data，若原生已是 Binance 格式则透传（便于双协议复用同一套 parser）。 */
+function unwrapWsData(raw: unknown): unknown {
+  if (raw && typeof raw === "object") {
+    const e = raw as GoWsEnvelope;
+    if (e.type && e.data !== undefined) return e.data;
+  }
+  return raw;
+}
 
 interface RawKlineEvent {
   e: "kline";
@@ -265,19 +281,28 @@ interface RawKlineEvent {
 }
 
 export function parseKlineEvent(d: unknown): { kline: Kline; closed: boolean } | null {
-  const e = d as RawKlineEvent;
-  if (!e || e.e !== "kline" || !e.k) return null;
-  return {
-    kline: {
-      time: e.k.t,
-      open: +e.k.o,
-      high: +e.k.h,
-      low: +e.k.l,
-      close: +e.k.c,
-      volume: +e.k.v,
-    },
-    closed: Boolean(e.k.x),
-  };
+  const raw = unwrapWsData(d);
+  // Binance WS：{e: "kline", k: {t,o,h,l,c,v,x}}
+  const e = raw as RawKlineEvent;
+  if (e && e.e === "kline" && e.k) {
+    return {
+      kline: {
+        time: e.k.t,
+        open: +e.k.o,
+        high: +e.k.h,
+        low: +e.k.l,
+        close: +e.k.c,
+        volume: +e.k.v,
+      },
+      closed: Boolean(e.k.x),
+    };
+  }
+  // Go 网关 /market/kline/ws：直接推送 BinanceKline {t,o,h,l,c,v}
+  const g = raw as { t?: number; o?: number; h?: number; l?: number; c?: number; v?: number };
+  if (g && typeof g.t === "number") {
+    return { kline: { time: g.t, open: g.o ?? 0, high: g.h ?? 0, low: g.l ?? 0, close: g.c ?? 0, volume: g.v ?? 0 }, closed: false };
+  }
+  return null;
 }
 
 interface RawDepthEvent {
@@ -287,10 +312,24 @@ interface RawDepthEvent {
 }
 
 export function parseDepthEvent(d: unknown): OrderBook | null {
-  const e = d as RawDepthEvent;
-  if (!e || !Array.isArray(e.bids) || !Array.isArray(e.asks)) return null;
-  const toLevels = (ls: [string, string][]) => ls.map(([p, q]) => [+p, +q] as [number, number]);
-  return { bids: toLevels(e.bids), asks: toLevels(e.asks) };
+  const raw = unwrapWsData(d);
+  // Go 网关 /ws：{bids: [{price,volume}], asks: [{price,volume}]}（level 为对象，含 price/volume 数值字段）
+  const g = raw as { bids?: unknown[]; asks?: unknown[] };
+  if (g && Array.isArray(g.bids) && Array.isArray(g.asks) && g.bids.length > 0 && typeof g.bids[0] === "object" && !Array.isArray(g.bids[0])) {
+    const lvl = g.bids[0] as { price?: number; volume?: number };
+    if ("price" in lvl) {
+      const toLevels = (ls: { price?: number; volume?: number }[]) =>
+        ls.map((l) => [+ (l.price ?? 0), + (l.volume ?? 0)] as [number, number]);
+      return { bids: toLevels(g.bids as { price?: number; volume?: number }[]), asks: toLevels(g.asks as { price?: number; volume?: number }[]) };
+    }
+  }
+  // Binance WS：bids/asks 为 [price, qty] 字符串数组
+  const b = raw as RawDepthEvent;
+  if (b && Array.isArray(b.bids) && Array.isArray(b.asks)) {
+    const toLevels = (ls: [string, string][]) => ls.map(([p, q]) => [+p, +q] as [number, number]);
+    return { bids: toLevels(b.bids), asks: toLevels(b.asks) };
+  }
+  return null;
 }
 
 interface RawTradeEvent {
@@ -299,30 +338,47 @@ interface RawTradeEvent {
   p: string;
   q: string;
   T: number;
-  m: boolean; // true=买方是挂单方（主动卖，红）；false=主动买（绿）
+  m: boolean;
 }
 
 export function parseTradeEvent(d: unknown): PublicTrade | null {
-  const e = d as RawTradeEvent;
-  if (!e || e.e !== "trade") return null;
-  return { id: e.t, price: +e.p, qty: +e.q, time: e.T, isBuyerMaker: e.m };
+  const raw = unwrapWsData(d);
+  // Binance WS
+  const b = raw as RawTradeEvent;
+  if (b && b.e === "trade") {
+    return { id: b.t, price: +b.p, qty: +b.q, time: b.T, isBuyerMaker: b.m };
+  }
+  // Go 网关 /ws：{price, qty, side, ts}（无独立 id，用 ts 充当去重键）
+  const g = raw as { price?: number; qty?: number; side?: string; ts?: number };
+  if (g && typeof g.ts === "number") {
+    return { id: g.ts, price: g.price ?? 0, qty: g.qty ?? 0, time: g.ts, isBuyerMaker: g.side === "sell" };
+  }
+  return null;
 }
 
 export function parseTickerEvent(d: unknown): Ticker | null {
-  const e = d as Record<string, unknown>;
-  if (!e || typeof e !== "object" || e.e !== "24hrTicker") return null;
-  // WS @ticker 推送为短字段名（s/c/o/h/l/v/q/p/P），REST 为长字段名；此处归一化
-  const r: RawTicker = {
-    symbol: String(e.s ?? e.symbol ?? ""),
-    lastPrice: String(e.c ?? e.lastPrice ?? ""),
-    openPrice: String(e.o ?? e.openPrice ?? ""),
-    highPrice: String(e.h ?? e.highPrice ?? ""),
-    lowPrice: String(e.l ?? e.lowPrice ?? ""),
-    volume: String(e.v ?? e.volume ?? ""),
-    quoteVolume: String(e.q ?? e.quoteVolume ?? ""),
-    priceChange: String(e.p ?? e.priceChange ?? ""),
-    priceChangePercent: String(e.P ?? e.priceChangePercent ?? ""),
-  };
-  return mapTicker(r);
+  const raw = unwrapWsData(d);
+  // Binance WS @ticker：{e: "24hrTicker", s, c, o, h, l, v, q, p, P, ...}
+  const b = raw as Record<string, unknown>;
+  if (b && b.e === "24hrTicker") {
+    const r: RawTicker = {
+      symbol: String(b.s ?? b.symbol ?? ""),
+      lastPrice: String(b.c ?? b.lastPrice ?? ""),
+      openPrice: String(b.o ?? b.openPrice ?? ""),
+      highPrice: String(b.h ?? b.highPrice ?? ""),
+      lowPrice: String(b.l ?? b.lowPrice ?? ""),
+      volume: String(b.v ?? b.volume ?? ""),
+      quoteVolume: String(b.q ?? b.quoteVolume ?? ""),
+      priceChange: String(b.p ?? b.priceChange ?? ""),
+      priceChangePercent: String(b.P ?? b.priceChangePercent ?? ""),
+    };
+    return mapTicker(r);
+  }
+  // Go 网关 /ws：Ticker 结构（字段与 REST 一致）
+  const g = raw as GoTicker;
+  if (g && typeof g.last === "number" && typeof g.symbol === "string") {
+    return mapGoTicker(g);
+  }
+  return null;
 }
 

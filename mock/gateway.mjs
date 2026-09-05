@@ -2218,11 +2218,63 @@ marketWss.on("connection", (ws, req) => {
   const s = getMarket(symbol);
   const send = () => {
     if (ws.readyState !== ws.OPEN) return;
-    ws.send(JSON.stringify(makeTicker(symbol, stepPrice(s))));
+    // 兼容双格式：带 {type, symbol} 信封（Go hub）与裸 ticker（旧 spot/ws 消费方）
+    ws.send(JSON.stringify({ type: "ticker", symbol, data: makeTicker(symbol, stepPrice(s)) }));
+    ws.send(JSON.stringify(makeTicker(symbol, s.price)));
   };
   send();
   const timer = setInterval(send, TICK_MS);
   ws.on("close", () => clearInterval(timer));
+});
+
+// 统一行情 Hub（对齐 Go internal/market 的 /ws）：trade / depth / ticker 三合一推送。
+// 消息格式 {type, symbol, data}，客户端按 type 分发到对应解析器。
+const gwHubWss = new WebSocketServer({ noServer: true });
+gwHubWss.on("connection", (ws, req) => {
+  const { symbol } = parseWsUrl(req.url);
+  // 支持逗号分隔的多个 symbol 订阅（匹配 Go hub 的 symbols[] 逻辑）
+  const wanted = symbol.split(",").map((s) => s.trim()).filter(Boolean);
+  const symbols = wanted.length > 0 ? new Set(wanted) : null;
+  const matches = (sym) => symbols === null || symbols.has(sym.toUpperCase());
+  let lastTradeId = 0;
+  const send = () => {
+    if (ws.readyState !== ws.OPEN) return;
+    // ticker
+    for (const sym of ["BTCUSDT", "ETHUSDT"]) {
+      if (!matches(sym)) continue;
+      const s = getMarket(sym);
+      ws.send(JSON.stringify({ type: "ticker", symbol: sym, data: makeTicker(sym, stepPrice(s)) }));
+    }
+    // depth（随机一个活跃 symbol）
+    const depthSym = matches("BTCUSDT") ? "BTCUSDT" : matches("ETHUSDT") ? "ETHUSDT" : "BTCUSDT";
+    const ds = getMarket(depthSym);
+    ws.send(JSON.stringify({ type: "depth", symbol: depthSym, data: makeDepth(depthSym, ds.price) }));
+    // trade（30% 概率推一笔）
+    if (Math.random() < 0.3) {
+      const sym = matches("BTCUSDT") ? "BTCUSDT" : "ETHUSDT";
+      const price = stepPrice(getMarket(sym));
+      const side = Math.random() < 0.5 ? "buy" : "sell";
+      ws.send(JSON.stringify({ type: "trade", symbol: sym, data: { price: r2(price), qty: r4(Math.random() * 2 + 0.01), side, ts: Date.now() } }));
+    }
+  };
+  send();
+  const timer = setInterval(send, TICK_MS);
+  ws.on("close", () => clearInterval(timer));
+});
+
+server.on("upgrade", (req, socket, head) => {
+  const { pathname } = parseWsUrl(req.url);
+  if (pathname === "/api/v1/spot/ws") {
+    spotWss.handleUpgrade(req, socket, head, (ws) => spotWss.emit("connection", ws, req));
+  } else if (pathname === "/api/v1/market/ws") {
+    marketWss.handleUpgrade(req, socket, head, (ws) => marketWss.emit("connection", ws, req));
+  } else if (pathname === "/ws") {
+    gwHubWss.handleUpgrade(req, socket, head, (ws) => gwHubWss.emit("connection", ws, req));
+  } else if (pathname.startsWith("/api/v1/market/kline/ws")) {
+    klineWss.handleUpgrade(req, socket, head, (ws) => klineWss.emit("connection", ws, req));
+  } else {
+    socket.destroy();
+  }
 });
 
 // K 线实时推送（与 REST 共用 kline-server 的内存行情，价格来自单一数据源）
