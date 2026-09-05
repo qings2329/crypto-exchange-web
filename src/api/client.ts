@@ -294,7 +294,11 @@ export const api = {
   },
 
   // ---- 合约 ----
-  futuresWalletBalance: () => request("/api/v1/futures/wallet/balance"),
+  // 本人全资产余额（uid 取 token，F4 安全）：返回 [{asset, available, frozen, withdraw_frozen, exists}]。
+  futuresWalletBalance: async () => {
+    const rows = await request<WalletBalanceRow[]>("/api/v1/futures/wallet/balances");
+    return rows ?? [];
+  },
   // POST /api/v1/futures/wallet/deposit/self 用户侧自助充值（uid 取 token；单笔上限+频控）。
   // 管理端 faucet 为 POST /deposit（AdminGuard），二者并存。
   futuresDeposit: (payload: { asset: string; amount: number; network?: string }) =>
@@ -764,6 +768,15 @@ export const api = {
 };
 
 // ---------- 类型 ----------
+
+// ---- 合约钱包 ----
+export interface WalletBalanceRow {
+  asset: string;
+  available: number;
+  frozen: number;
+  withdraw_frozen?: number;
+  exists?: boolean;
+}
 
 // ---- 理财（Earn）----
 export interface EarnProduct {

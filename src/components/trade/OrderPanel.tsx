@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/utils";
 import { fmtPrice, fmtQty } from "../../lib/format";
-import { useMockBalances, mockBalanceOf } from "../../hooks/use-mock-balances";
+import { useBalances } from "../../hooks/use-balances";
 import { orderCostAsset } from "../../lib/market-utils";
 import { useOrdersStore, type TradeOrder } from "../../store/orders-store";
 import { leverageOf, marginModeOf, useFuturesStore } from "../../store/futures-store";
@@ -43,7 +43,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
   const toast = useToast();
   const { uid } = useAuth();
   const authed = !!uid; // 中心化交易所：以站内登录态为准（Web3/DEX 能力后续版本接入）
-  const balances = useMockBalances();
+  const balances = useBalances();
   const place = useOrdersStore((s) => s.place);
   const openPosition = useFuturesStore((s) => s.open);
   const perp = variant === "perp";
@@ -72,7 +72,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
   const isBuy = side === "buy";
   // 合约保证金与现货买入均用 USDT；现货卖出消耗 base 币种余额（修复 ETHUSDT 等卖单误用 BTC 余额）
   const asset = orderCostAsset(perp, side, symbol);
-  const available = balances ? mockBalanceOf(balances, asset) : 0;
+  const available = authed ? balances.availableOf(asset) : 0;
 
   // 成交参考价：限价=输入价；市价=最新行情价
   const limitPrice = parseFloat(priceStr) || 0;
@@ -101,7 +101,7 @@ export function OrderPanel({ symbol, lastPrice, variant = "spot" }: Props) {
 
   // 百分比 → 数量：买入按可用 USDT 折算，卖出直接按持仓数量
   const applyPct = (p: number) => {    setPct(p);
-    if (!authed || !balances || p <= 0) return;
+    if (!authed || p <= 0) return;
     let q = 0;
     if (isBuy) {
       if (!(effectivePrice > 0)) return;

@@ -2,14 +2,11 @@ import { describe, expect, it } from "vitest";
 import { valueAssets } from "./wallet-utils";
 
 describe("valueAssets", () => {
-  const balances = {
-    usdt: 10_000,
-    btc: 0.5,
-    eth: 4,
-    frozenUsdt: 1_000,
-    frozenBtc: 0.1,
-    frozenEth: 0.5,
-  };
+  const balances = [
+    { asset: "USDT", available: 9_000, frozen: 1_000 },
+    { asset: "BTC", available: 0.4, frozen: 0.1 },
+    { asset: "ETH", available: 3.5, frozen: 0.5 },
+  ];
 
   it("按价格折算 USD 并区分可用/冻结", () => {
     const { rows } = valueAssets(balances, { btcUsdt: 60_000, ethUsdt: 3_000 });
@@ -23,7 +20,6 @@ describe("valueAssets", () => {
 
   it("总资产 = 各行 USD 之和；BTC 计价 = 总额 / BTC 价", () => {
     const { totalUsd, totalBtc } = valueAssets(balances, { btcUsdt: 50_000, ethUsdt: 2_500 });
-    // USDT 10000 + BTC 0.5*50000=25000 + ETH 4*2500=10000
     expect(totalUsd).toBeCloseTo(45_000, 6);
     expect(totalBtc).toBeCloseTo(0.9, 6);
   });
@@ -32,5 +28,13 @@ describe("valueAssets", () => {
     const { totalBtc } = valueAssets(balances, { btcUsdt: 0, ethUsdt: 1 });
     expect(Number.isFinite(totalBtc)).toBe(true);
     expect(totalBtc).toBe(0);
+  });
+
+  it("withdraw_frozen 计入冻结与总额", () => {
+    const { rows } = valueAssets(
+      [{ asset: "USDT", available: 100, frozen: 0, withdraw_frozen: 50 }],
+      { btcUsdt: 1, ethUsdt: 1 },
+    );
+    expect(rows[0]).toMatchObject({ available: 100, frozen: 50, total: 150, usdValue: 150 });
   });
 });

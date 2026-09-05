@@ -3,18 +3,20 @@
 // - 已连接：网络徽标（绿点=正常 / 红=错误网络）+ USDT/BTC 模拟余额 + 地址缩写。
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useMockBalances } from "../../hooks/use-mock-balances";
+import { useBalances } from "../../hooks/use-balances";
 
 function Balances() {
-  const balances = useMockBalances();
-  if (!balances) return null;
+  const balances = useBalances();
+  const usdt = balances.availableOf("USDT");
+  const btc = balances.availableOf("BTC");
+  if (balances.rows.length === 0) return null;
   return (
-    <div className="hidden items-center gap-3 font-mono text-xs tabular-nums lg:flex" title="Demo balances">
+    <div className="hidden items-center gap-3 font-mono text-xs tabular-nums lg:flex">
       <span className="text-muted">
-        <span className="font-semibold text-foreground">{balances.usdt.toLocaleString("en-US")}</span> USDT
+        <span className="font-semibold text-foreground">{usdt.toLocaleString("en-US")}</span> USDT
       </span>
       <span className="text-muted">
-        <span className="font-semibold text-foreground">{balances.btc.toFixed(4)}</span> BTC
+        <span className="font-semibold text-foreground">{btc.toFixed(4)}</span> BTC
       </span>
     </div>
   );
